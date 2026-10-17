@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import {
   VARIANTS,
@@ -13,6 +13,7 @@ import {
 } from '@sq/shared';
 import { Secret } from '@sq/shared/secret';
 import type { PersistedAny, SessionRecord, SessionSecrets } from '../games/session.js';
+import { PuzzleStore } from './puzzles.js';
 
 /**
  * Stockage SQLite des parties (reprise après redémarrage du serveur).
@@ -61,9 +62,15 @@ export interface SavedGame {
 export class GameStore {
   readonly #db: Database.Database;
   readonly #initialRating: number;
+  /** Puzzles : base Lichess attachée et données de l'utilisateur. */
+  readonly puzzles: PuzzleStore;
 
-  /** `initialRating` : Elo d'un joueur qui n'a encore joué aucune partie classée de la variante. */
-  constructor(path: string, options: { initialRating: number }) {
+  /**
+   * `initialRating` : Elo d'un joueur qui n'a encore joué aucune partie classée de la variante.
+   * `puzzlesPath` : base de puzzles (défaut : `puzzles.db` à côté de la base principale, en
+   * mémoire si celle-ci l'est).
+   */
+  constructor(path: string, options: { initialRating: number; puzzlesPath?: string }) {
     this.#initialRating = options.initialRating;
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.#db = new Database(path);
@@ -136,6 +143,10 @@ export class GameStore {
       -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
       INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
         SELECT id, 'secret-queen', rating, games_played FROM users WHERE games_played > 0;`);
+    this.puzzles = new PuzzleStore(
+      this.#db,
+      options.puzzlesPath ?? (path === ':memory:' ? ':memory:' : join(dirname(path), 'puzzles.db')),
+    );
   }
 
   // --- Comptes ---------------------------------------------------------------------------

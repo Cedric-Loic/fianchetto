@@ -878,3 +878,48 @@ a.button.primary {
 .table-scroll {
   overflow-x: auto;
 }
+
+/* --- Puzzles --- */
+.theme-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+}
+.theme-select select {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid #3c3a37;
+  border-radius: 6px;
+  padding: 8px;
+}
+.puzzle-status.solved {
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+.puzzle-status.failed {
+  box-shadow: inset 4px 0 0 var(--danger);
+}
+.puzzle-status code {
+  background: #000;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.theme-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.theme-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.puzzles .tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.puzzles .tabs button {
+  padding: 6px 4px;
+  font-size: 0.85rem;
+}

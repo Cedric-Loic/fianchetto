@@ -92,6 +92,17 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Parties importées privées                                                          | ✅     | `review.test.ts` (autre compte : 404)                                   |
 | Analyse par lot, progression, point de départ                                      | ✅ / 👁 | `review.test.ts`, `coach.spec.ts` ; pertinence des explications à juger |
 
+## Étape 8 : puzzles
+
+| Exigence                                                                           | État   | Preuve                                                                                   |
+| ---------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------- |
+| Import de la base Lichess (filtres, tranches de classement, CSV et zstd)           | ✅ / 👁 | `apps/server/test/puzzles.test.ts` (échantillon) ; vrai téléchargement à lancer chez toi |
+| Validation des coups par le serveur, autre mat accepté, coup illégal sans pénalité | ✅     | `puzzles.test.ts`                                                                        |
+| Classement Glicko-2, indice = réussite non classée                                 | ✅     | `packages/coach/test/puzzles.test.ts`, `puzzles.test.ts`                                 |
+| Révisions espacées (1, 3, 7, 21 jours)                                             | ✅     | `puzzles.test.ts`                                                                        |
+| Mes erreurs : puzzles tirés des revues, autre bon coup accepté (Stockfish)         | ✅     | `puzzles.test.ts`, `packages/coach/test/puzzles.test.ts`                                 |
+| Écran puzzles : coup adverse animé, solution, thème, réglage des coups possibles   | ✅ / 👁 | `tests/e2e/puzzles.spec.ts` (base de démonstration)                                      |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).

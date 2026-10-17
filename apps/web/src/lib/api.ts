@@ -4,6 +4,10 @@ import type {
   ImportResult,
   LeaderboardResponse,
   ProfileResponse,
+  PuzzleMode,
+  PuzzleMoveResponse,
+  PuzzleNextResponse,
+  PuzzleStats,
   ReviewResponse,
   UserPublic,
   Variant,
@@ -60,4 +64,12 @@ export const api = {
     request<ImportResult>('POST', '/api/imports/chesscom', { username, max }),
   deleteImport: (id: string) => call<{ ok: true }>('DELETE', `/api/imports/${id}`),
   reviewAll: () => call<{ queued: number }>('POST', '/api/imports/review-all'),
+  // Puzzles.
+  puzzleStats: () => call<PuzzleStats>('GET', '/api/puzzles/stats'),
+  puzzleNext: (mode: PuzzleMode, theme: string | null) =>
+    request<PuzzleNextResponse>('POST', '/api/puzzles/next', { mode, theme }),
+  puzzleMove: (attemptId: string, uci: string) =>
+    call<PuzzleMoveResponse>('POST', `/api/puzzles/${attemptId}/move`, { uci }),
+  puzzleHint: (attemptId: string) =>
+    call<{ from: string }>('POST', `/api/puzzles/${attemptId}/hint`),
 };

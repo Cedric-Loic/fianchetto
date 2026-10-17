@@ -19,7 +19,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage",
-    "verify": "pnpm check && pnpm test:e2e"
+    "verify": "pnpm check && pnpm test:e2e",
+    "puzzles:import": "pnpm --filter @sq/server puzzles:import"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

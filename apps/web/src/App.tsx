@@ -9,6 +9,7 @@ import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
 import { Login } from './screens/Login';
 import { Profile } from './screens/Profile';
+import { Puzzles } from './screens/Puzzles';
 import { Review } from './screens/Review';
 import { Selection } from './screens/Selection';
 import { SettingsMenu } from './game/SettingsMenu';
@@ -19,6 +20,7 @@ type Route =
   | { page: 'leaderboard' }
   | { page: 'profile'; username: string }
   | { page: 'analyse' }
+  | { page: 'puzzles' }
   | { page: 'review'; id: string }
   | { page: 'game'; gameId: string };
 
@@ -32,6 +34,7 @@ function parseHash(): Route {
   m = /^#\/review\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'review', id: m[1] };
   if (h === '#/analyse') return { page: 'analyse' };
+  if (h === '#/puzzles') return { page: 'puzzles' };
   if (h === '#/login') return { page: 'login' };
   if (h === '#/leaderboard') return { page: 'leaderboard' };
   return { page: 'home' };
@@ -45,6 +48,7 @@ function Nav() {
         ♞ Fianchetto
       </a>
       <a href="#/">Jouer</a>
+      <a href="#/puzzles">Puzzles</a>
       <a href="#/analyse">Analyse</a>
       <a href="#/leaderboard">Classement</a>
       <span className="spacer" />
@@ -102,6 +106,7 @@ export function App() {
   else if (route.page === 'leaderboard') content = <Leaderboard />;
   else if (route.page === 'profile') content = <Profile username={route.username} />;
   else if (route.page === 'analyse') content = <Analyse />;
+  else if (route.page === 'puzzles') content = <Puzzles />;
   else if (route.page === 'review') content = <Review key={route.id} id={route.id} />;
   else if (route.page === 'home') {
     content = <Home onStart={(id) => (location.hash = `#/game/${id}`)} />;

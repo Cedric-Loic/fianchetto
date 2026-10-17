@@ -1,0 +1,9 @@
+PuzzleId,FEN,Moves,Rating,RatingDeviation,Popularity,NbPlays,Themes,GameUrl,OpeningTags
+T0001,6k1/1p3ppp/8/8/8/8/5PPP/R5K1 b - - 0 1,b7b6 a1a8,800,75,95,1200,backRankMate endgame mate mateIn1 oneMove,https://lichess.org/abcdefgh#40,
+T0002,r3k3/7p/8/1N6/8/8/8/4K3 b - - 0 1,h7h6 b5c7 e8d7 c7a8,1000,76,92,900,crushing endgame fork short,https://lichess.org/bcdefghi#51,
+T0003,4k3/8/8/4n3/8/2B5/8/4K3 b - - 0 1,e8d8 c3e5,700,80,90,800,crushing endgame hangingPiece oneMove,,
+T0004,6k1/1p3ppp/8/8/8/8/5PPP/R1R3K1 b - - 0 1,b7b6 a1a8,900,74,96,1500,backRankMate endgame mate mateIn1 oneMove,,
+T0005,6k1/1p3ppp/8/8/8/8/5PPP/R5K1 b - - 0 1,b7b6 a1a8,2600,75,95,1200,mateIn1,,
+T0006,6k1/1p3ppp/8/8/8/8/5PPP/R5K1 b - - 0 1,b7b6 a1a8,1100,75,-20,1200,mateIn1,,
+T0007,6k1/1p3ppp/8/8/8/8/5PPP/R5K1 b - - 0 1,b7b6 a1a8,1100,75,90,20,mateIn1,,
+ligne cassée

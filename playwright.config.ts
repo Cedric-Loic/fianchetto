@@ -1,4 +1,9 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+
+/** Base de puzzles des tests (remplie par global-setup), jamais celle de l'utilisateur. */
+export const E2E_PUZZLES_DB = join(tmpdir(), 'fianchetto-e2e-puzzles.db');
 
 /**
  * Tests de bout en bout. Lance serveur + web (`pnpm dev`) puis pilote Chromium.
@@ -12,6 +17,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
+  globalSetup: './tests/e2e/global-setup.ts',
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'retain-on-failure',
@@ -21,6 +27,7 @@ export default defineConfig({
     command: 'pnpm dev',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: true,
+    env: { FIANCHETTO_PUZZLES_DB: E2E_PUZZLES_DB },
     timeout: 60_000,
   },
 });

@@ -15,3 +15,5 @@ export { explainMove, type EngineEval, type Explanation, type MoveContext } from
 export { parseGame, splitPgn, type ParsedGame } from './pgn.js';
 export { buildReview, type ReviewInput } from './review.js';
 export { classify, formatEval, gameAccuracy, moveAccuracy, winChance } from './win.js';
+export { INITIAL_GLICKO, updateGlicko, type Glicko } from './glicko.js';
+export { puzzlesFromReview, type OwnPuzzleCandidate } from './own-puzzles.js';

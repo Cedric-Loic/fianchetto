@@ -1,5 +1,5 @@
 import { buildReview, type ReviewInput } from '@sq/coach';
-import { evaluatePositions, UciEngine } from '@sq/bot';
+import { evaluatePositions, UciEngine, type PositionAnalysis } from '@sq/bot';
 import type { ReviewStatus } from '@sq/shared';
 import type { GameStore } from '../persistence/db.js';
 
@@ -84,6 +84,17 @@ export class ReviewService {
     } catch {
       this.#state.set(job.id, { status: 'error' });
     }
+  }
+
+  /**
+   * Évalue une seule position avec le même Stockfish (vérification d'un coup de puzzle). Les
+   * demandes passent dans la file du moteur, entre deux positions d'une analyse en cours.
+   */
+  async evaluate(fen: string, movetimeMs = 200): Promise<PositionAnalysis | null> {
+    if (this.#disposed) return null;
+    this.#engine ??= new UciEngine();
+    const [result] = await evaluatePositions(this.#engine, [fen], { movetimeMs });
+    return result ?? null;
   }
 
   dispose(): void {

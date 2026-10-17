@@ -8,18 +8,20 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Variantes : **Classique** (échecs standard, coups possibles affichés en option) et
   **Secret Queen**, chacune avec son propre Elo.
 - Modes : contre un bot (5 niveaux, partie classée Elo) ou à deux sur le même écran (hot-seat).
+- **Puzzles** (coach) : base Lichess au niveau ou par thème, révisions des puzzles ratés,
+  puzzles tirés de tes propres erreurs, classement puzzle (Glicko-2).
 - **Analyse** (coach) : revue de chaque partie (classe de chaque coup, explication des erreurs,
   précision), import de parties PGN ou chess.com, mesure de ton point de départ.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étapes 0 à 7 terminées** (Secret Queen, puis plateforme et variante classique).
+> **État : étapes 0 à 8 terminées** (Secret Queen, puis plateforme et variante classique).
 > Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Suite prévue (coach personnel) :
 > [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md).
 
 ## Prérequis
 
-- **Node.js ≥ 22.12** (`node -v`)
+- **Node.js ≥ 22.12** (`node -v`) ; ≥ 22.15 pour `pnpm puzzles:import` (décompression zstd)
 - **pnpm 10** : `corepack enable` (pnpm est fourni avec Node via corepack)
 
 ## Installation et lancement
@@ -35,15 +37,16 @@ uniquement sur la boucle locale.
 
 ## Commandes
 
-| Commande           | Effet                                                                                           |
-| ------------------ | ----------------------------------------------------------------------------------------------- |
-| `pnpm dev`         | lance le serveur et le web, avec rechargement à chaud                                           |
-| `pnpm check`       | formatage (Prettier), lint (ESLint), types (tsc), tests unitaires (Vitest)                      |
-| `pnpm test`        | tests unitaires seulement                                                                       |
-| `pnpm test:e2e`    | tests de bout en bout (Playwright) ; la première fois : `pnpm exec playwright install chromium` |
-| `pnpm test:stress` | tests longs (10 000 parties aléatoires)                                                         |
-| `pnpm verify`      | `pnpm check` puis `pnpm test:e2e`                                                               |
-| `pnpm format`      | formate tout le code                                                                            |
+| Commande              | Effet                                                                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`            | lance le serveur et le web, avec rechargement à chaud                                                                                                                                            |
+| `pnpm check`          | formatage (Prettier), lint (ESLint), types (tsc), tests unitaires (Vitest)                                                                                                                       |
+| `pnpm test`           | tests unitaires seulement                                                                                                                                                                        |
+| `pnpm test:e2e`       | tests de bout en bout (Playwright) ; la première fois : `pnpm exec playwright install chromium`                                                                                                  |
+| `pnpm test:stress`    | tests longs (10 000 parties aléatoires)                                                                                                                                                          |
+| `pnpm verify`         | `pnpm check` puis `pnpm test:e2e`                                                                                                                                                                |
+| `pnpm format`         | formate tout le code                                                                                                                                                                             |
+| `pnpm puzzles:import` | une seule fois : télécharge la base de puzzles Lichess (≈ 250 Mo, lus en flux) et en garde 150 000 (600 à 2000) dans `data/puzzles.db` ; `--file chemin.csv.zst` pour un fichier déjà téléchargé |
 
 ## Structure
 
@@ -88,7 +91,13 @@ docs/
 7. **Revue de la partie** (bouton de fin de partie, ou 📊 dans le profil) : Stockfish analyse
    chaque coup ; meilleur coup en flèche, explication des imprécisions (?!), erreurs (?) et
    gaffes (??), précision des deux camps, ◀ !? ▶ pour sauter d'erreur en erreur.
-8. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
+8. **Puzzles** (menu ; lance d'abord `pnpm puzzles:import` une fois) :
+   - **Au niveau** : légèrement au-dessus de ton classement puzzle ;
+   - **Thème** : fourchette, clouage, mat en 2… (le thème du jour suit le plan de progression) ;
+   - **Révisions** : les puzzles ratés reviennent après 1, 3, 7 puis 21 jours ;
+   - **Mes erreurs** : les positions où tu t'es trompé dans tes parties analysées.
+     💡 Indice : montre la pièce à jouer (une réussite avec indice ne compte pas au classement).
+9. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
    fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
    est le seul accès à Internet de l'application, uniquement quand tu cliques.
 
@@ -111,7 +120,8 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 5     | Audit de sécurité du secret, recette                           | ✅   |
 | 6     | Plateforme : variante classique, Elo par variante              | ✅   |
 | 7     | Coach : revue de partie, import PGN et chess.com               | ✅   |
-| 8–11  | Coach : puzzles, bot coach, leçons, tableau de bord            | ⏳   |
+| 8     | Coach : puzzles (Lichess, thèmes, révisions, mes erreurs)      | ✅   |
+| 9–11  | Coach : bot coach, leçons, tableau de bord                     | ⏳   |
 
 ## Licences et crédits
 

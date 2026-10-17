@@ -19,6 +19,8 @@ import { GameManager } from './games/manager.js';
 import type { GameSession, Participant } from './games/session.js';
 import { GameStore } from './persistence/db.js';
 import type { JsonFetcher } from './review/chesscom.js';
+import { registerPuzzleRoutes } from './puzzles/routes.js';
+import { PuzzleService } from './puzzles/service.js';
 import { registerReviewRoutes } from './review/routes.js';
 import { ReviewService } from './review/service.js';
 import { serializeOutgoing } from './send.js';
@@ -30,6 +32,8 @@ export interface ServerOptions {
   logLevel?: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'silent';
   /** Fichier SQLite ; `:memory:` pour les tests. Défaut : <racine du dépôt>/data/secret-queen.db. */
   dbPath?: string;
+  /** Base de puzzles Lichess. Défaut : `puzzles.db` à côté de la base principale. */
+  puzzlesPath?: string;
   /** Destination des logs (tests : capture pour vérifier qu'aucun secret n'y apparaît). */
   logStream?: { write: (line: string) => void };
   config?: GameConfig;
@@ -57,9 +61,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const config = options.config ?? loadConfig();
   const store = new GameStore(options.dbPath ?? DEFAULT_DB, {
     initialRating: config.elo.initial,
+    ...(options.puzzlesPath ? { puzzlesPath: options.puzzlesPath } : {}),
   });
   const games = new GameManager({ store, config, createBot: options.createBot });
   const reviews = new ReviewService(store, { movetimeMs: options.reviewMovetimeMs });
+  const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen));
   app.addHook('onClose', () => {
     reviews.dispose();
     games.disposeAll();
@@ -118,6 +124,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     return { session, viewer: session.botColor === 'w' ? ('b' as const) : ('w' as const) };
   };
 
+  registerPuzzleRoutes(app, store, puzzles);
   registerReviewRoutes(app, {
     store,
     reviews,

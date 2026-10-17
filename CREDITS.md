@@ -5,6 +5,10 @@
 - **Pièces « merida »** : Armando Hernandez Marroquin, via Lichess. Licence GPLv2+.
 - **Pièces « alpha »** : Eric Bentzen, via Lichess. « Libre pour usage personnel non commercial ».
 - **Sons** : synthétisés dans le navigateur (Web Audio), originaux.
+- **Puzzles** : base de puzzles Lichess (https://database.lichess.org/#puzzles), licence CC0
+  (domaine public). Téléchargée par `pnpm puzzles:import` sur ta machine, jamais versionnée.
+- **Formules** de probabilité de gain, de précision et de classement des puzzles (Glicko-2) :
+  publiées par Lichess et Mark Glickman ; réimplémentées ici.
 - Aucun asset, logo, police ni son de chess.com n'est utilisé.
 - **Stockfish 19** (paquet npm `stockfish`, version WASM par Nathan Rugg) : moteur du bot et de
   l'analyse. Licence GPLv3. Installé comme dépendance, non redistribué.

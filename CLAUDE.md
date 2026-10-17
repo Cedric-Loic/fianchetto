@@ -22,7 +22,7 @@ Plateforme d'échecs web personnelle, servie en local (127.0.0.1), au look chess
 4. Secret Queen : pas de surbrillance des coups légaux (`legalMoves` toujours `null`). Refus de
    coup sans motif. La variante classique peut, elle, marquer les coups possibles.
 5. Aucune dépendance réseau au runtime, sauf l'import chess.com (API publique, côté serveur, sur
-   clic explicite). Aucun asset, logo, police ou son de chess.com.
+   clic explicite). La base de puzzles est téléchargée à l'installation (`pnpm puzzles:import`). Aucun asset, logo, police ou son de chess.com.
 
 ## Organisation (orchestrateur + sous-agents)
 
@@ -42,14 +42,15 @@ Plateforme d'échecs web personnelle, servie en local (127.0.0.1), au look chess
 
 ## Commandes
 
-| Commande           | Effet                                                  |
-| ------------------ | ------------------------------------------------------ |
-| `pnpm dev`         | serveur (127.0.0.1:3001) + web (http://127.0.0.1:5173) |
-| `pnpm check`       | Prettier, ESLint, types, tests unitaires               |
-| `pnpm test`        | tests unitaires (Vitest)                               |
-| `pnpm test:e2e`    | tests Playwright (lance `pnpm dev`)                    |
-| `pnpm test:stress` | tests longs (10 000 parties aléatoires)                |
-| `pnpm format`      | formate le code                                        |
+| Commande              | Effet                                                  |
+| --------------------- | ------------------------------------------------------ |
+| `pnpm dev`            | serveur (127.0.0.1:3001) + web (http://127.0.0.1:5173) |
+| `pnpm check`          | Prettier, ESLint, types, tests unitaires               |
+| `pnpm test`           | tests unitaires (Vitest)                               |
+| `pnpm test:e2e`       | tests Playwright (lance `pnpm dev`)                    |
+| `pnpm test:stress`    | tests longs (10 000 parties aléatoires)                |
+| `pnpm format`         | formate le code                                        |
+| `pnpm puzzles:import` | une fois : base de puzzles Lichess → `data/puzzles.db` |
 
 Tests d'un seul paquet : `pnpm vitest run --project engine` (noms : shared, engine, bot, coach,
 server, web, security, lint-rules).
