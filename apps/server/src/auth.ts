@@ -1,18 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { hash, verify } from '@node-rs/argon2';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { CredentialsSchema, type GameConfig, type UserPublic } from '@sq/shared';
+import { CredentialsSchema } from '@sq/shared';
 import type { GameStore, UserRow } from './persistence/db.js';
 
 export const SESSION_COOKIE = 'sq_session';
 const SESSION_DAYS = 30;
-
-export const toPublicUser = (u: UserRow): UserPublic => ({
-  id: u.id,
-  username: u.username,
-  rating: u.rating,
-  gamesPlayed: u.gamesPlayed,
-});
 
 /** Utilisateur de la session (cookie httpOnly), ou `undefined`. */
 export function currentUser(store: GameStore, request: FastifyRequest): UserRow | undefined {
@@ -33,7 +26,7 @@ function openSession(store: GameStore, reply: FastifyReply, userId: string): voi
 }
 
 /** Routes de comptes locaux : inscription, connexion, déconnexion, utilisateur courant. */
-export function registerAuthRoutes(app: FastifyInstance, store: GameStore, config: GameConfig) {
+export function registerAuthRoutes(app: FastifyInstance, store: GameStore) {
   app.post('/api/auth/register', async (request, reply) => {
     const parsed = CredentialsSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'BAD_REQUEST' });
@@ -42,12 +35,11 @@ export function registerAuthRoutes(app: FastifyInstance, store: GameStore, confi
       id,
       username: parsed.data.username,
       passwordHash: await hash(parsed.data.password),
-      rating: config.elo.initial,
     });
     if (!created) return reply.code(409).send({ error: 'USERNAME_TAKEN' });
     openSession(store, reply, id);
     const user = store.findUser(id);
-    return user ? toPublicUser(user) : reply.code(500).send({ error: 'ERROR' });
+    return user ? store.publicUser(user) : reply.code(500).send({ error: 'ERROR' });
   });
 
   app.post('/api/auth/login', async (request, reply) => {
@@ -59,7 +51,7 @@ export function registerAuthRoutes(app: FastifyInstance, store: GameStore, confi
       return reply.code(401).send({ error: 'INVALID_CREDENTIALS' });
     }
     openSession(store, reply, user.id);
-    return toPublicUser(user);
+    return store.publicUser(user);
   });
 
   app.post('/api/auth/logout', (request, reply) => {
@@ -71,6 +63,6 @@ export function registerAuthRoutes(app: FastifyInstance, store: GameStore, confi
 
   app.get('/api/auth/me', (request, reply) => {
     const user = currentUser(store, request);
-    return user ? toPublicUser(user) : reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+    return user ? store.publicUser(user) : reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
   });
 }

@@ -83,7 +83,13 @@ async function playWorld(botSecret: Square, illegalFirst: boolean): Promise<Worl
   const created = await fetch(`http://${base}/api/games`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie },
-    body: JSON.stringify({ mode: 'bot', level: 3, timeControl: 'untimed', color: 'w' }),
+    body: JSON.stringify({
+      mode: 'bot',
+      variant: 'secret-queen',
+      level: 3,
+      timeControl: 'untimed',
+      color: 'w',
+    }),
   });
   const { gameId } = (await created.json()) as { gameId: string };
 
@@ -187,7 +193,9 @@ describe('serveur : indistinguabilité et canari', () => {
     const w = await playWorld('b7', false);
     // La colonne publique `record` ne contient aucun choix de pion ; le choix (« b7 » du bot) est
     // dans `secret_state`. On vérifie la forme JSON : "selection" n'apparaît que dans le secret.
-    const records = [...w.dbBytes.matchAll(/\{"id":"[^"]+","mode"[^\n]*?"startedAt":"[^"]+"\}/g)];
+    const records = [
+      ...w.dbBytes.matchAll(/\{"id":"[^"]+","variant":"[^"]+","mode"[^\n]*?"startedAt":"[^"]+"\}/g),
+    ];
     expect(records.length).toBeGreaterThan(0);
     for (const r of records) {
       expect(r[0]).not.toContain('selection');

@@ -19,7 +19,8 @@ Plateforme d'échecs web personnelle, servie en local (127.0.0.1), au look chess
    renvoient « [REDACTED] ». `expose()` n'est autorisé que dans la liste blanche d'`eslint.config.js`.
 3. Les contrats (`packages/shared`) ne changent que par décision de l'orchestrateur, tracée dans
    `docs/DECISIONS.md`.
-4. Pas de surbrillance des coups légaux. Refus de coup sans motif.
+4. Secret Queen : pas de surbrillance des coups légaux (`legalMoves` toujours `null`). Refus de
+   coup sans motif. La variante classique peut, elle, marquer les coups possibles.
 5. Aucune dépendance réseau au runtime. Aucun asset, logo, police ou son de chess.com.
 
 ## Organisation (orchestrateur + sous-agents)

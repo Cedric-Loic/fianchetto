@@ -12,7 +12,7 @@ import { send } from '../lib/net';
 import { publicPositionAt } from '../lib/position';
 import { useGame } from '../lib/store';
 import { useSession } from '../lib/session';
-import { REASONS, SIDE } from './labels';
+import { REASONS, SIDE, VARIANT_LABEL } from './labels';
 import { useSettings } from '../lib/settings';
 
 function resultText(result: GameResult, state: ViewerGameState): string {
@@ -20,13 +20,17 @@ function resultText(result: GameResult, state: ViewerGameState): string {
   return `${state.players[result.winner].name} (${SIDE[result.winner]}) gagne ${REASONS[result.reason]}`;
 }
 
-/** Écran de partie hot-seat : plateau, barres joueur, coups, actions, révélation de fin. */
+/**
+ * Écran de partie (classique ou Secret Queen, à deux ou contre le bot) : plateau, barres joueur,
+ * coups, actions, révélation de fin (Secret Queen).
+ */
 export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave: () => void }) {
   const board = state.board;
   const { receivedAt, toast, peek, clearToast, setPeekHeld, rejections, focus, setFocus } =
     useGame();
   const me = state.viewer === 'public' ? null : state.viewer;
   const isBot = state.mode === 'bot';
+  const classic = state.variant === 'classic';
   const user = useSession((s) => s.user);
   const [orientation, setOrientation] = useState<Color>(me ?? 'w');
   // Position consultée dans l'historique ; oubliée dès qu'un nouveau coup arrive.
@@ -44,6 +48,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     rej: number;
   } | null>(null);
   const autoFlip = useSettings((s) => s.autoFlip);
+  const showLegalMoves = useSettings((s) => s.showLegalMoves);
   // Analyse après la fin : positions réelles, évaluation, meilleur coup.
   const [analysis, setAnalysis] = useState<AnalysisResponse | 'loading' | 'error' | null>(null);
   const analysing = analysis !== null && analysis !== 'loading' && analysis !== 'error';
@@ -197,6 +202,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
       onPremove={(m) => setQueue({ list: [...premoves, m], rej: rejections })}
       onCancelPremove={() => setQueue({ list: [], rej: rejections })}
       movable={movable}
+      legalMoves={classic && showLegalMoves && live ? board.legalMoves : null}
       ownSecretSquare={isBot ? ownSecretSquare : null}
       lastMove={lastMove ? { from: lastMove.from, to: lastMove.to } : null}
       checkSquare={checkSquare}
@@ -252,6 +258,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           {ended
             ? 'Partie terminée'
             : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`}
+          <span className="variant-badge">{VARIANT_LABEL[state.variant]}</span>
           {state.rated && <span className="rated-badge">Classée</span>}
         </div>
         {analysing && (
@@ -297,7 +304,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
 
         {!ended && (
           <>
-            {!isBot && (
+            {!isBot && !classic && (
               <button
                 className="peek"
                 data-testid="peek"
@@ -363,16 +370,17 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         {analysis === 'error' && <p className="error">Analyse impossible.</p>}
       </aside>
 
-      {ended && board.result && board.reveal && showEnd && (
+      {ended && board.result && (classic || board.reveal) && showEnd && (
         <div className="modal-backdrop" onClick={() => setShowEnd(false)}>
           <div className="modal" data-testid="end-modal" onClick={(e) => e.stopPropagation()}>
             <h2>{resultText(board.result, state)}</h2>
             {state.rated && me && user && state.players[me].rating !== null && (
               <p className="elo-change" data-testid="elo-change">
-                Elo : {state.players[me].rating} → <strong>{user.rating}</strong>
+                Elo {VARIANT_LABEL[state.variant]} : {state.players[me].rating} →{' '}
+                <strong>{user.ratings[state.variant].rating}</strong>
               </p>
             )}
-            <h3>Les dames secrètes</h3>
+            {board.reveal && <h3>Les dames secrètes</h3>}
             {(['w', 'b'] as const).map((c) => {
               const s = board.reveal?.secrets[c];
               if (!s) return null;

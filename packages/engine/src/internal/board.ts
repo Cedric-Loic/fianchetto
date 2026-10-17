@@ -41,10 +41,13 @@ export function squareAt(file: number, rank: number): Square | null {
 const BACK_RANK: readonly PieceType[] = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
 
 /**
- * Position de départ réelle : position standard où le pion de chaque case secrète est une dame.
+ * Position de départ réelle : position standard où le pion de chaque case secrète est une dame
+ * (aucune en classique : `secrets` vide).
  * Identifiant = couleur + type affiché initial + case initiale (la dame secrète garde « p »).
  */
-export function initialPieces(secrets: Readonly<Record<Color, Square>>): Map<Square, TrackedPiece> {
+export function initialPieces(
+  secrets: Readonly<Partial<Record<Color, Square>>>,
+): Map<Square, TrackedPiece> {
   const pieces = new Map<Square, TrackedPiece>();
   const place = (color: Color, type: PieceType, square: Square) => {
     const real = type === 'p' && secrets[color] === square ? 'q' : type;

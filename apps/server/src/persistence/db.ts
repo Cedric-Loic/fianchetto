@@ -1,10 +1,18 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
-import type { AnalysisResponse, Color, GameSummary, Square } from '@sq/shared';
+import {
+  VARIANTS,
+  type AnalysisResponse,
+  type Color,
+  type GameSummary,
+  type Rating,
+  type Square,
+  type UserPublic,
+  type Variant,
+} from '@sq/shared';
 import { Secret } from '@sq/shared/secret';
-import type { PersistedGame } from '@sq/engine';
-import type { SessionRecord, SessionSecrets } from '../games/session.js';
+import type { PersistedAny, SessionRecord, SessionSecrets } from '../games/session.js';
 
 /**
  * Stockage SQLite des parties (reprise après redémarrage du serveur).
@@ -17,22 +25,22 @@ export interface UserRow {
   id: string;
   username: string;
   passwordHash: string;
-  rating: number;
-  gamesPlayed: number;
 }
 
-const USER_SELECT = `SELECT id, username, password_hash AS passwordHash, rating,
-  games_played AS gamesPlayed FROM users`;
+const USER_SELECT = `SELECT id, username, password_hash AS passwordHash FROM users`;
 
 export interface SavedGame {
   record: SessionRecord;
-  secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedGame> | null };
+  secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedAny> | null };
 }
 
 export class GameStore {
   readonly #db: Database.Database;
+  readonly #initialRating: number;
 
-  constructor(path: string) {
+  /** `initialRating` : Elo d'un joueur qui n'a encore joué aucune partie classée de la variante. */
+  constructor(path: string, options: { initialRating: number }) {
+    this.#initialRating = options.initialRating;
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.#db = new Database(path);
     this.#db.pragma('journal_mode = WAL');
@@ -44,6 +52,8 @@ export class GameStore {
         phase        TEXT NOT NULL,
         updated_at   INTEGER NOT NULL
       );
+      -- users.rating et users.games_played : Elo unique d'avant la variante classique, lu
+      -- seulement par la migration vers la table ratings ci-dessous.
       CREATE TABLE IF NOT EXISTS users (
         id            TEXT PRIMARY KEY,
         username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -66,24 +76,29 @@ export class GameStore {
         user_id       TEXT NOT NULL REFERENCES users(id),
         summary       TEXT NOT NULL,
         ended_at      INTEGER NOT NULL
-      );`);
+      );
+      CREATE TABLE IF NOT EXISTS ratings (
+        user_id      TEXT NOT NULL REFERENCES users(id),
+        variant      TEXT NOT NULL,
+        rating       INTEGER NOT NULL,
+        games_played INTEGER NOT NULL,
+        PRIMARY KEY (user_id, variant)
+      );
+      -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
+      INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
+        SELECT id, 'secret-queen', rating, games_played FROM users WHERE games_played > 0;`);
   }
 
   // --- Comptes ---------------------------------------------------------------------------
 
-  createUser(user: {
-    id: string;
-    username: string;
-    passwordHash: string;
-    rating: number;
-  }): boolean {
+  createUser(user: { id: string; username: string; passwordHash: string }): boolean {
     try {
       this.#db
         .prepare(
           `INSERT INTO users (id, username, password_hash, rating, created_at)
            VALUES (@id, @username, @passwordHash, @rating, @now)`,
         )
-        .run({ ...user, now: Date.now() });
+        .run({ ...user, rating: this.#initialRating, now: Date.now() });
       return true;
     } catch {
       return false; // pseudo déjà pris
@@ -99,16 +114,44 @@ export class GameStore {
     return this.#db.prepare(`${USER_SELECT} WHERE id = ?`).get(id) as UserRow | undefined;
   }
 
-  setRating(userId: string, rating: number): void {
-    this.#db
-      .prepare(`UPDATE users SET rating = ?, games_played = games_played + 1 WHERE id = ?`)
-      .run(rating, userId);
+  /** Elo d'un joueur dans une variante (Elo initial s'il n'y a encore joué aucune partie). */
+  ratingOf(userId: string, variant: Variant): Rating {
+    const row = this.#db
+      .prepare(
+        `SELECT rating, games_played AS gamesPlayed FROM ratings WHERE user_id = ? AND variant = ?`,
+      )
+      .get(userId, variant) as Rating | undefined;
+    return row ?? { rating: this.#initialRating, gamesPlayed: 0 };
   }
 
-  leaderboard(): UserRow[] {
+  /** Enregistre le nouvel Elo après une partie classée de la variante. */
+  setRating(userId: string, variant: Variant, rating: number): void {
+    this.#db
+      .prepare(
+        `INSERT INTO ratings (user_id, variant, rating, games_played) VALUES (?, ?, ?, 1)
+         ON CONFLICT(user_id, variant) DO UPDATE SET rating = excluded.rating,
+           games_played = games_played + 1`,
+      )
+      .run(userId, variant, rating);
+  }
+
+  publicUser(user: UserRow): UserPublic {
+    const ratings = Object.fromEntries(
+      VARIANTS.map((variant) => [variant, this.ratingOf(user.id, variant)]),
+    ) as UserPublic['ratings'];
+    return { id: user.id, username: user.username, ratings };
+  }
+
+  /** Classement d'une variante : tous les comptes, Elo initial pour ceux qui n'y ont pas joué. */
+  leaderboard(variant: Variant): (Rating & { username: string })[] {
     return this.#db
-      .prepare(`${USER_SELECT} ORDER BY rating DESC, username LIMIT 100`)
-      .all() as UserRow[];
+      .prepare(
+        `SELECT u.username, COALESCE(r.rating, @initial) AS rating,
+           COALESCE(r.games_played, 0) AS gamesPlayed
+         FROM users u LEFT JOIN ratings r ON r.user_id = u.id AND r.variant = @variant
+         ORDER BY rating DESC, u.username LIMIT 100`,
+      )
+      .all({ variant, initial: this.#initialRating }) as (Rating & { username: string })[];
   }
 
   createSession(token: string, userId: string, expiresAt: number): void {
@@ -120,7 +163,7 @@ export class GameStore {
   sessionUser(token: string): UserRow | undefined {
     return this.#db
       .prepare(
-        `SELECT u.id, u.username, u.password_hash AS passwordHash, u.rating, u.games_played AS gamesPlayed
+        `SELECT u.id, u.username, u.password_hash AS passwordHash
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.token = ? AND s.expires_at > ?`,
       )
@@ -145,7 +188,10 @@ export class GameStore {
     const rows = this.#db
       .prepare(`SELECT summary FROM results WHERE user_id = ? ORDER BY ended_at DESC LIMIT 100`)
       .all(userId) as { summary: string }[];
-    return rows.map((r) => JSON.parse(r.summary) as GameSummary);
+    // Résumés antérieurs à la variante classique : Secret Queen.
+    return rows.map(
+      (r) => ({ variant: 'secret-queen', ...(JSON.parse(r.summary) as object) }) as GameSummary,
+    );
   }
 
   /** Partie non terminée la plus récente d'un utilisateur (reprise après rafraîchissement). */
@@ -209,7 +255,7 @@ export class GameStore {
   #parse(row: { record: string; secret_state: string }): SavedGame {
     const secret = JSON.parse(row.secret_state) as {
       selection: Partial<Record<Color, Square>>;
-      game: PersistedGame | null;
+      game: PersistedAny | null;
     };
     return {
       record: JSON.parse(row.record) as SessionRecord,

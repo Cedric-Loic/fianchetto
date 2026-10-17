@@ -37,12 +37,13 @@ describe('parties classées contre le bot (Stockfish dans un worker)', () => {
       password: 'motdepasse',
     });
     expect(reg.status).toBe(200);
-    let rating = (reg.json as UserPublic).rating;
+    let rating = (reg.json as UserPublic).ratings['secret-queen'].rating;
     expect(rating).toBe(1200);
 
     for (const level of [1, 2, 3, 4, 5]) {
       const created = await http('POST', '/api/games', {
         mode: 'bot',
+        variant: 'secret-queen',
         level,
         timeControl: 'untimed',
         color: 'w',
@@ -70,9 +71,11 @@ describe('parties classées contre le bot (Stockfish dans un worker)', () => {
       client.socket.close();
 
       const me = (await http('GET', '/api/auth/me')).json as UserPublic;
-      expect(me.rating).not.toBe(rating);
-      expect(me.gamesPlayed).toBe(level);
-      rating = me.rating;
+      expect(me.ratings['secret-queen'].rating).not.toBe(rating);
+      expect(me.ratings['secret-queen'].gamesPlayed).toBe(level);
+      // Elo séparé : le classique n'a pas bougé.
+      expect(me.ratings.classic).toEqual({ rating: 1200, gamesPlayed: 0 });
+      rating = me.ratings['secret-queen'].rating;
     }
     const profile = (await http('GET', '/api/profile/cedric')).json as {
       history: { rated: boolean; ratingAfter: number }[];
@@ -114,6 +117,7 @@ describe('isolation du bot', () => {
     const { gameId } = (
       await http('POST', '/api/games', {
         mode: 'bot',
+        variant: 'secret-queen',
         level: 3,
         timeControl: 'untimed',
         color: 'w',

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
+import { ClassicGame } from '@sq/engine';
 import type { BotRejection } from '@sq/shared';
 import { SecretQueenBot } from '../src/player.js';
 import { UciEngine } from '../src/uci.js';
@@ -31,6 +32,17 @@ describe('bot (Stockfish)', () => {
       }
     }, 120_000);
   }
+
+  it('partie classique : 10 coups légaux du premier coup, sans refus (niveaux 1 et 5)', async () => {
+    for (const level of [1, 5] as const) {
+      const bot = new SecretQueenBot(engine, level, { humanPace: false });
+      const game = ClassicGame.create();
+      for (let i = 0; i < 10 && !game.isOver; i++) {
+        const move = await bot.chooseMove(observe(game, game.turn));
+        expect(game.play(game.turn, move).ok).toBe(true);
+      }
+    }
+  }, 120_000);
 
   it('joue un coup légal dès l’ouverture (niveau 5)', async () => {
     const bot = new SecretQueenBot(engine, 5, { humanPace: false });

@@ -43,9 +43,12 @@ function isExternalResult(result: GameResult): boolean {
   }
 }
 
-function parsePersisted(data: unknown): PersistedGame {
-  if (typeof data !== 'object' || data === null) throw new Error(INVALID_PERSISTED);
-  const { version, secrets, moves, externalResult } = data as Record<string, unknown>;
+/** Coups et fin externe d'une partie persistée (communs aux deux variantes). */
+export function parseHistory(data: Record<string, unknown>): {
+  moves: MoveIntent[];
+  externalResult: GameResult | null;
+} {
+  const { version, moves, externalResult } = data;
   if (version !== 1 || !Array.isArray(moves)) throw new Error(INVALID_PERSISTED);
   const intents = moves.map((move): MoveIntent => {
     const parsed = MoveIntentSchema.safeParse(move);
@@ -58,8 +61,26 @@ function parsePersisted(data: unknown): PersistedGame {
     if (!parsed.success || !isExternalResult(parsed.data)) throw new Error(INVALID_PERSISTED);
     result = parsed.data;
   }
+  return { moves: intents, externalResult: result };
+}
+
+/** Rejoue un historique persisté sur un GameCore neuf (erreur sans détail si incohérent). */
+export function replayHistory(core: GameCore, history: ReturnType<typeof parseHistory>): void {
+  for (const intent of history.moves) {
+    if (!core.play(core.turn, intent).ok) throw new Error(INVALID_PERSISTED);
+  }
+  if (history.externalResult !== null) {
+    if (core.result !== null) throw new Error(INVALID_PERSISTED);
+    core.endExternally(history.externalResult);
+  }
+}
+
+function parsePersisted(data: unknown): PersistedGame {
+  if (typeof data !== 'object' || data === null) throw new Error(INVALID_PERSISTED);
+  const history = parseHistory(data as Record<string, unknown>);
   // Les secrets sont validés par GameCore.
-  return { version: 1, secrets: secrets as SecretChoice, moves: intents, externalResult: result };
+  const { secrets } = data as Record<string, unknown>;
+  return { version: 1, secrets: secrets as SecretChoice, ...history };
 }
 
 export class SecretQueenGame {
@@ -87,13 +108,7 @@ export class SecretQueenGame {
     if (!Secret.isSecret(persisted)) throw new Error(INVALID_PERSISTED);
     const data = parsePersisted(persisted.expose());
     const core = new GameCore(data.secrets);
-    for (const intent of data.moves) {
-      if (!core.play(core.turn, intent).ok) throw new Error(INVALID_PERSISTED);
-    }
-    if (data.externalResult !== null) {
-      if (core.result !== null) throw new Error(INVALID_PERSISTED);
-      core.endExternally(data.externalResult);
-    }
+    replayHistory(core, data);
     return new SecretQueenGame(core);
   }
 

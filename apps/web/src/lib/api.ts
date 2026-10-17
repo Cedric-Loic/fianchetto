@@ -4,6 +4,7 @@ import type {
   LeaderboardResponse,
   ProfileResponse,
   UserPublic,
+  Variant,
 } from '@sq/shared';
 
 /** Appel REST ; `null` en cas d'erreur HTTP ou réseau (serveur arrêté…). */
@@ -30,7 +31,8 @@ export const api = {
     call<UserPublic>('POST', '/api/auth/register', { username, password }),
   logout: () => call<{ ok: true }>('POST', '/api/auth/logout'),
   botLevels: () => call<BotLevelInfo[]>('GET', '/api/bot-levels'),
-  leaderboard: () => call<LeaderboardResponse>('GET', '/api/leaderboard'),
+  leaderboard: (variant: Variant) =>
+    call<LeaderboardResponse>('GET', `/api/leaderboard?variant=${variant}`),
   profile: (username: string) =>
     call<ProfileResponse>('GET', `/api/profile/${encodeURIComponent(username)}`),
   activeGame: () => call<{ gameId: string | null }>('GET', '/api/games/active'),

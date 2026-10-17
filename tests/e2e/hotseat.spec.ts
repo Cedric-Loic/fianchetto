@@ -16,6 +16,7 @@ test('partie hot-seat complète : choix secrets, passage, mat par la dame secrè
   page,
 }) => {
   await page.goto('/');
+  await page.getByTestId('variant-secret-queen').click();
   const seat = page.locator('.home-panel', { hasText: 'À deux sur cet écran' });
   await seat.getByLabel('Blancs').fill('Alice');
   await seat.getByLabel('Noirs').fill('Bob');

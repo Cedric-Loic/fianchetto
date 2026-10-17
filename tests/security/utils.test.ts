@@ -52,6 +52,7 @@ function initialState(viewer: Viewer, ownSecret: Square | null = null): ViewerBo
         : { pieceId: `${viewer}p${ownSecret}`, square: ownSecret },
     result: null,
     reveal: null,
+    legalMoves: null,
   };
 }
 
@@ -108,6 +109,8 @@ describe('scan des champs interdits', () => {
     ['droits-de-roque', { castlingRights: 'KQkq' }],
     ['repetition', { repetitionCount: 1 }],
     ['coups-legaux', { legalMoves: [] }],
+    ['coups-legaux', { legalMoves: [{ from: 'e2', to: 'e4' }] }],
+    ['coups-legaux', { board: { legalMoves: false } }],
     ['notation-ou-type-reel', { realSan: 'Qe4' }],
     ['notation-ou-type-reel', { pieces: [{ trueType: 'q' }] }],
     ['secret', { opponentSecret: 'e7' }],
@@ -120,11 +123,12 @@ describe('scan des champs interdits', () => {
     expect(findForbidden(value).map((f) => f.rule)).toContain(rule);
   });
 
-  it('autorise ownSecret, result.reason, castle ; reveal seulement après la fin', () => {
+  it('autorise ownSecret, result.reason, castle, legalMoves nul ; reveal seulement après la fin', () => {
     const allowed = {
       ownSecret: { pieceId: 'wpe2', square: 'e2' },
       result: { winner: null, reason: 'agreement' },
       castle: null,
+      board: { legalMoves: null },
     };
     expect(findForbidden(allowed)).toEqual([]);
     const ended = { reveal: { realInitialFen: realInitialFen({ w: 'e2', b: 'e7' }) } };

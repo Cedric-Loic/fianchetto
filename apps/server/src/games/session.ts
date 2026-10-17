@@ -16,16 +16,27 @@ import {
   type ServerMessage,
   type Square,
   type TimeControlId,
+  type Variant,
   type Viewer,
+  type ViewerBoardState,
   type ViewerGameState,
 } from '@sq/shared';
-import { SecretQueenGame, projectForViewer, type PersistedGame } from '@sq/engine';
+import {
+  ClassicGame,
+  SecretQueenGame,
+  projectClassic,
+  projectForViewer,
+  type PersistedClassicGame,
+  type PersistedGame,
+} from '@sq/engine';
 import { Secret } from '@sq/shared/secret';
 import type { BotDriver } from '../bot/driver.js';
 
 /** Partie publique d'un enregistrement de partie (aucun secret) : colonnes ordinaires. */
 export interface SessionRecord {
   id: string;
+  /** Absent des enregistrements antérieurs à la variante classique : Secret Queen. */
+  variant?: Variant;
   mode: GameMode;
   timeControl: TimeControlId;
   players: Record<Color, PlayerInfo>;
@@ -41,14 +52,18 @@ export interface SessionRecord {
   startedAt: string;
 }
 
+/** Partie persistée, selon la variante. */
+export type PersistedAny = PersistedGame | PersistedClassicGame;
+
 /** Partie secrète : choix déjà verrouillés et partie persistée. Colonne dédiée, jamais loggée. */
 export interface SessionSecrets {
   selection: Partial<Record<Color, Square>>;
-  game: Secret<PersistedGame> | null;
+  game: Secret<PersistedAny> | null;
 }
 
 export interface SessionOptions {
   id: string;
+  variant: Variant;
   mode: GameMode;
   timeControl: TimeControlId;
   players: Record<Color, PlayerInfo>;
@@ -84,9 +99,12 @@ interface ClockData {
 const MAX_BOT_ATTEMPTS = 80;
 
 /**
- * Une partie côté serveur, hot-seat ou contre le bot. Gère la phase de choix du secret, la
- * pendule autoritative, la nulle, l'abandon, la revanche, et diffuse à chaque client SA
- * projection.
+ * Une partie côté serveur, classique ou Secret Queen, hot-seat ou contre le bot. Gère la phase
+ * de choix du secret (Secret Queen), la pendule autoritative, la nulle, l'abandon, la revanche,
+ * et diffuse à chaque client SA projection.
+ *
+ * Classique : pas de phase de choix, la partie commence tout de suite et la pendule ne démarre
+ * qu'après le premier coup des Blancs.
  *
  * Les choix secrets vivent dans `#secrets` (champ privé) puis dans le moteur ; ils ne sont
  * jamais loggés ni envoyés : seule `projectForViewer` produit ce qu'un client reçoit. Le bot ne
@@ -94,6 +112,7 @@ const MAX_BOT_ATTEMPTS = 80;
  */
 export class GameSession {
   readonly id: string;
+  readonly variant: Variant;
   readonly mode: GameMode;
   readonly timeControl: TimeControlId;
   readonly players: Record<Color, PlayerInfo>;
@@ -107,7 +126,7 @@ export class GameSession {
   #handoffPending: boolean;
   #selectionDeadline: number | null = null;
   #selectionTimer: NodeJS.Timeout | null = null;
-  #game: SecretQueenGame | null = null;
+  #game: SecretQueenGame | ClassicGame | null = null;
   #clock: ClockData | null;
   #flagTimer: NodeJS.Timeout | null = null;
   #drawOffer: Color | null = null;
@@ -125,6 +144,7 @@ export class GameSession {
 
   constructor(options: SessionOptions) {
     this.id = options.id;
+    this.variant = options.variant;
     this.mode = options.mode;
     this.timeControl = options.timeControl;
     this.players = options.players;
@@ -135,7 +155,11 @@ export class GameSession {
     this.#options = options;
     this.#now = options.now ?? (() => Date.now());
     // Hot-seat : écran de passage avant chaque choix. Mode bot : choix immédiat.
-    this.#handoffPending = options.mode === 'hotseat';
+    this.#handoffPending = options.mode === 'hotseat' && options.variant === 'secret-queen';
+    if (options.variant === 'classic') {
+      this.#phase = 'playing';
+      this.#game = ClassicGame.create();
+    }
     const tc = TIME_CONTROLS[options.timeControl];
     this.#clock =
       tc.initialMs === null
@@ -147,9 +171,13 @@ export class GameSession {
           };
   }
 
-  /** Mode bot : le bot verrouille son pion et le chrono de 30 s de l'humain démarre. */
-  startBotSelection(): void {
+  /**
+   * Mode bot, à la création. Secret Queen : le bot verrouille son pion et le chrono de 30 s de
+   * l'humain démarre. Classique : le bot joue s'il a les Blancs.
+   */
+  start(): void {
     this.#ensureBot();
+    if (this.variant === 'classic') return this.#maybeBotTurn();
     if (this.mode !== 'bot' || this.#phase !== 'secret-selection' || !this.#bot) return;
     const botColor = this.botColor ?? 'b';
     if (this.#secrets[botColor] === undefined) {
@@ -339,9 +367,11 @@ export class GameSession {
 
   /** Hot-seat : case de la dame secrète du camp au trait, à la demande (bouton maintenu). */
   #peek(participant: Participant): void {
-    if (this.mode !== 'hotseat' || this.#phase !== 'playing' || this.#game === null) return;
-    const color = this.#game.turn;
-    const own = projectForViewer(this.#game, color).ownSecret;
+    const game = this.#game;
+    if (this.mode !== 'hotseat' || this.#phase !== 'playing') return;
+    if (!(game instanceof SecretQueenGame)) return;
+    const color = game.turn;
+    const own = projectForViewer(game, color).ownSecret;
     participant.send({ type: 'secret-peek', color, square: own?.square ?? null });
   }
 
@@ -413,14 +443,16 @@ export class GameSession {
   // --- Pendule autoritative ----------------------------------------------------------------
 
   #startClock(): void {
-    if (!this.#clock) return;
+    // Classique : la pendule ne démarre qu'après le premier coup des Blancs.
+    if (!this.#clock || (this.variant === 'classic' && (this.#game?.plyCount ?? 0) === 0)) return;
     this.#clock.startedAt = this.#now();
     this.#armFlagTimer();
   }
 
   #switchClock(mover: Color): void {
     const clock = this.#clock;
-    if (!clock || clock.startedAt === null) return;
+    if (!clock) return;
+    if (clock.startedAt === null) return this.#startClock();
     const elapsed = this.#now() - clock.startedAt;
     clock.remainingMs[mover] = Math.max(0, clock.remainingMs[mover] - elapsed) + clock.incrementMs;
     clock.startedAt = this.#now();
@@ -485,6 +517,7 @@ export class GameSession {
     return {
       record: {
         id: this.id,
+        variant: this.variant,
         mode: this.mode,
         timeControl: this.timeControl,
         players: this.players,
@@ -514,15 +547,17 @@ export class GameSession {
    */
   static restore(
     record: SessionRecord,
-    secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedGame> | null },
+    secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedAny> | null },
     options: Omit<
       SessionOptions,
-      'id' | 'mode' | 'timeControl' | 'players' | 'botColor' | 'ownerId'
+      'id' | 'variant' | 'mode' | 'timeControl' | 'players' | 'botColor' | 'ownerId'
     >,
   ): GameSession {
+    const variant = record.variant ?? 'secret-queen';
     const session = new GameSession({
       ...options,
       id: record.id,
+      variant,
       mode: record.mode,
       timeControl: record.timeControl,
       players: record.players,
@@ -536,7 +571,12 @@ export class GameSession {
     session.#rematchOffer = record.rematchOffer;
     session.#nextGameId = record.nextGameId;
     if (session.#clock && record.clockMs) session.#clock.remainingMs = { ...record.clockMs };
-    if (secrets.game) session.#game = SecretQueenGame.restore(secrets.game);
+    if (secrets.game) {
+      session.#game =
+        variant === 'classic'
+          ? ClassicGame.restore(secrets.game as Secret<PersistedClassicGame>)
+          : SecretQueenGame.restore(secrets.game as Secret<PersistedGame>);
+    }
     if (record.phase === 'playing') {
       session.#startClock();
     } else if (record.phase === 'secret-selection' && record.mode === 'bot') {
@@ -549,6 +589,27 @@ export class GameSession {
     return session;
   }
 
+  /** Projection du moteur selon la variante : seule source de ce que voit un spectateur. */
+  #project(viewer: Viewer): ViewerBoardState | null {
+    const game = this.#game;
+    if (game === null) return null;
+    return game instanceof ClassicGame
+      ? projectClassic(game, viewer)
+      : projectForViewer(game, viewer);
+  }
+
+  /**
+   * FEN réelles de la partie (position initiale puis une par demi-coup), pour l'analyse :
+   * uniquement une fois la partie terminée (en Secret Queen, elles viennent de la révélation).
+   */
+  realPositions(): string[] | null {
+    const game = this.#game;
+    if (this.#phase !== 'ended' || game === null) return null;
+    if (game instanceof ClassicGame) return game.positions();
+    const reveal = projectForViewer(game, 'public').reveal;
+    return reveal ? [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)] : null;
+  }
+
   /** Vue complète pour un spectateur : seule la projection du moteur décrit l'échiquier. */
   stateFor(viewer: Viewer): ViewerGameState {
     const now = this.#now();
@@ -556,6 +617,7 @@ export class GameSession {
     const running = this.#phase === 'playing' && this.#game ? this.#game.turn : null;
     return {
       gameId: this.id,
+      variant: this.variant,
       mode: this.mode,
       viewer,
       phase: this.#phase,
@@ -575,7 +637,7 @@ export class GameSession {
               ownLocked: viewer === 'public' ? null : (this.#secrets[viewer] ?? null),
             }
           : null,
-      board: this.#game ? projectForViewer(this.#game, viewer) : null,
+      board: this.#project(viewer),
       clock: clock
         ? {
             remainingMs: {

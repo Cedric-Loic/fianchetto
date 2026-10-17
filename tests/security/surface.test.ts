@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import * as engine from '@sq/engine';
-import { SecretQueenGame, projectForViewer, type SecretChoice } from '@sq/engine';
+import {
+  ClassicGame,
+  SecretQueenGame,
+  projectClassic,
+  projectForViewer,
+  type SecretChoice,
+} from '@sq/engine';
 import { persistedOf, playLine, snapshotAll } from './harness.js';
 
 /*
@@ -10,7 +16,25 @@ import { persistedOf, playLine, snapshotAll } from './harness.js';
 
 describe('surface exportée par @sq/engine', () => {
   it("n'exporte que l'API contractuelle (valeurs à l'exécution)", () => {
-    expect(Object.keys(engine).sort()).toEqual(['SecretQueenGame', 'projectForViewer']);
+    expect(Object.keys(engine).sort()).toEqual([
+      'ClassicGame',
+      'SecretQueenGame',
+      'projectClassic',
+      'projectForViewer',
+    ]);
+  });
+
+  it('la projection classique refuse une partie Secret Queen (et inversement)', () => {
+    // projectClassic ne montre que la position réelle : appliquée à une partie Secret Queen,
+    // elle révélerait les dames secrètes. Elle doit donc la refuser.
+    const game = SecretQueenGame.create({ w: 'e2', b: 'd7' });
+    expect(() => projectClassic(game as unknown as ClassicGame, 'w')).toThrow('Partie invalide.');
+    const classic = ClassicGame.create();
+    expect(() => projectForViewer(classic as unknown as SecretQueenGame, 'w')).toThrow(
+      'Partie invalide.',
+    );
+    const fake = Object.create(ClassicGame.prototype) as ClassicGame;
+    expect(() => projectClassic(fake, 'w')).toThrow('Partie invalide.');
   });
 
   it('les modules internes ne sont pas importables par le nom du paquet', async () => {

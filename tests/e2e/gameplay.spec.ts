@@ -11,6 +11,7 @@ async function center(page: Page, square: string) {
 
 async function startHotseat(page: Page) {
   await page.goto('/');
+  await page.getByTestId('variant-secret-queen').click();
   const seat = page.locator('.home-panel', { hasText: 'À deux sur cet écran' });
   await seat.getByRole('button', { name: 'Sans pendule' }).click();
   await seat.getByRole('button', { name: 'Jouer', exact: true }).click();

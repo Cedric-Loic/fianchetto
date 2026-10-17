@@ -22,10 +22,19 @@ interface Settings {
   sound: boolean;
   /** Hot-seat : retourner le plateau vers le camp au trait. */
   autoFlip: boolean;
+  /** Classique : points sur les cases accessibles à la pièce sélectionnée (jamais en Secret Queen). */
+  showLegalMoves: boolean;
 }
 
 const KEY = 'sq-settings';
-const DEFAULTS: Settings = { board: 'vert', pieces: 'cburnett', sound: true, autoFlip: false };
+const DEFAULTS: Settings = {
+  board: 'vert',
+  pieces: 'cburnett',
+  sound: true,
+  autoFlip: false,
+  showLegalMoves: true,
+};
+const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
 
 function load(): Settings {
   try {
@@ -34,8 +43,9 @@ function load(): Settings {
     return {
       board: parsed.board && parsed.board in BOARD_THEMES ? parsed.board : DEFAULTS.board,
       pieces: parsed.pieces && parsed.pieces in PIECE_SETS ? parsed.pieces : DEFAULTS.pieces,
-      sound: typeof parsed.sound === 'boolean' ? parsed.sound : DEFAULTS.sound,
-      autoFlip: typeof parsed.autoFlip === 'boolean' ? parsed.autoFlip : DEFAULTS.autoFlip,
+      sound: bool(parsed.sound, DEFAULTS.sound),
+      autoFlip: bool(parsed.autoFlip, DEFAULTS.autoFlip),
+      showLegalMoves: bool(parsed.showLegalMoves, DEFAULTS.showLegalMoves),
     };
   } catch {
     return DEFAULTS;
@@ -47,9 +57,12 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
     ...load(),
     update(patch) {
       set(patch);
-      const { board, pieces, sound, autoFlip } = get();
+      const { board, pieces, sound, autoFlip, showLegalMoves } = get();
       try {
-        localStorage.setItem(KEY, JSON.stringify({ board, pieces, sound, autoFlip }));
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({ board, pieces, sound, autoFlip, showLegalMoves }),
+        );
       } catch {
         // stockage indisponible : préférences non conservées
       }

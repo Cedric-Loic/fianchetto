@@ -19,6 +19,7 @@ const KEYS = [
   'ownSecret',
   'result',
   'reveal',
+  'legalMoves',
 ];
 
 describe('projectForViewer — position initiale', () => {
@@ -85,7 +86,10 @@ describe('projectForViewer — ce qui ne fuit pas', () => {
     // Double pas d'un vrai pion à côté d'un pion adverse : la prise en passant existe.
     const game = gameAfter({ w: 'a2', b: 'd7' }, 'e2e4 h7h6 e4e5 f7f5');
     for (const viewer of ['w', 'b', 'public'] as const) {
-      const json = JSON.stringify(projectForViewer(game, viewer));
+      // Seule la clé `legalMoves` (toujours nulle en Secret Queen) peut contenir « legal ».
+      const { legalMoves, ...rest } = projectForViewer(game, viewer);
+      expect(legalMoves).toBeNull();
+      const json = JSON.stringify(rest);
       expect(json).not.toMatch(/fen|castling|passant|halfmove|clock|repetition|legal|f6/i);
       expect(Object.keys(projectForViewer(game, viewer))).toEqual(KEYS);
     }

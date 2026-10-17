@@ -28,6 +28,7 @@ test('frames WebSocket, stockage navigateur et rafraîchissement : aucune fuite'
   await page.getByLabel('Pseudo').fill(`sec${Date.now() % 1_000_000_000}`);
   await page.getByLabel('Mot de passe').fill('motdepasse');
   await page.getByRole('button', { name: "S'inscrire" }).click();
+  await page.getByTestId('variant-secret-queen').click();
   const bot = page.locator('.home-panel', { hasText: 'Contre le bot' });
   await bot.getByTestId('level-1').click();
   await bot.getByRole('button', { name: 'Blancs' }).click();

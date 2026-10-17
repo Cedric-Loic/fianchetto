@@ -41,5 +41,7 @@ export function projectForViewer(game: SecretQueenGame, viewer: Viewer): ViewerB
         : { pieceId: core.secretId(viewer), square: core.secretSquare(viewer) },
     result,
     reveal: result === null ? null : core.reveal(),
+    // Jamais de coups légaux en Secret Queen (§3.5 et docs/SECURITY.md).
+    legalMoves: null,
   };
 }

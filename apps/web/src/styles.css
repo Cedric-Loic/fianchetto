@@ -680,3 +680,74 @@ a.button.primary {
   border-radius: 50%;
   background: #3c3a37cc;
 }
+
+/* --- Plateforme : choix de la variante, coups possibles (classique) --- */
+.variant-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.variant-tab {
+  flex: 1 1 260px;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  text-align: left;
+  background: var(--panel);
+  border: 2px solid transparent;
+}
+.variant-tab strong {
+  font-size: 1.15rem;
+}
+.variant-tab span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.variant-tab.selected {
+  border-color: var(--accent);
+}
+.variant-badge {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  background: #3c3a37;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.hint {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+}
+.hint::after {
+  content: '';
+  width: 33%;
+  height: 33%;
+  border-radius: 50%;
+  background: #00000024;
+}
+.hint.capture::after {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 0.45rem solid #00000024;
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ratings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}

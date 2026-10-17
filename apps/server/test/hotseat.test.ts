@@ -20,6 +20,7 @@ async function connect() {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       mode: 'hotseat',
+      variant: 'secret-queen',
       timeControl: 'untimed',
       whiteName: 'A',
       blackName: 'B',

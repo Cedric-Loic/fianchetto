@@ -20,3 +20,11 @@ export interface PersistedGame {
 export type PlayResult =
   | { ok: true; move: PublicMove; result: GameResult | null } // result non nul si le coup termine la partie
   | { ok: false }; // refus SANS motif
+
+/** Forme persistable d'une partie classique (rien de secret, mais même circuit de stockage). */
+export interface PersistedClassicGame {
+  version: 1;
+  variant: 'classic';
+  moves: MoveIntent[];
+  externalResult: GameResult | null;
+}

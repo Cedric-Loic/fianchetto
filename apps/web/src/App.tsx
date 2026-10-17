@@ -44,7 +44,7 @@ function Nav() {
       {user ? (
         <>
           <a href={`#/profile/${user.username}`} data-testid="nav-user">
-            {user.username} ({user.rating})
+            {user.username}
           </a>
           <button className="link" onClick={() => void api.logout().then(() => setUser(null))}>
             Déconnexion

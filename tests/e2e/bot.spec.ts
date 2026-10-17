@@ -16,7 +16,9 @@ test('compte, partie classée contre le bot, Elo mis à jour', async ({ page }) 
   await page.getByLabel('Pseudo').fill(username);
   await page.getByLabel('Mot de passe').fill('motdepasse');
   await page.getByRole('button', { name: "S'inscrire" }).click();
-  await expect(page.getByTestId('nav-user')).toContainText(`${username} (1200)`);
+  await expect(page.getByTestId('nav-user')).toContainText(username);
+  await page.getByTestId('variant-secret-queen').click();
+  await expect(page.getByTestId('my-rating')).toContainText('Secret Queen : 1200');
 
   const bot = page.locator('.home-panel', { hasText: 'Contre le bot' });
   await bot.getByTestId('level-1').click();
@@ -43,9 +45,13 @@ test('compte, partie classée contre le bot, Elo mis à jour', async ({ page }) 
   await page.getByRole('button', { name: '⚑ Abandonner' }).click();
   const modal = page.getByTestId('end-modal');
   await expect(modal).toContainText('gagne par abandon');
-  await expect(page.getByTestId('elo-change')).toContainText('1200 →');
+  await expect(page.getByTestId('elo-change')).toContainText('Elo Secret Queen : 1200 →');
   await page.screenshot({ path: 'test-results/bot-fin.png' });
 
   await page.goto(`/#/profile/${username}`);
   await expect(page.getByText('Défaite')).toBeVisible();
+  // Elo séparé : seul l'Elo Secret Queen a bougé.
+  await expect(page.getByTestId('rating-classic')).toContainText('1200');
+  await expect(page.getByTestId('rating-classic')).toContainText('0 partie classée');
+  await expect(page.getByTestId('rating-secret-queen')).toContainText('1 partie classée');
 });

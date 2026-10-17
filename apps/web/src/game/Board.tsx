@@ -34,6 +34,11 @@ export interface BoardProps {
   onCancelPremove?: () => void;
   /** Flèches imposées (meilleur coup en analyse). */
   extraArrows?: readonly Arrow[];
+  /**
+   * Classique, si le réglage est actif : coups légaux du camp au trait, fournis par le serveur.
+   * Les cases accessibles à la pièce sélectionnée sont marquées. Toujours absent en Secret Queen.
+   */
+  legalMoves?: readonly Arrow[] | null;
 }
 
 function squareXY(square: Square, orientation: Color): [number, number] {
@@ -89,8 +94,8 @@ function ArrowShape({
 /**
  * Échiquier : glisser-déposer et clic-clic (pointer events), coordonnées dans les cases,
  * surlignage du dernier coup et de la case sélectionnée, roi en échec, animations CSS,
- * flèches et surlignages au clic droit, premoves. Aucune surbrillance des coups légaux
- * (le client ne connaît pas les règles).
+ * flèches et surlignages au clic droit, premoves. Le client ne connaît pas les règles : les
+ * coups possibles ne sont marqués qu'en classique, à partir de la liste envoyée par le serveur.
  */
 export function Board(props: BoardProps) {
   const { pieces, orientation, movable } = props;
@@ -256,6 +261,12 @@ export function Board(props: BoardProps) {
     }
   }
 
+  // Coups possibles de la pièce sélectionnée (classique) : point, ou anneau sur une prise.
+  const hints =
+    selected && movable !== null && props.legalMoves
+      ? props.legalMoves.filter((m) => m.from === selected).map((m) => m.to)
+      : [];
+
   const allArrows = [
     ...arrows.map((a) => ({ a, c: '#f2a33a' })),
     ...(props.extraArrows ?? []).map((a) => ({ a, c: '#4a9eea' })),
@@ -303,6 +314,17 @@ export function Board(props: BoardProps) {
             }}
           />,
         ];
+      })}
+      {hints.map((square) => {
+        const [x, y] = squareXY(square, orientation);
+        return (
+          <div
+            key={`hint-${square}`}
+            className={`hint${bySquare.has(square) ? ' capture' : ''}`}
+            data-testid="legal-hint"
+            style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
+          />
+        );
       })}
       {props.crowns?.map((square) => {
         const [x, y] = squareXY(square, orientation);

@@ -5,11 +5,15 @@ Plateforme d'échecs web personnelle, servie en local, au style chess.com. Premi
 est en réalité une **dame**, mais il reste affiché comme un pion pour tout le monde jusqu'à
 l'écran de fin. À l'adversaire de la démasquer.
 
+- Variantes : **Classique** (échecs standard, coups possibles affichés en option) et
+  **Secret Queen**, chacune avec son propre Elo.
 - Modes : contre un bot (5 niveaux, partie classée Elo) ou à deux sur le même écran (hot-seat).
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : terminé (étapes 0 à 5)**. Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md).
+> **État : étapes 0 à 6 terminées** (Secret Queen, puis plateforme et variante classique).
+> Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Suite prévue (coach personnel) :
+> [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md).
 
 ## Prérequis
 
@@ -23,7 +27,8 @@ pnpm install
 pnpm dev
 ```
 
-Puis ouvre <http://127.0.0.1:5173>, choisis les noms et la cadence, et clique sur « Jouer ». Le serveur écoute sur `127.0.0.1:3001` ; les deux écoutent
+Puis ouvre <http://127.0.0.1:5173>, choisis la variante (Classique ou Secret Queen), les noms
+et la cadence, et clique sur « Jouer ». Le serveur écoute sur `127.0.0.1:3001` ; les deux écoutent
 uniquement sur la boucle locale.
 
 ## Commandes
@@ -65,13 +70,18 @@ docs/
 ## Comment jouer
 
 1. **Connexion → Créer un compte** (comptes locaux, mot de passe haché).
-2. **Contre le bot** : choisis le niveau, la couleur et la cadence, puis ton pion secret (30 s).
+2. **Choisis la variante** en haut de l'accueil : Classique ou Secret Queen.
+   - **Classique** : la partie commence tout de suite. Les coups possibles de la pièce
+     sélectionnée sont marqués (désactivable dans ⚙ Réglages).
+   - **Secret Queen** : suis les étapes ci-dessous.
+3. **Contre le bot** (Secret Queen) : choisis le niveau, la couleur et la cadence, puis ton pion
+   secret (30 s).
    Ton propre pion-dame est marqué d'une petite couronne ♛, visible de toi seul.
-3. **À deux sur cet écran** : chacun choisit son pion à tour de rôle (l'autre détourne le regard) ;
+4. **À deux sur cet écran** (Secret Queen) : chacun choisit son pion à tour de rôle (l'autre détourne le regard) ;
    pendant la partie, maintiens « Voir ma dame secrète » pour la retrouver.
-4. Pendant la partie : glisser-déposer ou clic-clic, clic droit pour les flèches, premoves contre
+5. Pendant la partie : glisser-déposer ou clic-clic, clic droit pour les flèches, premoves contre
    le bot (clic droit pour les annuler), ⛶ pour le mode concentration (✕ ou Échap pour sortir).
-5. À la fin : révélation des deux dames, puis **Analyser la partie** (Stockfish sur les positions
+6. À la fin (Secret Queen) : révélation des deux dames, puis **Analyser la partie** (Stockfish sur les positions
    réelles) et export **PGN**.
 
 ## Comment le secret est protégé (résumé)
@@ -91,6 +101,8 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 3     | Bot, comptes, Elo, pendules                                    | ✅   |
 | 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | ✅   |
 | 5     | Audit de sécurité du secret, recette                           | ✅   |
+| 6     | Plateforme : variante classique, Elo par variante              | ✅   |
+| 7–11  | Coach personnel (voir `docs/PLAN-COACH.md`)                    | ⏳   |
 
 ## Licences et crédits
 

@@ -1,6 +1,11 @@
-import type { Color, GameResult } from '@sq/shared';
+import type { Color, GameResult, Variant } from '@sq/shared';
 
 export const SIDE: Record<Color, string> = { w: 'Blancs', b: 'Noirs' };
+
+export const VARIANT_LABEL: Record<Variant, string> = {
+  classic: 'Classique',
+  'secret-queen': 'Secret Queen',
+};
 
 export const REASONS: Record<GameResult['reason'], string> = {
   checkmate: 'par échec et mat',

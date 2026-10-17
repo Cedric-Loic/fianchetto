@@ -4,6 +4,13 @@ Document de référence pour `packages/engine`, `apps/server` et `tests/security
 cahier des charges (`docs/SPEC.md`, §3) avec les arbitrages validés (`docs/DECISIONS.md`).
 En cas de divergence : DECISIONS.md > ce document > SPEC.md.
 
+> **Variante classique** (étape 6) : règles standard des échecs, jugées par chess.js sur la
+> position réelle, qui est aussi la position affichée. Notation SAN standard, mêmes fins de
+> partie (§5), mêmes pendules (qui ne démarrent qu'après le premier coup des Blancs), pas de
+> choix secret ni de révélation. La vue (`projectClassic`) est identique pour tous les
+> spectateurs et fournit les coups légaux du camp au trait. Le reste de ce document ne concerne
+> que Secret Queen.
+
 ## 1. Position réelle
 
 - La **position réelle** est une position d'échecs standard : le pion choisi par chaque camp y

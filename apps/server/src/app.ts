@@ -6,13 +6,14 @@ import {
   ClientMessageSchema,
   CreateGameRequestSchema,
   LOCAL_HOST,
+  VariantSchema,
   type GameConfig,
   type LeaderboardResponse,
   type ProfileResponse,
   type ServerMessage,
 } from '@sq/shared';
 import { analyzeGame, UciEngine } from '@sq/bot';
-import { currentUser, registerAuthRoutes, toPublicUser } from './auth.js';
+import { currentUser, registerAuthRoutes } from './auth.js';
 import type { BotDriver } from './bot/driver.js';
 import { loadConfig } from './config.js';
 import { GameManager } from './games/manager.js';
@@ -48,7 +49,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     },
   });
   const config = options.config ?? loadConfig();
-  const store = new GameStore(options.dbPath ?? DEFAULT_DB);
+  const store = new GameStore(options.dbPath ?? DEFAULT_DB, {
+    initialRating: config.elo.initial,
+  });
   const games = new GameManager({ store, config, createBot: options.createBot });
   app.addHook('onClose', () => {
     games.disposeAll();
@@ -57,23 +60,33 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   void app.register(cookie);
   app.get('/api/health', () => ({ status: 'ok' }));
-  registerAuthRoutes(app, store, config);
+  registerAuthRoutes(app, store);
 
   app.get('/api/bot-levels', () => config.botLevels);
 
-  app.get('/api/leaderboard', (): LeaderboardResponse => ({
-    entries: store.leaderboard().map((u, i) => ({
-      rank: i + 1,
-      username: u.username,
-      rating: u.rating,
-      gamesPlayed: u.gamesPlayed,
-    })),
-  }));
+  // Classement d'une variante (`?variant=classic`), Secret Queen par défaut.
+  app.get<{ Querystring: { variant?: string } }>('/api/leaderboard', (request) => {
+    const parsed = VariantSchema.safeParse(request.query.variant ?? 'secret-queen');
+    const variant = parsed.success ? parsed.data : 'secret-queen';
+    const response: LeaderboardResponse = {
+      variant,
+      entries: store.leaderboard(variant).map((u, i) => ({
+        rank: i + 1,
+        username: u.username,
+        rating: u.rating,
+        gamesPlayed: u.gamesPlayed,
+      })),
+    };
+    return response;
+  });
 
   app.get<{ Params: { username: string } }>('/api/profile/:username', (request, reply) => {
     const user = store.findUserByName(request.params.username);
     if (!user) return reply.code(404).send({ error: 'NOT_FOUND' });
-    const profile: ProfileResponse = { user: toPublicUser(user), history: store.history(user.id) };
+    const profile: ProfileResponse = {
+      user: store.publicUser(user),
+      history: store.history(user.id),
+    };
     return profile;
   });
 
@@ -103,20 +116,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   app.get<{ Params: { id: string } }>('/api/games/:id/analysis', async (request, reply) => {
     const found = viewable(request.params.id, request);
     if (!found) return reply.code(404).send({ error: 'NOT_FOUND' });
-    const reveal = found.session.stateFor(found.viewer).board?.reveal;
-    if (found.session.phase !== 'ended' || !reveal) {
-      return reply.code(409).send({ error: 'GAME_NOT_OVER' });
-    }
+    const fens = found.session.realPositions();
+    if (!fens) return reply.code(409).send({ error: 'GAME_NOT_OVER' });
     const cached = store.getAnalysis(found.session.id);
     if (cached) return cached;
     analysisEngine ??= new UciEngine();
-    const fens = [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)];
     const analysis = await analyzeGame(analysisEngine, fens);
     store.saveAnalysis(found.session.id, analysis);
     return analysis;
   });
 
-  // Export de la notation : publique pendant la partie, réelle (PGN avec FEN de départ) après.
+  // Export de la notation. Classique : SAN standard. Secret Queen : notation publique pendant la
+  // partie, réelle (PGN avec FEN de départ) après.
   app.get<{ Params: { id: string } }>('/api/games/:id/pgn', (request, reply) => {
     const found = viewable(request.params.id, request);
     if (!found) return reply.code(404).send({ error: 'NOT_FOUND' });
@@ -134,8 +145,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       ? reveal.plies.map((p) => p.realSan)
       : (board?.moves ?? []).map((m) => m.san);
     const body = sans.map((san, i) => (i % 2 === 0 ? `${i / 2 + 1}. ${san}` : san)).join(' ');
+    const event =
+      state.variant === 'classic'
+        ? 'Fianchetto, partie classique'
+        : `Fianchetto, Secret Queen${reveal ? '' : ' (notation publique)'}`;
     const headers = [
-      `[Event "Secret Queen${reveal ? '' : ' (notation publique)'}"]`,
+      `[Event "${event}"]`,
       `[White "${state.players.w.name}"]`,
       `[Black "${state.players.b.name}"]`,
       `[Result "${result}"]`,

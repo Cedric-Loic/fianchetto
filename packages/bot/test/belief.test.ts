@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeBelief } from '../src/belief.js';
+import { ClassicGame } from '@sq/engine';
+import { classicWorld, computeBelief, worldsFor } from '../src/belief.js';
 import { newGame, observe, randomMove, rng } from './helpers.js';
 
 describe('croyance du bot', () => {
@@ -54,5 +55,32 @@ describe('croyance du bot', () => {
         expect(worlds.map((x) => x.pieceId)).toContain(`wp${w}`);
       }
     }
+  });
+});
+
+describe('partie classique', () => {
+  it('un seul monde : la position réelle, rejouée depuis les coups publics', () => {
+    const game = ClassicGame.create();
+    for (const m of [
+      { from: 'e2', to: 'e4' },
+      { from: 'd7', to: 'd5' },
+      { from: 'e4', to: 'd5' },
+    ] as const) {
+      expect(game.play(game.turn, m).ok).toBe(true);
+    }
+    const worlds = worldsFor(observe(game, 'b'));
+    expect(worlds).toHaveLength(1);
+    expect(worlds[0]?.fen).toBe(game.positions().at(-1));
+    expect(worlds[0]?.weight).toBe(1);
+  });
+
+  it('promotion rejouée correctement', () => {
+    const game = ClassicGame.create();
+    for (const m of ['e2e4', 'd7d5', 'e4d5', 'c7c6', 'd5c6', 'g8f6', 'c6b7', 'b8d7', 'b7a8n']) {
+      const intent = { from: m.slice(0, 2), to: m.slice(2, 4) } as { from: 'a1'; to: 'a1' };
+      const promotion = m[4] as 'n' | undefined;
+      expect(game.play(game.turn, promotion ? { ...intent, promotion } : intent).ok).toBe(true);
+    }
+    expect(classicWorld(observe(game, 'b'))[0]?.fen).toBe(game.positions().at(-1));
   });
 });

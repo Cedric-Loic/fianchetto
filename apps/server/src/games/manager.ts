@@ -8,6 +8,7 @@ import {
   type GameSummary,
   type PlayerInfo,
   type TimeControlId,
+  type Variant,
 } from '@sq/shared';
 import { WorkerBot, type BotDriver } from '../bot/driver.js';
 import { updateRating } from '../elo.js';
@@ -24,7 +25,7 @@ export interface ManagerOptions {
 /**
  * Registre des parties. Chaque changement d'état est sauvegardé dans SQLite ; au démarrage,
  * les parties non terminées sont reprises. À la fin d'une partie contre le bot, l'Elo du joueur
- * est mis à jour (toutes cadences, H6) et la partie entre dans son historique.
+ * DANS LA VARIANTE est mis à jour (toutes cadences, H6) et la partie entre dans son historique.
  */
 export class GameManager {
   readonly #games = new Map<string, GameSession>();
@@ -75,6 +76,7 @@ export class GameManager {
   }
 
   createHotseat(options: {
+    variant: Variant;
     timeControl: TimeControlId;
     whiteName: string;
     blackName: string;
@@ -89,6 +91,7 @@ export class GameManager {
     return this.#register(
       new GameSession({
         id: randomUUID(),
+        variant: options.variant,
         mode: 'hotseat',
         timeControl: options.timeControl,
         players: { w: player(options.whiteName), b: player(options.blackName) },
@@ -99,6 +102,7 @@ export class GameManager {
   }
 
   createBotGame(options: {
+    variant: Variant;
     userId: string;
     level: BotLevel;
     timeControl: TimeControlId;
@@ -110,13 +114,15 @@ export class GameManager {
     const human: Color =
       options.color === 'random' ? (randomInt(2) === 0 ? 'w' : 'b') : options.color;
     const botColor = opposite(human);
+    const { rating } = this.#store.ratingOf(user.id, options.variant);
     const players = {
-      [human]: { name: user.username, rating: user.rating, isBot: false, botLevel: null },
+      [human]: { name: user.username, rating, isBot: false, botLevel: null },
       [botColor]: { name: level.name, rating: level.elo, isBot: true, botLevel: level.level },
     } as Record<Color, PlayerInfo>;
     const session = this.#register(
       new GameSession({
         id: randomUUID(),
+        variant: options.variant,
         mode: 'bot',
         timeControl: options.timeControl,
         players,
@@ -126,14 +132,15 @@ export class GameManager {
         ...this.#hooks(),
       }),
     );
-    session.startBotSelection();
+    session.start();
     return session;
   }
 
-  /** Revanche : mêmes joueurs, couleurs inversées, nouveau choix des pions secrets. */
+  /** Revanche : même variante, mêmes joueurs, couleurs inversées (nouveaux pions secrets). */
   #rematch(previous: GameSession): string {
     if (previous.mode === 'hotseat') {
       return this.createHotseat({
+        variant: previous.variant,
         timeControl: previous.timeControl,
         whiteName: previous.players.b.name,
         blackName: previous.players.w.name,
@@ -142,6 +149,7 @@ export class GameManager {
     }
     const botColor = previous.botColor ?? 'b';
     return this.createBotGame({
+      variant: previous.variant,
       userId: previous.ownerId ?? '',
       level: previous.players[botColor].botLevel ?? 1,
       timeControl: previous.timeControl,
@@ -155,21 +163,23 @@ export class GameManager {
     const user = this.#store.findUser(userId);
     if (!user) return;
     const color: Color = session.mode === 'bot' ? opposite(session.botColor ?? 'b') : 'w';
+    const before = this.#store.ratingOf(user.id, session.variant);
     let ratingAfter: number | null = null;
     if (session.mode === 'bot') {
       const opponentElo = session.players[opposite(color)].rating ?? this.#config.elo.initial;
       const score = result.winner === null ? 0.5 : result.winner === color ? 1 : 0;
       ratingAfter = updateRating(
-        user.rating,
+        before.rating,
         opponentElo,
         score,
-        user.gamesPlayed,
+        before.gamesPlayed,
         this.#config.elo,
       );
-      this.#store.setRating(user.id, ratingAfter);
+      this.#store.setRating(user.id, session.variant, ratingAfter);
     }
     const summary: GameSummary = {
       gameId: session.id,
+      variant: session.variant,
       mode: session.mode,
       rated: session.mode === 'bot',
       timeControl: session.timeControl,
@@ -177,7 +187,7 @@ export class GameManager {
       opponentName: session.players[opposite(color)].name,
       winner: result.winner,
       reason: result.reason,
-      ratingBefore: session.mode === 'bot' ? user.rating : null,
+      ratingBefore: session.mode === 'bot' ? before.rating : null,
       ratingAfter,
       startedAt: session.startedAt,
       endedAt: new Date().toISOString(),

@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react';
-import { TIME_CONTROLS, TIME_CONTROL_IDS, type BotLevelInfo, type TimeControlId } from '@sq/shared';
+import {
+  TIME_CONTROLS,
+  TIME_CONTROL_IDS,
+  VARIANTS,
+  type BotLevelInfo,
+  type TimeControlId,
+  type Variant,
+} from '@sq/shared';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
+import { VARIANT_LABEL } from './labels';
+
+const VARIANT_DESCRIPTION: Record<Variant, string> = {
+  classic: 'Les échecs, tout simplement.',
+  'secret-queen': 'Un de vos pions est une dame. Personne ne sait lequel.',
+};
 
 function TimeControls(props: { value: TimeControlId; onChange: (id: TimeControlId) => void }) {
   return (
@@ -19,9 +32,10 @@ function TimeControls(props: { value: TimeControlId; onChange: (id: TimeControlI
   );
 }
 
-/** Accueil : partie contre le bot (classée) ou à deux sur cet écran. */
+/** Accueil : choix de la variante, puis partie contre le bot (classée) ou à deux sur cet écran. */
 export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   const user = useSession((s) => s.user);
+  const [variant, setVariant] = useState<Variant>('classic');
   const [levels, setLevels] = useState<BotLevelInfo[]>([]);
   const [level, setLevel] = useState(3);
   const [color, setColor] = useState<'w' | 'b' | 'random'>('random');
@@ -49,7 +63,7 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   return (
     <div className="home wide">
       <h1>Fianchetto</h1>
-      <p className="tagline">Secret Queen : un de vos pions est une dame. Personne ne sait lequel.</p>
+      <p className="tagline">Ta plateforme d'échecs personnelle.</p>
       {active && (
         <div className="panel resume">
           Une partie est en cours.{' '}
@@ -58,6 +72,21 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
           </button>
         </div>
       )}
+      <div className="variant-tabs" role="tablist">
+        {VARIANTS.map((v) => (
+          <button
+            key={v}
+            role="tab"
+            aria-selected={v === variant}
+            data-testid={`variant-${v}`}
+            className={`variant-tab${v === variant ? ' selected' : ''}`}
+            onClick={() => setVariant(v)}
+          >
+            <strong>{VARIANT_LABEL[v]}</strong>
+            <span>{VARIANT_DESCRIPTION[v]}</span>
+          </button>
+        ))}
+      </div>
       <div className="home-cards">
         <div className="panel home-panel">
           <h2>Contre le bot</h2>
@@ -70,6 +99,9 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
             </>
           ) : (
             <>
+              <p className="muted" data-testid="my-rating">
+                Ton Elo {VARIANT_LABEL[variant]} : <strong>{user.ratings[variant].rating}</strong>
+              </p>
               <div className="levels">
                 {levels.map((l) => (
                   <button
@@ -103,7 +135,9 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
               <TimeControls value={botTc} onChange={setBotTc} />
               <button
                 className="primary big"
-                onClick={() => void create({ mode: 'bot', level, color, timeControl: botTc })}
+                onClick={() =>
+                  void create({ mode: 'bot', variant, level, color, timeControl: botTc })
+                }
               >
                 Jouer contre le bot
               </button>
@@ -128,6 +162,7 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
             onClick={() =>
               void create({
                 mode: 'hotseat',
+                variant,
                 timeControl: seatTc,
                 whiteName: white,
                 blackName: black,

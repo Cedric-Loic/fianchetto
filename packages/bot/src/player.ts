@@ -8,7 +8,7 @@ import type {
   PromotionPiece,
   Square,
 } from '@sq/shared';
-import { computeBelief, type Hypothesis } from './belief.js';
+import { worldsFor, type Hypothesis } from './belief.js';
 import { LEVELS, type LevelSettings } from './levels.js';
 import { targetThinkMs } from './think-time.js';
 import type { UciEngine, UciLine } from './uci.js';
@@ -26,7 +26,8 @@ const key = (m: MoveIntent) => `${m.from}${m.to}${m.promotion ?? ''}`;
 /**
  * Bot Secret Queen : analyse chaque monde compatible avec ses observations, puis choisit le
  * coup au meilleur score moyen. Il ne voit QUE son observation (vue publique, son propre
- * secret, ses refus) : aucun accès au secret de l'humain.
+ * secret, ses refus) : aucun accès au secret de l'humain. En classique, il n'y a qu'un monde :
+ * la position réelle.
  */
 export class SecretQueenBot implements BotPlayer {
   readonly #engine: UciEngine;
@@ -74,7 +75,7 @@ export class SecretQueenBot implements BotPlayer {
 
   async chooseMove(observation: BotObservation): Promise<MoveIntent> {
     const started = Date.now();
-    const worlds = computeBelief(observation);
+    const worlds = worldsFor(observation);
     const plies = observation.state.board?.moves.length ?? 0;
     const rejectedNow = new Set(
       observation.rejections.filter((r) => r.ply === plies).map((r) => key(r.move)),
@@ -134,7 +135,7 @@ export class SecretQueenBot implements BotPlayer {
 
   /** Accepte la nulle si sa position moyenne est nettement mauvaise. */
   async shouldAcceptDraw(observation: BotObservation): Promise<boolean> {
-    const worlds = computeBelief(observation);
+    const worlds = worldsFor(observation);
     if (worlds.length === 0) return false;
     const evaluations = await this.#evaluate(observation, worlds);
     const average = evaluations.reduce(

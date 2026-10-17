@@ -8,6 +8,7 @@ describe('analyse et export de la notation', () => {
     const { gameId } = (
       await http('POST', '/api/games', {
         mode: 'hotseat',
+        variant: 'secret-queen',
         timeControl: 'untimed',
         whiteName: 'A',
         blackName: 'B',

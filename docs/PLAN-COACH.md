@@ -1,6 +1,7 @@
 # Plan : plateforme Fianchetto et coach personnel
 
-Statut : **proposition, en attente du GO**. Rien n'est codé.
+Statut : **étape 6 terminée** (plateforme et variante classique). Étapes 7 à 11 : en attente du
+GO.
 
 ## 1. Point de départ et objectif
 

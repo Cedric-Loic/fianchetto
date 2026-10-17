@@ -12,7 +12,7 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Indistinguabilité : deux secrets, mêmes coups publics → messages identiques pour l'adversaire | ✅   | `tests/security/server.test.ts` (WebSocket réel, bot scripté, le bot essuie des refus dans un seul des deux mondes) ; `tests/security/indistinguishability.test.ts` (projections, paires de mondes fast-check) ; 10 000 paires dans `pnpm test:stress` |
 | Canari : aucun payload, store, stockage navigateur ni log serveur ne contient le secret       | ✅   | `server.test.ts` (FEN réelles absentes des messages et des logs niveau debug) ; `tests/security/e2e/browser.spec.ts` (frames WebSocket, localStorage, sessionStorage, IndexedDB, cookie illisible) ; `canary-engine.test.ts`                           |
 | Rejeu après rafraîchissement ou reconnexion sans fuite                                        | ✅   | `server.test.ts` (reconnexion WebSocket en pleine partie) ; `browser.spec.ts` (rechargement de page)                                                                                                                                                   |
-| `pnpm check` vert, README complet, démo de chaque étape                                       | ✅   | `pnpm check` (lint, types, 291 tests) ; `pnpm test:e2e` (7 parcours navigateur) ; README ; captures Playwright dans `test-results/`                                                                                                                    |
+| `pnpm check` vert, README complet, démo de chaque étape                                       | ✅   | `pnpm check` (lint, types, 315 tests à l'étape 6) ; `pnpm test:e2e` (9 parcours navigateur) ; README ; captures Playwright dans `test-results/`                                                                                                        |
 
 ## Règles Secret Queen (§3)
 
@@ -65,6 +65,20 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Thèmes, pièces, sons                                                              | ✅ / 👁 | e2e thème ; sons à écouter                                         |
 | Mode concentration                                                                | ✅     | `gameplay.spec.ts`                                                 |
 | Aucun asset chess.com, aucun réseau au runtime                                    | ✅     | `CREDITS.md` ; pièces et sons locaux                               |
+
+## Étape 6 : plateforme et variante classique
+
+| Exigence                                                                      | État   | Preuve                                                                                 |
+| ----------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------- |
+| Accueil multi-variantes (Classique par défaut, Secret Queen)                  | ✅     | `tests/e2e/classic.spec.ts`, specs Secret Queen (onglet sélectionné)                   |
+| Classique à deux et contre le bot, sans choix secret                          | ✅     | `classic.spec.ts`, `apps/server/test/classic.test.ts`                                  |
+| Notation SAN standard, mat, fins de partie, PGN, analyse                      | ✅     | `packages/engine/test/classic.test.ts`, `classic.test.ts` (serveur), `classic.spec.ts` |
+| Pendule classique : départ après le premier coup des Blancs                   | ✅     | `apps/server/test/classic.test.ts`                                                     |
+| Elo séparé par variante, migration de l'ancien Elo vers Secret Queen          | ✅     | `classic.test.ts` (serveur), `bot-games.test.ts`, `bot.spec.ts`, `classic.spec.ts`     |
+| Coups possibles : réglage (actif par défaut), classique seulement             | ✅ / 👁 | `classic.spec.ts` (activé, désactivé) ; rendu à vérifier à l'œil                       |
+| Secret Queen inchangé : `legalMoves` toujours nul, projections non croisables | ✅     | `projection.test.ts` (moteur et banc), `surface.test.ts`, `utils.test.ts` (scanner)    |
+| Bot classique (un seul monde : la position réelle)                            | ✅     | `packages/bot/test/belief.test.ts`, `player.test.ts`                                   |
+| Force réelle des niveaux du bot en classique                                  | 👁      | à calibrer en jouant                                                                   |
 
 ## Limites connues (acceptées)
 

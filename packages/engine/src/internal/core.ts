@@ -39,6 +39,13 @@ import { publicSan } from './notation.js';
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 
 const INVALID_SECRETS = 'Choix de dame secrète invalide.';
+const NOT_SECRET_QUEEN = 'Partie classique : aucune dame secrète.';
+
+/**
+ * Marqueur d'une partie classique (aucune dame secrète). Un symbole ne peut pas provenir d'un
+ * JSON : une partie Secret Queen persistée ne peut donc jamais être recréée en partie classique.
+ */
+export const CLASSIC = Symbol('classic');
 const GAME_OVER = 'La partie est déjà terminée.';
 
 interface ParsedIntent {
@@ -94,8 +101,9 @@ function copyMove(move: PublicMove): PublicMove {
 }
 
 export class GameCore {
-  readonly #secrets: SecretChoice;
-  readonly #secretIds: Readonly<Record<Color, PieceId>>;
+  /** `null` : partie classique. */
+  readonly #secrets: SecretChoice | null;
+  readonly #secretIds: Readonly<Record<Color, PieceId>> | null;
   readonly #chess: Chess;
   readonly #realInitialFen: string;
   readonly #pieces: Map<Square, TrackedPiece>;
@@ -107,12 +115,20 @@ export class GameCore {
   #result: GameResult | null = null;
   #externalResult: GameResult | null = null;
 
-  /** Lève une erreur si une case n'est pas une case de départ de pion de la bonne couleur. */
-  constructor(secrets: SecretChoice) {
-    if (!isValidSecretChoice(secrets)) throw new Error(INVALID_SECRETS);
-    this.#secrets = { w: secrets.w, b: secrets.b };
-    this.#secretIds = { w: `wp${secrets.w}`, b: `bp${secrets.b}` };
-    this.#pieces = initialPieces(this.#secrets);
+  /**
+   * `CLASSIC` : partie classique. Sinon, lève une erreur si une case n'est pas une case de
+   * départ de pion de la bonne couleur.
+   */
+  constructor(secrets: SecretChoice | typeof CLASSIC) {
+    if (secrets === CLASSIC) {
+      this.#secrets = null;
+      this.#secretIds = null;
+    } else {
+      if (!isValidSecretChoice(secrets)) throw new Error(INVALID_SECRETS);
+      this.#secrets = { w: secrets.w, b: secrets.b };
+      this.#secretIds = { w: `wp${secrets.w}`, b: `bp${secrets.b}` };
+    }
+    this.#pieces = initialPieces(this.#secrets ?? {});
     this.#chess = new Chess(`${realPlacement(this.#pieces)} w KQkq - 0 1`);
     this.#realInitialFen = this.#chess.fen();
     this.#countRepetition(this.#realInitialFen);
@@ -135,6 +151,10 @@ export class GameCore {
     return this.#result === null ? null : { ...this.#result };
   }
 
+  get isClassic(): boolean {
+    return this.#secrets === null;
+  }
+
   /** Pièce suivie sur `square` (lecture seule). */
   pieceAt(square: Square): Readonly<TrackedPiece> | undefined {
     return this.#pieces.get(square);
@@ -151,12 +171,12 @@ export class GameCore {
   }
 
   secretId(color: Color): PieceId {
-    return this.#secretIds[color];
+    return this.#secretChoice().ids[color];
   }
 
   /** Case actuelle de la dame secrète de `color`, `null` si elle a été capturée. */
   secretSquare(color: Color): Square | null {
-    const id = this.#secretIds[color];
+    const id = this.#secretChoice().ids[color];
     for (const [square, piece] of this.#pieces) {
       if (piece.id === id) return square;
     }
@@ -165,9 +185,10 @@ export class GameCore {
 
   /** Vérité de fin de partie (§3.10). À ne publier qu'une fois la partie terminée. */
   reveal(): Reveal {
+    const { secrets, ids } = this.#secretChoice();
     const secret = (color: Color) => ({
-      pieceId: this.#secretIds[color],
-      initialSquare: this.#secrets[color],
+      pieceId: ids[color],
+      initialSquare: secrets[color],
       finalSquare: this.secretSquare(color),
     });
     return {
@@ -177,10 +198,39 @@ export class GameCore {
     };
   }
 
+  /** FEN réelles : position initiale puis position après chaque demi-coup. */
+  positions(): string[] {
+    return [this.#realInitialFen, ...this.#realPlies.map((ply) => ply.realFenAfter)];
+  }
+
+  /** Coups légaux du camp au trait dans la position réelle (aucun si la partie est finie). */
+  legalMoves(): { from: Square; to: Square }[] {
+    if (this.#result !== null) return [];
+    const seen = new Set<string>();
+    const moves: { from: Square; to: Square }[] = [];
+    for (const move of this.#chess.moves({ verbose: true })) {
+      // Les quatre promotions possibles d'un même coup ne comptent qu'une fois.
+      if (seen.has(move.lan.slice(0, 4))) continue;
+      seen.add(move.lan.slice(0, 4));
+      moves.push({ from: move.from, to: move.to });
+    }
+    return moves;
+  }
+
+  /** Coups joués (intentions normalisées), pour la persistance. */
+  intents(): MoveIntent[] {
+    return this.#intents.map((intent) => ({ ...intent }));
+  }
+
+  /** Fin appliquée par le serveur, pour la persistance. */
+  get externalResult(): GameResult | null {
+    return this.#externalResult === null ? null : { ...this.#externalResult };
+  }
+
   persisted(): PersistedGame {
     return {
       version: 1,
-      secrets: { ...this.#secrets },
+      secrets: { ...this.#secretChoice().secrets },
       moves: this.#intents.map((intent) => ({ ...intent })),
       externalResult: this.#externalResult === null ? null : { ...this.#externalResult },
     };
@@ -243,6 +293,12 @@ export class GameCore {
     return REDACTED;
   }
 
+  /** Choix secrets d'une partie Secret Queen (erreur en classique). */
+  #secretChoice(): { secrets: SecretChoice; ids: Readonly<Record<Color, PieceId>> } {
+    if (this.#secrets === null || this.#secretIds === null) throw new Error(NOT_SECRET_QUEEN);
+    return { secrets: this.#secrets, ids: this.#secretIds };
+  }
+
   /** Échiquier public : types affichés uniquement. */
   #publicBoard(): PublicBoard {
     const board = new Map<Square, PublicPiece>();
@@ -274,19 +330,23 @@ export class GameCore {
     const mate = check && this.#chess.isCheckmate();
     const stalemate = !check && this.#chess.isStalemate();
 
-    const san = publicSan({
-      board,
-      color,
-      displayedType: piece.displayed,
-      isSecretQueen: piece.id === this.#secretIds[color],
-      from,
-      to,
-      enPassant,
-      promotion,
-      castle: castleSide,
-      check,
-      mate,
-    });
+    // Classique : notation SAN standard de chess.js (rien n'est caché).
+    const san =
+      this.#secretIds === null
+        ? move.san
+        : publicSan({
+            board,
+            color,
+            displayedType: piece.displayed,
+            isSecretQueen: piece.id === this.#secretIds[color],
+            from,
+            to,
+            enPassant,
+            promotion,
+            castle: castleSide,
+            check,
+            mate,
+          });
 
     let castle: PublicMove['castle'] = null;
     if (castleSide !== null) {

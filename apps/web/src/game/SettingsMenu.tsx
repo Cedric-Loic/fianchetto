@@ -8,7 +8,10 @@ import {
   type PieceSet,
 } from '../lib/settings';
 
-/** Réglages : thème du plateau, jeu de pièces, sons, retournement automatique en hot-seat. */
+/**
+ * Réglages : thème du plateau, jeu de pièces, sons, retournement automatique en hot-seat, coups
+ * possibles (classique).
+ */
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
   const settings = useSettings();
@@ -69,6 +72,15 @@ export function SettingsMenu() {
               onChange={(e) => settings.update({ autoFlip: e.target.checked })}
             />{' '}
             À deux : tourner le plateau vers le camp au trait
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              data-testid="setting-legal-moves"
+              checked={settings.showLegalMoves}
+              onChange={(e) => settings.update({ showLegalMoves: e.target.checked })}
+            />{' '}
+            Classique : afficher les coups possibles
           </label>
         </div>
       )}

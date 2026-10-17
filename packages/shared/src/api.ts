@@ -4,6 +4,7 @@ import {
   BotLevelSchema,
   EndReasonSchema,
   GameModeSchema,
+  VariantSchema,
   ViewerGameStateSchema,
 } from './game-state.js';
 import { TimeControlIdSchema } from './time-control.js';
@@ -26,23 +27,32 @@ export const CredentialsSchema = z.object({
 });
 export type Credentials = z.infer<typeof CredentialsSchema>;
 
+/** Elo d'un joueur dans une variante. */
+export const RatingSchema = z.object({
+  rating: z.number().int(),
+  gamesPlayed: z.number().int().nonnegative(),
+});
+export type Rating = z.infer<typeof RatingSchema>;
+
 export const UserPublicSchema = z.object({
   id: z.string(),
   username: UsernameSchema,
-  rating: z.number().int(),
-  gamesPlayed: z.number().int().nonnegative(),
+  /** Un Elo séparé par variante. */
+  ratings: z.object({ classic: RatingSchema, 'secret-queen': RatingSchema }),
 });
 export type UserPublic = z.infer<typeof UserPublicSchema>;
 
 export const CreateGameRequestSchema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('bot'),
+    variant: VariantSchema,
     level: BotLevelSchema,
     timeControl: TimeControlIdSchema,
     color: z.enum(['w', 'b', 'random']),
   }),
   z.object({
     mode: z.literal('hotseat'),
+    variant: VariantSchema,
     timeControl: TimeControlIdSchema,
     whiteName: z.string().min(1).max(32),
     blackName: z.string().min(1).max(32),
@@ -55,6 +65,7 @@ export type CreateGameResponse = z.infer<typeof CreateGameResponseSchema>;
 
 export const GameSummarySchema = z.object({
   gameId: z.string(),
+  variant: VariantSchema,
   mode: GameModeSchema,
   rated: z.boolean(),
   timeControl: TimeControlIdSchema,
@@ -78,6 +89,7 @@ export const ProfileResponseSchema = z.object({
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 
 export const LeaderboardResponseSchema = z.object({
+  variant: VariantSchema,
   entries: z.array(
     z.object({
       rank: z.number().int().positive(),

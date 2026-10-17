@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Moteur Secret Queen : position réelle, secrets, légalité, fins de partie, projection par joueur, notation. Aucun I/O.",
+  "description": "Moteur d'échecs (classique et Secret Queen) : position réelle, secrets, légalité, fins de partie, projection par joueur, notation. Aucun I/O.",
   "exports": {
     ".": "./src/index.ts"
   },

@@ -42,6 +42,7 @@ describe('persistance SQLite', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         mode: 'hotseat',
+        variant: 'secret-queen',
         timeControl: 'blitz-5+0',
         whiteName: 'A',
         blackName: 'B',
@@ -104,7 +105,13 @@ describe('reprise des parties contre le bot', () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/games`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ mode: 'bot', level: 2, timeControl: 'untimed', color: 'w' }),
+        body: JSON.stringify({
+          mode: 'bot',
+          variant: 'secret-queen',
+          level: 2,
+          timeControl: 'untimed',
+          color: 'w',
+        }),
       });
       ids.push(((await res.json()) as { gameId: string }).gameId);
     }

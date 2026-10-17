@@ -21,6 +21,14 @@ import { TimeControlIdSchema } from './time-control.js';
  *   PAS de compteur des 50 coups, PAS de droits de roque, PAS de FEN réelle avant la fin.
  */
 
+/**
+ * Variante jouée. `classic` : échecs classiques, aucune information cachée (la projection est la
+ * position réelle). `secret-queen` : un pion de chaque camp est secrètement une dame.
+ */
+export const VARIANTS = ['classic', 'secret-queen'] as const;
+export const VariantSchema = z.enum(VARIANTS);
+export type Variant = z.infer<typeof VariantSchema>;
+
 /** Qui regarde : un camp, ou `public` (écran partagé du hot-seat, sans secret). */
 export const ViewerSchema = z.enum(['w', 'b', 'public']);
 export type Viewer = z.infer<typeof ViewerSchema>;
@@ -108,9 +116,15 @@ export const RevealSchema = z.object({
 });
 export type Reveal = z.infer<typeof RevealSchema>;
 
+/** Coup légal (cases de départ et d'arrivée), pour l'aide visuelle du mode classique. */
+export const LegalMoveSchema = z.object({ from: SquareSchema, to: SquareSchema });
+export type LegalMove = z.infer<typeof LegalMoveSchema>;
+
 /**
- * Partie « échiquier » de la vue, produite par `projectForViewer` (packages/engine).
- * `result` et `reveal` sont non nuls si et seulement si la partie est terminée.
+ * Partie « échiquier » de la vue, produite par `projectForViewer` (Secret Queen) ou
+ * `projectClassic` (classique), dans packages/engine.
+ * Secret Queen : `result` et `reveal` sont non nuls si et seulement si la partie est terminée.
+ * Classique : `reveal` est toujours `null` (rien n'est caché, la notation est déjà réelle).
  */
 export const ViewerBoardStateSchema = z.object({
   viewer: ViewerSchema,
@@ -127,6 +141,12 @@ export const ViewerBoardStateSchema = z.object({
   ownSecret: OwnSecretSchema.nullable(),
   result: GameResultSchema.nullable(),
   reveal: RevealSchema.nullable(),
+  /**
+   * Classique uniquement : coups légaux du camp au trait (`null` une fois la partie finie).
+   * TOUJOURS `null` en Secret Queen (pas de surbrillance des coups légaux, et la liste
+   * trahirait la dame secrète).
+   */
+  legalMoves: z.array(LegalMoveSchema).nullable(),
 });
 export type ViewerBoardState = z.infer<typeof ViewerBoardStateSchema>;
 
@@ -180,13 +200,14 @@ export type GamePhase = z.infer<typeof GamePhaseSchema>;
 /** Vue complète envoyée à un client (snapshot WebSocket). */
 export const ViewerGameStateSchema = z.object({
   gameId: z.string().min(1),
+  variant: VariantSchema,
   mode: GameModeSchema,
   viewer: ViewerSchema,
   phase: GamePhaseSchema,
   rated: z.boolean(),
   timeControl: TimeControlIdSchema,
   players: z.object({ w: PlayerInfoSchema, b: PlayerInfoSchema }),
-  /** Non nul uniquement pendant la phase `secret-selection`. */
+  /** Non nul uniquement pendant la phase `secret-selection` (jamais en classique). */
   selection: SelectionStateSchema.nullable(),
   /** `null` pendant la phase `secret-selection`. */
   board: ViewerBoardStateSchema.nullable(),

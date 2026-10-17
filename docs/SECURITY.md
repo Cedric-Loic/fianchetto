@@ -33,7 +33,10 @@ ne sort jamais du serveur vers le client d'un joueur, ni vers un log.
 1. **Serveur autoritatif.** Le client envoie des intentions (`ClientMessage`) et n'affiche que des
    snapshots projetés pour lui (`ServerMessage`).
 2. **Projection par joueur.** `projectForViewer` (packages/engine) est la seule fonction qui
-   produit ce qu'un joueur voit. Champs interdits : voir `docs/RULES.md` §2.
+   produit ce qu'un joueur voit. Champs interdits : voir `docs/RULES.md` §2. `legalMoves` y est
+   toujours `null`. La variante classique a sa propre projection (`projectClassic`), qui refuse
+   une partie Secret Queen (champ privé d'une autre classe) : elle ne peut pas servir à lire une
+   position réelle secrète.
 3. **Liste blanche à l'envoi.** Chaque message sortant est passé par son schéma Zod
    (`ServerMessageSchema.parse`), qui supprime toute clé non déclarée, puis contrôlé : un payload
    contenant « [REDACTED] » est une erreur de programmation et n'est pas envoyé.

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { ProfileResponse } from '@sq/shared';
+import { VARIANTS, type ProfileResponse } from '@sq/shared';
 import { api } from '../lib/api';
-import { REASON_SHORT } from './labels';
+import { REASON_SHORT, VARIANT_LABEL } from './labels';
 
-/** Profil : Elo et historique des parties. */
+const classedGames = (n: number) => (n <= 1 ? `${n} partie classée` : `${n} parties classées`);
+
+/** Profil : Elo de chaque variante et historique des parties. */
 export function Profile({ username }: { username: string }) {
   const [profile, setProfile] = useState<ProfileResponse | null | undefined>(undefined);
   useEffect(() => {
@@ -17,13 +19,18 @@ export function Profile({ username }: { username: string }) {
     <div className="page">
       <div className="panel page-panel">
         <h2>{user.username}</h2>
-        <p className="big-rating">
-          Elo <strong>{user.rating}</strong>{' '}
-          <span className="muted">· {user.gamesPlayed} parties classées</span>
-        </p>
+        <div className="ratings">
+          {VARIANTS.map((v) => (
+            <p key={v} className="big-rating" data-testid={`rating-${v}`}>
+              {VARIANT_LABEL[v]} <strong>{user.ratings[v].rating}</strong>{' '}
+              <span className="muted">· {classedGames(user.ratings[v].gamesPlayed)}</span>
+            </p>
+          ))}
+        </div>
         <table className="table">
           <thead>
             <tr>
+              <th>Variante</th>
               <th>Adversaire</th>
               <th>Résultat</th>
               <th>Cadence</th>
@@ -41,6 +48,7 @@ export function Profile({ username }: { username: string }) {
                   : null;
               return (
                 <tr key={g.gameId}>
+                  <td>{VARIANT_LABEL[g.variant]}</td>
                   <td>
                     {g.opponentName}{' '}
                     {g.mode === 'hotseat' && <span className="muted">(à deux)</span>}
@@ -70,7 +78,7 @@ export function Profile({ username }: { username: string }) {
             })}
             {history.length === 0 && (
               <tr>
-                <td colSpan={5} className="muted">
+                <td colSpan={6} className="muted">
                   Aucune partie pour l'instant.
                 </td>
               </tr>

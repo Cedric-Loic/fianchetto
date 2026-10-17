@@ -1,4 +1,10 @@
-import { SecretQueenGame, projectForViewer, type SecretChoice } from '@sq/engine';
+import {
+  ClassicGame,
+  SecretQueenGame,
+  projectClassic,
+  projectForViewer,
+  type SecretChoice,
+} from '@sq/engine';
 import {
   SQUARES,
   type BotObservation,
@@ -9,7 +15,7 @@ import {
 
 /** Observation telle que le serveur la construirait : projection pour le camp du bot. */
 export function observe(
-  game: SecretQueenGame,
+  game: SecretQueenGame | ClassicGame,
   botColor: Color,
   rejections: BotRejection[] = [],
 ): BotObservation {
@@ -18,6 +24,7 @@ export function observe(
     rejections,
     state: {
       gameId: 'test',
+      variant: game instanceof ClassicGame ? 'classic' : 'secret-queen',
       mode: 'bot',
       viewer: botColor,
       phase: 'playing',
@@ -28,7 +35,10 @@ export function observe(
         b: { name: 'b', rating: null, isBot: botColor === 'b', botLevel: null },
       },
       selection: null,
-      board: projectForViewer(game, botColor),
+      board:
+        game instanceof ClassicGame
+          ? projectClassic(game, botColor)
+          : projectForViewer(game, botColor),
       clock: null,
       drawOffer: null,
       rematch: { offeredBy: null, nextGameId: null },

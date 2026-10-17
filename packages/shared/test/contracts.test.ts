@@ -13,6 +13,7 @@ import {
 
 const sampleState: ViewerGameState = {
   gameId: 'g1',
+  variant: 'secret-queen',
   mode: 'bot',
   viewer: 'w',
   phase: 'playing',
@@ -49,6 +50,7 @@ const sampleState: ViewerGameState = {
     ownSecret: { pieceId: 'wpd2', square: 'd2' },
     result: null,
     reveal: null,
+    legalMoves: null,
   },
   clock: { remainingMs: { w: 180_000, b: 180_000 }, running: 'b', incrementMs: 2_000 },
   drawOffer: null,

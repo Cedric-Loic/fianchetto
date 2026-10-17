@@ -33,6 +33,14 @@ export const FORBIDDEN_KEY_RULES: readonly KeyRule[] = [
   { rule: 'motif', key: /^(reason|why|motive|motif|error|message|details?)$/i },
 ];
 
+/**
+ * Clés autorisées seulement si leur valeur est `null`. `legalMoves` (variante classique) est
+ * TOUJOURS nulle en Secret Queen : une liste, même vide, reste une fuite détectée.
+ */
+const NULL_ONLY_KEYS: ReadonlyArray<{ rule: string; path: RegExp }> = [
+  { rule: 'coups-legaux', path: /(^|\.)legalMoves$/ },
+];
+
 /** Clés autorisées malgré une règle (chemin complet → règle levée). */
 const ALLOWED_KEYS: ReadonlyArray<{ rule: string; path: RegExp }> = [
   // Le spectateur voit son propre secret (contenu vérifié ailleurs).
@@ -138,13 +146,18 @@ export function findForbidden(value: unknown, options: ScanOptions = {}): Findin
     for (const key of Object.getOwnPropertyNames(node)) {
       const childPath = keyPath(path, key);
       if (options.allowReveal && key === 'reveal') continue;
+      const descriptor = Object.getOwnPropertyDescriptor(node, key);
       for (const rule of rulesMatchingKey(key)) {
         if (ALLOWED_KEYS.some((a) => a.rule === rule && a.path.test(childPath))) continue;
+        const isNull =
+          descriptor !== undefined && 'value' in descriptor && descriptor.value === null;
+        if (isNull && NULL_ONLY_KEYS.some((a) => a.rule === rule && a.path.test(childPath))) {
+          continue;
+        }
         if (options.allowPaths?.some((re) => re.test(childPath))) continue;
         findings.push({ path: childPath, rule, detail: `clé interdite « ${key} »` });
       }
       visitString(key, `${childPath} (clé)`);
-      const descriptor = Object.getOwnPropertyDescriptor(node, key);
       if (descriptor && !('value' in descriptor)) {
         findings.push({ path: childPath, rule: 'non-donnee', detail: 'accesseur (getter)' });
         continue;

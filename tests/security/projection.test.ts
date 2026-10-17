@@ -103,6 +103,7 @@ describe('projection : position initiale', () => {
                 : { pieceId: `${viewer}p${secrets[viewer]}`, square: secrets[viewer] },
             result: null,
             reveal: null,
+            legalMoves: null,
           });
         }
         expectAllViewsConform(game, secrets, `initiale ${w}/${b}`);

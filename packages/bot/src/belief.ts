@@ -13,7 +13,10 @@ const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 /** Une hypothèse sur la dame secrète adverse, compatible avec tout ce que le bot a observé. */
 export interface Hypothesis {
-  /** Identifiant du pion adverse supposé être la dame (il peut avoir été capturé). */
+  /**
+   * Identifiant du pion adverse supposé être la dame (il peut avoir été capturé). Sans objet en
+   * classique (un seul monde).
+   */
   pieceId: PieceId;
   /** Position réelle actuelle si l'hypothèse est vraie. */
   fen: string;
@@ -104,4 +107,26 @@ export function computeBelief(observation: BotObservation): Hypothesis[] {
   }
   const total = worlds.length;
   return worlds.map((w) => ({ ...w, weight: 1 / total }));
+}
+
+/**
+ * Partie classique : un seul monde, la position réelle, obtenue en rejouant les coups publics
+ * depuis la position de départ standard (rien n'est caché).
+ */
+export function classicWorld(observation: BotObservation): Hypothesis[] {
+  const chess = new Chess(START_FEN);
+  for (const move of observation.state.board?.moves ?? []) {
+    const intent: MoveIntent = move.promotion
+      ? { from: move.from, to: move.to, promotion: move.promotion }
+      : { from: move.from, to: move.to };
+    if (!tryMove(chess, intent)) return [];
+  }
+  return [{ pieceId: 'wke1', fen: chess.fen(), weight: 1 }];
+}
+
+/** Mondes à analyser : la position réelle en classique, la croyance en Secret Queen. */
+export function worldsFor(observation: BotObservation): Hypothesis[] {
+  return observation.state.variant === 'classic'
+    ? classicWorld(observation)
+    : computeBelief(observation);
 }
