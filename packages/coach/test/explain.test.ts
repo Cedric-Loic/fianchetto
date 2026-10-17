@@ -41,9 +41,16 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 30, bestMoveUci: 'f1b5', pv: ['f1b5'] }),
       after: ev({ evalCp: -250, bestMoveUci: 'c6e5', pv: ['c6e5'] }),
     });
-    expect(explanation).toEqual({
+    expect(explanation).toMatchObject({
       kind: 'hanging-piece',
       text: 'Le cavalier joué en e5 est en prise : Nxe5 le gagne.',
+      visual: {
+        arrows: [{ from: 'c6', to: 'e5', kind: 'threat' }],
+        marks: [
+          { square: 'e5', kind: 'hanging' },
+          { square: 'c6', kind: 'attacker' },
+        ],
+      },
     });
   });
 
@@ -58,7 +65,7 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 900, bestMoveUci: 'g4f3', pv: ['g4f3'] }),
       after: ev({ evalCp: 1200, bestMoveUci: 'd4g4', pv: ['d4g4'] }),
     });
-    expect(explanation).toEqual({
+    expect(explanation).toMatchObject({
       kind: 'hanging-piece',
       text: 'Laisse le fou g4 en prise : Qxg4 le gagne.',
     });
@@ -74,9 +81,18 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 0, bestMoveUci: 'e8d7', pv: ['e8d7'] }),
       after: ev({ evalCp: 300, bestMoveUci: 'b5c7', pv: ['b5c7'] }),
     });
-    expect(explanation).toEqual({
+    expect(explanation).toMatchObject({
       kind: 'allowed-fork',
       text: 'Permet la fourchette Nc7+ sur roi e8 et tour a8.',
+      visual: {
+        arrows: [{ from: 'b5', to: 'c7', kind: 'threat' }],
+        marks: [
+          { square: 'e8', kind: 'target' },
+          { square: 'a8', kind: 'target' },
+          { square: 'c7', kind: 'attacker' },
+        ],
+        line: ['h7h6', 'b5c7'],
+      },
     });
   });
 
@@ -90,7 +106,7 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 400, bestMoveUci: 'd5c7', pv: ['d5c7'] }),
       after: ev({ evalCp: 0, bestMoveUci: 'a8a2', pv: ['a8a2'] }),
     });
-    expect(explanation).toEqual({
+    expect(explanation).toMatchObject({
       kind: 'missed-fork',
       text: 'Nc7+ était une fourchette sur roi e8 et tour a8.',
     });
@@ -106,7 +122,7 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 300, bestMoveUci: 'c3e5', pv: ['c3e5'] }),
       after: ev({ evalCp: 0, bestMoveUci: 'e5c4', pv: ['e5c4'] }),
     });
-    expect(explanation).toEqual({
+    expect(explanation).toMatchObject({
       kind: 'missed-material',
       text: 'Bxe5 gagnait le cavalier e5.',
     });
@@ -122,7 +138,7 @@ describe('détecteurs', () => {
       before: ev({ evalCp: null, mate: 1, bestMoveUci: 'a1a8', pv: ['a1a8'] }),
       after: ev({ evalCp: 500, bestMoveUci: 'h7h6', pv: ['h7h6'] }),
     });
-    expect(explanation).toEqual({
+    expect(explanation).toMatchObject({
       kind: 'missed-mate',
       text: 'Mat en 1 manqué : Ra8# lançait le mat.',
     });
@@ -138,7 +154,7 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 500, bestMoveUci: 'h7h6', pv: ['h7h6'] }),
       after: ev({ evalCp: null, mate: 1, bestMoveUci: 'a1a8', pv: ['a1a8'] }),
     });
-    expect(explanation).toEqual({
+    expect(explanation).toMatchObject({
       kind: 'allowed-mate',
       text: 'Ce coup permet un mat en 1, à commencer par Ra8#.',
     });
@@ -155,7 +171,7 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 0, bestMoveUci: 'd1e1', pv: ['d1e1'] }),
       after: ev({ evalCp: -500, bestMoveUci: 'b8b2', pv: ['b8b2', 'd2e3', 'b2h2'] }),
     });
-    expect(loss).toEqual({
+    expect(loss).toMatchObject({
       kind: 'material-loss',
       text: 'Ce coup coûte du matériel (environ 5 points sur la suite) ; Ke1 était meilleur.',
     });
@@ -168,7 +184,7 @@ describe('détecteurs', () => {
       before: ev({ evalCp: 30, bestMoveUci: 'e2e4', pv: ['e2e4'] }),
       after: ev({ evalCp: -20, bestMoveUci: 'e7e5', pv: ['e7e5'] }),
     });
-    expect(generic).toEqual({
+    expect(generic).toMatchObject({
       kind: 'generic',
       text: 'Meilleur coup : e4 (évaluation +0,3 au lieu de −0,2).',
     });
@@ -187,7 +203,7 @@ describe('conséquences seules (garde-fou)', () => {
       after: ev({ evalCp: -600, bestMoveUci: 'f6g4', pv: ['f6g4'] }),
     };
     expect(explainMove(ctx).kind).toBe('missed-mate');
-    expect(explainMove(ctx, { consequencesOnly: true })).toEqual({
+    expect(explainMove(ctx, { consequencesOnly: true })).toMatchObject({
       kind: 'hanging-piece',
       text: 'La dame jouée en g4 est en prise : Nxg4 la gagne.',
     });

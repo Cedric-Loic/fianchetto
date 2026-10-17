@@ -19,6 +19,9 @@ export interface ReviewInput {
 const emptyCounts = (): ClassCounts =>
   Object.fromEntries(MOVE_CLASSES.map((c) => [c, 0])) as ClassCounts;
 
+/** Longueur de la ligne principale conservée dans la revue (exploration, « Voir la ligne »). */
+const PV_PLIES = 10;
+
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
 /**
@@ -78,6 +81,7 @@ export function buildReview(input: ReviewInput, evals: readonly EngineEval[]): G
       mate: e.mate,
       bestMoveUci: e.bestMoveUci,
       bestMoveSan: e.bestMoveUci ? uciToSan(input.positions[i] ?? '', e.bestMoveUci) : null,
+      pv: e.pv.slice(0, PV_PLIES),
     })),
     moves,
     accuracy: { w: gameAccuracy(accuracies.w), b: gameAccuracy(accuracies.b) },

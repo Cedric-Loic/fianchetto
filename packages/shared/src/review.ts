@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ColorSchema } from './chess.js';
 import { VariantSchema } from './game-state.js';
+import { ExplanationVisualSchema } from './analysis.js';
 
 /*
  * Revue de partie (coach, étape 7) : évaluation Stockfish de chaque position, classification de
@@ -17,6 +18,8 @@ export const PositionEvalSchema = z.object({
   mate: z.number().int().nullable(),
   bestMoveUci: z.string().nullable(),
   bestMoveSan: z.string().nullable(),
+  /** Ligne principale en UCI (10 demi-coups au plus) ; absente des revues anciennes. */
+  pv: z.array(z.string()).optional(),
 });
 export type PositionEval = z.infer<typeof PositionEvalSchema>;
 
@@ -44,6 +47,14 @@ export const EXPLANATION_KINDS = [
 export const ExplanationKindSchema = z.enum(EXPLANATION_KINDS);
 export type ExplanationKind = z.infer<typeof ExplanationKindSchema>;
 
+export const ExplanationSchema = z.object({
+  kind: ExplanationKindSchema,
+  text: z.string(),
+  /** Flèches et cases à dessiner ; absent des revues anciennes. */
+  visual: ExplanationVisualSchema.optional(),
+});
+export type ReviewExplanation = z.infer<typeof ExplanationSchema>;
+
 export const ReviewMoveSchema = z.object({
   /** Numéro de demi-coup, à partir de 1. */
   ply: z.number().int().positive(),
@@ -57,7 +68,7 @@ export const ReviewMoveSchema = z.object({
   /** Précision du coup (0 à 100). */
   accuracy: z.number(),
   /** Explication en français des imprécisions, erreurs et gaffes ; `null` sinon. */
-  explanation: z.object({ kind: ExplanationKindSchema, text: z.string() }).nullable(),
+  explanation: ExplanationSchema.nullable(),
 });
 export type ReviewMove = z.infer<typeof ReviewMoveSchema>;
 
@@ -112,6 +123,24 @@ export const ReviewResponseSchema = z.object({
   state: ReviewStatusSchema,
 });
 export type ReviewResponse = z.infer<typeof ReviewResponseSchema>;
+
+/** « Apprends de tes erreurs » : un autre coup proposé à la place du coup joué au demi-coup `ply`. */
+export const RetryMoveRequestSchema = z.object({
+  ply: z.number().int().positive(),
+  uci: z.string().regex(/^[a-h][1-8][a-h][1-8][qrbn]?$/),
+});
+export type RetryMoveRequest = z.infer<typeof RetryMoveRequestSchema>;
+
+export const RetryMoveResponseSchema = z.object({
+  /** `best` : coup du moteur ; `good` : presque aussi bon (perte < 5 points) ; `wrong` sinon. */
+  verdict: z.enum(['best', 'good', 'wrong']),
+  san: z.string(),
+  /** FEN après le coup proposé. */
+  fen: z.string(),
+  /** Meilleure réponse adverse et suite (UCI), pour montrer la réfutation d'un coup faux. */
+  line: z.array(z.string()),
+});
+export type RetryMoveResponse = z.infer<typeof RetryMoveResponseSchema>;
 
 // --- Import de parties -------------------------------------------------------------------
 
