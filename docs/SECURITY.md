@@ -34,6 +34,10 @@ ne sort jamais du serveur vers le client d'un joueur, ni vers un log.
   L'import chess.com est le seul accès réseau : côté serveur, sur clic explicite, et seules les
   URL `https://api.chess.com/pub/player/…` sont suivies (pas d'URL arbitraire venue de la réponse).
 
+- **Entraînement (étape 9)** : indices, garde-fou et reprise de coups n'existent qu'en
+  classique (`trainingPosition()` est nul pour toute partie Secret Queen ; création refusée en
+  400 ; tests dans `apps/server/test/training.test.ts`).
+
 ## Mécanismes
 
 1. **Serveur autoritatif.** Le client envoie des intentions (`ClientMessage`) et n'affiche que des

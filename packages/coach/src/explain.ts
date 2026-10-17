@@ -62,7 +62,17 @@ function listTargets(targets: readonly ForkTarget[]): string {
  * fourchette manquée, prise gagnante manquée, perte de matériel sur la suite, puis repli
  * générique (meilleur coup et évaluations). Formulation neutre : elle vaut pour les deux camps.
  */
-export function explainMove(ctx: MoveContext): Explanation {
+export function explainMove(
+  ctx: MoveContext,
+  options: {
+    /**
+     * Ignorer ce que le joueur a manqué (mat, fourchette, prise) : seules les conséquences du
+     * coup comptent. Utilisé par le garde-fou, qui ne doit pas souffler le meilleur coup.
+     */
+    consequencesOnly?: boolean;
+  } = {},
+): Explanation {
+  const missed = !options.consequencesOnly;
   const { color, fenBefore, fenAfter, playedUci, before, after } = ctx;
   const opponent: Color = color === 'w' ? 'b' : 'w';
   const bestUci = before.bestMoveUci;
@@ -72,7 +82,7 @@ export function explainMove(ctx: MoveContext): Explanation {
   const playedBest = bestUci === playedUci;
 
   const mateBefore = mateFor(before, color);
-  if (mateBefore !== null && mateFor(after, color) === null && bestSan) {
+  if (missed && mateBefore !== null && mateFor(after, color) === null && bestSan) {
     return {
       kind: 'missed-mate',
       text: `Mat en ${mateBefore} manqué : ${bestSan} lançait le mat.`,
@@ -92,7 +102,7 @@ export function explainMove(ctx: MoveContext): Explanation {
     const square = reply.isEnPassant() ? `${reply.to[0]}${reply.from[1]}` : reply.to;
     const text =
       square === playedUci.slice(2, 4)
-        ? `${capitalize(pieceLabel(type, square).replace(` ${square}`, ''))} joué en ${square} est en prise : ${reply.san} ${pronoun(type)} gagne.`
+        ? `${capitalize(pieceLabel(type, square).replace(` ${square}`, ''))} ${pronoun(type) === 'la' ? 'jouée' : 'joué'} en ${square} est en prise : ${reply.san} ${pronoun(type)} gagne.`
         : `Laisse ${pieceLabel(type, square)} en prise : ${reply.san} ${pronoun(type)} gagne.`;
     return { kind: 'hanging-piece', text };
   }
@@ -107,7 +117,7 @@ export function explainMove(ctx: MoveContext): Explanation {
     }
   }
 
-  if (bestUci && bestSan && !playedBest) {
+  if (missed && bestUci && bestSan && !playedBest) {
     const targets = forkTargets(fenBefore, bestUci);
     if (targets.length > 0) {
       return {

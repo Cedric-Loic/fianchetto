@@ -1,7 +1,7 @@
 # Plan : plateforme Fianchetto et coach personnel
 
-Statut : **étapes 6 à 8 terminées** (plateforme, variante classique, revue et import de
-parties, puzzles). Étapes 9 à 11 : en attente du GO.
+Statut : **étapes 6 à 9 terminées** (plateforme, variante classique, revue et import de
+parties, puzzles, entraînement contre le bot). Étapes 10 et 11 : en attente du GO.
 
 ## 1. Point de départ et objectif
 

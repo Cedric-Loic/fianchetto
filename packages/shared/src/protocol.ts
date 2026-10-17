@@ -31,6 +31,8 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
     color: ColorSchema.optional(),
   }),
   z.object({ type: z.literal('offer-rematch'), color: ColorSchema.optional() }),
+  /** Entraînement : reprendre son dernier coup (et la réponse du bot). */
+  z.object({ type: z.literal('takeback') }),
   /**
    * Hot-seat uniquement : demande la case de la dame secrète du camp AU TRAIT, pendant que
    * le bouton « Voir ma dame secrète » est maintenu. Le client l'efface au relâchement.

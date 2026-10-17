@@ -330,6 +330,14 @@ button.big {
   gap: 10px;
   padding: 12px;
   max-height: calc(min(80vh, 680px) + 120px);
+  overflow-y: auto;
+}
+/* Panneau trop rempli (revue, entraînement) : il défile ; seule la liste des coups rétrécit. */
+.side-panel > * {
+  flex-shrink: 0;
+}
+.side-panel > .move-list {
+  flex-shrink: 1;
 }
 .turn-banner {
   font-weight: 700;
@@ -922,4 +930,46 @@ a.button.primary {
 .puzzles .tabs button {
   padding: 6px 4px;
   font-size: 0.85rem;
+}
+
+/* --- Entraînement --- */
+.training {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 8px;
+}
+.hint-text {
+  margin: 0;
+  color: #f7c631;
+}
+.key-moment {
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.key-moment button {
+  padding: 2px 8px;
+}
+.home-panel label.check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+}
+.replay {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.replay select {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid #3c3a37;
+  border-radius: 6px;
+  padding: 6px;
 }

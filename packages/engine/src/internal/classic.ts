@@ -21,11 +21,16 @@ function assertColor(color: unknown): asserts color is Color {
   if (!(COLORS as readonly unknown[]).includes(color)) throw new Error(INVALID_COLOR);
 }
 
+const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
 export class ClassicGame {
   readonly #core: GameCore;
+  /** Position de départ si elle n'est pas standard. */
+  readonly #initialFen: string | undefined;
 
-  private constructor(core: GameCore) {
+  private constructor(core: GameCore, initialFen?: string) {
     this.#core = core;
+    this.#initialFen = initialFen;
   }
 
   static {
@@ -35,8 +40,13 @@ export class ClassicGame {
     };
   }
 
-  static create(): ClassicGame {
-    return new ClassicGame(new GameCore(CLASSIC));
+  /**
+   * Nouvelle partie, depuis la position initiale ou une FEN (rejouer à partir d'une erreur).
+   * Lève une erreur si la FEN est invalide ou si la partie y est déjà finie.
+   */
+  static create(initialFen?: string): ClassicGame {
+    const fen = initialFen === START ? undefined : initialFen;
+    return new ClassicGame(new GameCore(CLASSIC, fen), fen);
   }
 
   /** Rejoue une partie persistée. Lève une erreur (sans détail) si elle est incohérente. */
@@ -44,12 +54,18 @@ export class ClassicGame {
     if (!Secret.isSecret(persisted)) throw new Error(INVALID_PERSISTED);
     const data: unknown = persisted.expose();
     if (typeof data !== 'object' || data === null) throw new Error(INVALID_PERSISTED);
-    if ((data as Record<string, unknown>).variant !== 'classic') {
+    const record = data as Record<string, unknown>;
+    if (record.variant !== 'classic') throw new Error(INVALID_PERSISTED);
+    const fen = record.initialFen;
+    if (fen !== undefined && typeof fen !== 'string') throw new Error(INVALID_PERSISTED);
+    let core: GameCore;
+    try {
+      core = new GameCore(CLASSIC, fen);
+    } catch {
       throw new Error(INVALID_PERSISTED);
     }
-    const core = new GameCore(CLASSIC);
-    replayHistory(core, parseHistory(data as Record<string, unknown>));
-    return new ClassicGame(core);
+    replayHistory(core, parseHistory(record));
+    return new ClassicGame(core, fen);
   }
 
   get turn(): Color {
@@ -93,10 +109,25 @@ export class ClassicGame {
     return this.#core.positions();
   }
 
+  /**
+   * La même partie sans ses `count` derniers demi-coups (reprise de coup en entraînement).
+   * Une fin de partie éventuelle est annulée.
+   */
+  withoutLastMoves(count: number): ClassicGame {
+    const core = new GameCore(CLASSIC, this.#initialFen);
+    const moves = this.#core.intents();
+    replayHistory(core, {
+      moves: moves.slice(0, Math.max(0, moves.length - count)),
+      externalResult: null,
+    });
+    return new ClassicGame(core, this.#initialFen);
+  }
+
   toPersisted(): Secret<PersistedClassicGame> {
     return new Secret({
       version: 1,
       variant: 'classic',
+      ...(this.#initialFen ? { initialFen: this.#initialFen } : {}),
       moves: this.#core.intents(),
       externalResult: this.#core.externalResult,
     });

@@ -37,6 +37,10 @@ export interface SessionRecord {
   id: string;
   /** Absent des enregistrements antérieurs à la variante classique : Secret Queen. */
   variant?: Variant;
+  /** Partie d'entraînement (absent : non). */
+  training?: boolean;
+  /** Classique : position de départ si elle n'est pas standard. */
+  initialFen?: string | null;
   mode: GameMode;
   timeControl: TimeControlId;
   players: Record<Color, PlayerInfo>;
@@ -64,6 +68,10 @@ export interface SessionSecrets {
 export interface SessionOptions {
   id: string;
   variant: Variant;
+  /** Entraînement contre le bot (classique) : non classée, indices, reprise de coups. */
+  training?: boolean;
+  /** Classique : position de départ (FEN), sinon position standard. */
+  initialFen?: string | null;
   mode: GameMode;
   timeControl: TimeControlId;
   players: Record<Color, PlayerInfo>;
@@ -113,6 +121,8 @@ const MAX_BOT_ATTEMPTS = 80;
 export class GameSession {
   readonly id: string;
   readonly variant: Variant;
+  readonly training: boolean;
+  readonly initialFen: string | null;
   readonly mode: GameMode;
   readonly timeControl: TimeControlId;
   readonly players: Record<Color, PlayerInfo>;
@@ -136,6 +146,8 @@ export class GameSession {
   #participants = new Set<Participant>();
   #bot: BotDriver | null;
   #botThinking = false;
+  /** Incrémenté à chaque reprise de coup : un coup du bot calculé avant est ignoré. */
+  #botGeneration = 0;
   /** Refus des coups du bot : renvoyés au bot seulement. */
   #botRejections: BotRejection[] = [];
   #ended = false;
@@ -145,6 +157,8 @@ export class GameSession {
   constructor(options: SessionOptions) {
     this.id = options.id;
     this.variant = options.variant;
+    this.training = options.training ?? false;
+    this.initialFen = options.initialFen ?? null;
     this.mode = options.mode;
     this.timeControl = options.timeControl;
     this.players = options.players;
@@ -158,7 +172,7 @@ export class GameSession {
     this.#handoffPending = options.mode === 'hotseat' && options.variant === 'secret-queen';
     if (options.variant === 'classic') {
       this.#phase = 'playing';
-      this.#game = ClassicGame.create();
+      this.#game = ClassicGame.create(this.initialFen ?? undefined);
     }
     const tc = TIME_CONTROLS[options.timeControl];
     this.#clock =
@@ -184,6 +198,11 @@ export class GameSession {
       this.#secrets[botColor] = this.#bot.chooseSecret(pawnStartSquares(botColor));
     }
     this.#armSelectionTimer(opposite(botColor));
+  }
+
+  /** Partie classée : contre le bot, hors entraînement. */
+  get rated(): boolean {
+    return this.mode === 'bot' && !this.training;
   }
 
   get phase(): GamePhase {
@@ -243,6 +262,8 @@ export class GameSession {
         return;
       case 'peek-secret':
         return this.#peek(participant);
+      case 'takeback':
+        return this.#takeback(actor);
     }
   }
 
@@ -365,6 +386,37 @@ export class GameSession {
     this.#broadcast({ kind: 'rematch-offered', by: color });
   }
 
+  /**
+   * Entraînement : reprend le dernier coup du joueur (et la réponse du bot s'il a déjà joué).
+   * Un coup du bot en cours de calcul est abandonné.
+   */
+  #takeback(actor: Color | null): void {
+    const game = this.#game;
+    if (!this.training || !(game instanceof ClassicGame) || this.#phase !== 'playing') return;
+    if (actor === null || actor === this.botColor) return;
+    const count = game.turn === actor ? 2 : 1;
+    if (game.plyCount < count) return;
+    const back = game.withoutLastMoves(count);
+    if (back.turn !== actor) return;
+    this.#game = back;
+    this.#botGeneration++;
+    this.#drawOffer = null;
+    this.#botRejections = [];
+    this.#broadcast(null);
+  }
+
+  /**
+   * Entraînement : position où le joueur doit jouer (indices, garde-fou), sinon `null`. Jamais
+   * en Secret Queen.
+   */
+  trainingPosition(): { fen: string; color: Color } | null {
+    const game = this.#game;
+    if (!this.training || !(game instanceof ClassicGame) || this.#phase !== 'playing') return null;
+    const human = this.botColor === null ? null : opposite(this.botColor);
+    const fen = game.positions().at(-1);
+    return human !== null && game.turn === human && fen ? { fen, color: human } : null;
+  }
+
   /** Hot-seat : case de la dame secrète du camp au trait, à la demande (bouton maintenu). */
   #peek(participant: Participant): void {
     const game = this.#game;
@@ -410,6 +462,7 @@ export class GameSession {
 
   async #botPlay(): Promise<void> {
     const color = this.botColor;
+    const generation = this.#botGeneration;
     for (let attempt = 0; attempt < MAX_BOT_ATTEMPTS; attempt++) {
       const bot = this.#bot;
       const game = this.#game;
@@ -422,6 +475,8 @@ export class GameSession {
       } catch {
         return;
       }
+      // Coup repris pendant la réflexion du bot : ce coup ne vaut plus.
+      if (generation !== this.#botGeneration) return;
       const plies = game.plyCount;
       if (this.#applyMove(color, move)) return;
       if (this.#phase !== 'playing') return;
@@ -518,6 +573,8 @@ export class GameSession {
       record: {
         id: this.id,
         variant: this.variant,
+        training: this.training,
+        initialFen: this.initialFen,
         mode: this.mode,
         timeControl: this.timeControl,
         players: this.players,
@@ -558,6 +615,8 @@ export class GameSession {
       ...options,
       id: record.id,
       variant,
+      training: record.training ?? false,
+      initialFen: record.initialFen ?? null,
       mode: record.mode,
       timeControl: record.timeControl,
       players: record.players,
@@ -634,7 +693,9 @@ export class GameSession {
       mode: this.mode,
       viewer,
       phase: this.#phase,
-      rated: this.mode === 'bot',
+      rated: this.rated,
+      training: this.training,
+      initialFen: this.initialFen,
       timeControl: this.timeControl,
       players: this.players,
       selection:

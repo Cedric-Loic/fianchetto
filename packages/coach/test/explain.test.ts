@@ -175,6 +175,25 @@ describe('détecteurs', () => {
   });
 });
 
+describe('conséquences seules (garde-fou)', () => {
+  it('ignore le mat manqué et décrit la pièce laissée en prise', () => {
+    const fenBefore = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
+    const ctx = {
+      color: 'w' as const,
+      fenBefore,
+      fenAfter: play(fenBefore, 'h5g4'),
+      playedUci: 'h5g4',
+      before: ev({ evalCp: null, mate: 1, bestMoveUci: 'h5f7', pv: ['h5f7'] }),
+      after: ev({ evalCp: -600, bestMoveUci: 'f6g4', pv: ['f6g4'] }),
+    };
+    expect(explainMove(ctx).kind).toBe('missed-mate');
+    expect(explainMove(ctx, { consequencesOnly: true })).toEqual({
+      kind: 'hanging-piece',
+      text: 'La dame jouée en g4 est en prise : Nxg4 la gagne.',
+    });
+  });
+});
+
 describe('fourchettes', () => {
   it('une pièce prise aussitôt avec profit ne fait pas de fourchette', () => {
     // Nc7+ attaque e8 et a8, mais le cavalier est pris par la dame d8 (sans défense).

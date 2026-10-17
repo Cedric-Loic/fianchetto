@@ -103,6 +103,17 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Mes erreurs : puzzles tirés des revues, autre bon coup accepté (Stockfish)         | ✅     | `puzzles.test.ts`, `packages/coach/test/puzzles.test.ts`                                 |
 | Écran puzzles : coup adverse animé, solution, thème, réglage des coups possibles   | ✅ / 👁 | `tests/e2e/puzzles.spec.ts` (base de démonstration)                                      |
 
+## Étape 9 : entraînement contre le bot
+
+| Exigence                                                              | État   | Preuve                                                            |
+| --------------------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| Partie d'entraînement non classée, sans pendule, classique seulement  | ✅     | `apps/server/test/training.test.ts`, `tests/e2e/training.spec.ts` |
+| Indices progressifs (idée, pièce, coup)                               | ✅ / 👁 | `training.test.ts`, `training.spec.ts` ; pertinence à juger       |
+| Garde-fou avant une gaffe (sans souffler le meilleur coup)            | ✅     | `training.test.ts`, `packages/coach/test/explain.test.ts`, e2e    |
+| Reprise de coups, y compris pendant la réflexion du bot               | ✅     | `training.test.ts`, `training.spec.ts`                            |
+| Bilan du coach : 3 moments clés et un conseil ; revue lancée d'office | ✅     | `training.test.ts`, `coach.spec.ts`, `training.spec.ts`           |
+| Rejouer à partir d'une erreur (partie depuis une FEN)                 | ✅     | `packages/engine/test/classic.test.ts`, `coach.spec.ts`           |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).

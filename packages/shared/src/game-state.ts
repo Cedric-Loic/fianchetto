@@ -205,6 +205,13 @@ export const ViewerGameStateSchema = z.object({
   viewer: ViewerSchema,
   phase: GamePhaseSchema,
   rated: z.boolean(),
+  /**
+   * Partie d'entraînement contre le bot (classique) : non classée, sans pendule, avec indices,
+   * garde-fou et reprise de coups.
+   */
+  training: z.boolean(),
+  /** Classique depuis une position quelconque : FEN de départ ; sinon `null` (Secret Queen : toujours `null`). */
+  initialFen: z.string().nullable(),
   timeControl: TimeControlIdSchema,
   players: z.object({ w: PlayerInfoSchema, b: PlayerInfoSchema }),
   /** Non nul uniquement pendant la phase `secret-selection` (jamais en classique). */

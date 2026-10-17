@@ -20,7 +20,12 @@ export interface ManagerOptions {
   config: GameConfig;
   /** Fabrique de bots (remplaçable dans les tests). */
   createBot?: (level: BotLevel) => BotDriver;
+  /** Après la fin d'une partie (par exemple : lancer sa revue). */
+  afterEnd?: (session: GameSession) => void;
 }
+
+/** Demande de partie invalide (FEN, combinaison d'options). */
+export class InvalidGameRequest extends Error {}
 
 /**
  * Registre des parties. Chaque changement d'état est sauvegardé dans SQLite ; au démarrage,
@@ -32,11 +37,13 @@ export class GameManager {
   readonly #store: GameStore;
   readonly #config: GameConfig;
   readonly #createBot: (level: BotLevel) => BotDriver;
+  readonly #afterEnd: ((session: GameSession) => void) | undefined;
 
   constructor(options: ManagerOptions) {
     this.#store = options.store;
     this.#config = options.config;
     this.#createBot = options.createBot ?? ((level) => new WorkerBot(level));
+    this.#afterEnd = options.afterEnd;
     for (const saved of this.#store.loadUnfinished()) {
       try {
         const level = saved.record.botColor
@@ -64,7 +71,10 @@ export class GameManager {
         const { record, secrets } = session.toRecord();
         this.#store.save(record, secrets);
       },
-      onEnd: (session: GameSession, result: GameResult) => this.#recordResult(session, result),
+      onEnd: (session: GameSession, result: GameResult) => {
+        this.#recordResult(session, result);
+        this.#afterEnd?.(session);
+      },
     };
   }
 
@@ -107,31 +117,52 @@ export class GameManager {
     level: BotLevel;
     timeControl: TimeControlId;
     color: Color | 'random';
+    /** Entraînement (classique) : non classée, sans pendule, indices, reprise de coups. */
+    training?: boolean;
+    /** Entraînement : position de départ ; le joueur a le trait. */
+    fen?: string;
   }): GameSession {
     const user = this.#store.findUser(options.userId);
     const level = this.#config.botLevels.find((l) => l.level === options.level);
     if (!user || !level) throw new Error('Utilisateur ou niveau inconnu.');
+    const training = options.training ?? false;
+    if (training && options.variant !== 'classic') throw new InvalidGameRequest();
+    if (options.fen !== undefined && !training) throw new InvalidGameRequest();
+    const fenTurn = options.fen?.split(' ')[1];
     const human: Color =
-      options.color === 'random' ? (randomInt(2) === 0 ? 'w' : 'b') : options.color;
+      fenTurn === 'w' || fenTurn === 'b'
+        ? fenTurn
+        : options.color === 'random'
+          ? randomInt(2) === 0
+            ? 'w'
+            : 'b'
+          : options.color;
     const botColor = opposite(human);
     const { rating } = this.#store.ratingOf(user.id, options.variant);
     const players = {
       [human]: { name: user.username, rating, isBot: false, botLevel: null },
       [botColor]: { name: level.name, rating: level.elo, isBot: true, botLevel: level.level },
     } as Record<Color, PlayerInfo>;
-    const session = this.#register(
-      new GameSession({
+    let created: GameSession;
+    try {
+      created = new GameSession({
         id: randomUUID(),
         variant: options.variant,
+        training,
+        initialFen: options.fen ?? null,
         mode: 'bot',
-        timeControl: options.timeControl,
+        // Entraînement : pas de pendule (on prend le temps de réfléchir, on reprend des coups).
+        timeControl: training ? 'untimed' : options.timeControl,
         players,
         botColor,
         ownerId: user.id,
         createBot: () => this.#createBot(level.level),
         ...this.#hooks(),
-      }),
-    );
+      });
+    } catch {
+      throw new InvalidGameRequest();
+    }
+    const session = this.#register(created);
     session.start();
     return session;
   }
@@ -148,12 +179,15 @@ export class GameManager {
       }).id;
     }
     const botColor = previous.botColor ?? 'b';
+    // Entraînement depuis une position : on rejoue la même position, du même côté.
     return this.createBotGame({
       variant: previous.variant,
       userId: previous.ownerId ?? '',
       level: previous.players[botColor].botLevel ?? 1,
       timeControl: previous.timeControl,
       color: botColor,
+      training: previous.training,
+      ...(previous.initialFen ? { fen: previous.initialFen } : {}),
     }).id;
   }
 
@@ -165,7 +199,7 @@ export class GameManager {
     const color: Color = session.mode === 'bot' ? opposite(session.botColor ?? 'b') : 'w';
     const before = this.#store.ratingOf(user.id, session.variant);
     let ratingAfter: number | null = null;
-    if (session.mode === 'bot') {
+    if (session.rated) {
       const opponentElo = session.players[opposite(color)].rating ?? this.#config.elo.initial;
       const score = result.winner === null ? 0.5 : result.winner === color ? 1 : 0;
       ratingAfter = updateRating(
@@ -181,13 +215,13 @@ export class GameManager {
       gameId: session.id,
       variant: session.variant,
       mode: session.mode,
-      rated: session.mode === 'bot',
+      rated: session.rated,
       timeControl: session.timeControl,
       color,
       opponentName: session.players[opposite(color)].name,
       winner: result.winner,
       reason: result.reason,
-      ratingBefore: session.mode === 'bot' ? before.rating : null,
+      ratingBefore: session.rated ? before.rating : null,
       ratingAfter,
       startedAt: session.startedAt,
       endedAt: new Date().toISOString(),

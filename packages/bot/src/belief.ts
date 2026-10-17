@@ -111,10 +111,10 @@ export function computeBelief(observation: BotObservation): Hypothesis[] {
 
 /**
  * Partie classique : un seul monde, la position réelle, obtenue en rejouant les coups publics
- * depuis la position de départ standard (rien n'est caché).
+ * depuis la position de départ (standard, ou FEN de l'entraînement ; rien n'est caché).
  */
 export function classicWorld(observation: BotObservation): Hypothesis[] {
-  const chess = new Chess(START_FEN);
+  const chess = new Chess(observation.state.initialFen ?? START_FEN);
   for (const move of observation.state.board?.moves ?? []) {
     const intent: MoveIntent = move.promotion
       ? { from: move.from, to: move.to, promotion: move.promotion }

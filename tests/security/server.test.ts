@@ -194,7 +194,9 @@ describe('serveur : indistinguabilité et canari', () => {
     // La colonne publique `record` ne contient aucun choix de pion ; le choix (« b7 » du bot) est
     // dans `secret_state`. On vérifie la forme JSON : "selection" n'apparaît que dans le secret.
     const records = [
-      ...w.dbBytes.matchAll(/\{"id":"[^"]+","variant":"[^"]+","mode"[^\n]*?"startedAt":"[^"]+"\}/g),
+      ...w.dbBytes.matchAll(
+        /\{"id":"[^"]+","variant":"[^"]+",[^\n]*?"mode"[^\n]*?"startedAt":"[^"]+"\}/g,
+      ),
     ];
     expect(records.length).toBeGreaterThan(0);
     for (const r of records) {

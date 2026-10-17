@@ -49,6 +49,10 @@ export const CreateGameRequestSchema = z.discriminatedUnion('mode', [
     level: BotLevelSchema,
     timeControl: TimeControlIdSchema,
     color: z.enum(['w', 'b', 'random']),
+    /** Entraînement (classique seulement) : non classée, sans pendule. */
+    training: z.boolean().optional(),
+    /** Entraînement : position de départ (FEN), par exemple avant une erreur à rejouer. */
+    fen: z.string().max(100).optional(),
   }),
   z.object({
     mode: z.literal('hotseat'),
@@ -111,6 +115,23 @@ export type BotLevelInfo = z.infer<typeof BotLevelInfoSchema>;
 /** Partie en cours de l'utilisateur (reprise après rafraîchissement). */
 export const ActiveGameResponseSchema = z.object({ gameId: z.string().nullable() });
 export type ActiveGameResponse = z.infer<typeof ActiveGameResponseSchema>;
+
+/** Indice d'entraînement : 1 = l'idée, 2 = la pièce, 3 = le coup. */
+export const HintRequestSchema = z.object({ level: z.number().int().min(1).max(3) });
+export const HintResponseSchema = z.object({
+  level: z.number().int(),
+  text: z.string(),
+  from: z.string().nullable(),
+  to: z.string().nullable(),
+});
+export type HintResponse = z.infer<typeof HintResponseSchema>;
+
+/** Garde-fou : le coup envisagé est-il une gaffe ? */
+export const CheckMoveRequestSchema = z.object({
+  uci: z.string().regex(/^[a-h][1-8][a-h][1-8][qrbn]?$/),
+});
+export const CheckMoveResponseSchema = z.object({ warning: z.string().nullable() });
+export type CheckMoveResponse = z.infer<typeof CheckMoveResponseSchema>;
 
 /** Rejeu d'une partie terminée : dernier état, révélation comprise. */
 export const ReplayResponseSchema = z.object({ state: ViewerGameStateSchema });

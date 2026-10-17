@@ -84,3 +84,14 @@ describe('partie classique', () => {
     expect(classicWorld(observe(game, 'b'))[0]?.fen).toBe(game.positions().at(-1));
   });
 });
+
+describe('partie classique depuis une FEN', () => {
+  it('la position réelle part de la FEN de départ', () => {
+    const fen = 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3';
+    const game = ClassicGame.create(fen);
+    expect(game.play('w', { from: 'f1', to: 'b5' }).ok).toBe(true);
+    const obs = observe(game, 'b');
+    expect(obs.state.initialFen).toBe(fen);
+    expect(classicWorld(obs)[0]?.fen).toBe(game.positions().at(-1));
+  });
+});

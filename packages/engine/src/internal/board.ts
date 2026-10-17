@@ -64,6 +64,26 @@ export function initialPieces(
 }
 
 /** Champ « placement » d'une FEN, à partir des types RÉELS. */
+/** Pièces suivies d'une position quelconque (partie classique depuis une FEN). */
+export function piecesFromBoard(
+  board: readonly ({ square: Square; type: PieceType; color: Color } | null)[][],
+): Map<Square, TrackedPiece> {
+  const pieces = new Map<Square, TrackedPiece>();
+  for (const row of board) {
+    for (const p of row) {
+      if (p) {
+        pieces.set(p.square, {
+          id: `${p.color}${p.type}${p.square}`,
+          color: p.color,
+          displayed: p.type,
+          real: p.type,
+        });
+      }
+    }
+  }
+  return pieces;
+}
+
 export function realPlacement(pieces: ReadonlyMap<Square, TrackedPiece>): string {
   const rows: string[] = [];
   for (let rank = 8; rank >= 1; rank--) {

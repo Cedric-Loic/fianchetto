@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { Color, GameResult, Square, ViewerGameState } from '@sq/shared';
+import type { Color, GameResult, HintResponse, Square, ViewerGameState } from '@sq/shared';
+import { api } from '../lib/api';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { Board } from '../game/Board';
 import { MoveList } from '../game/MoveList';
 import { PlayerBar } from '../game/PlayerBar';
 import { send } from '../lib/net';
 import { publicPositionAt } from '../lib/position';
+import { piecesFromFen } from '../lib/fen';
 import { useGame } from '../lib/store';
 import { useSession } from '../lib/session';
 import { REASONS, SIDE, VARIANT_LABEL } from './labels';
@@ -45,6 +47,14 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   } | null>(null);
   const autoFlip = useSettings((s) => s.autoFlip);
   const showLegalMoves = useSettings((s) => s.showLegalMoves);
+  const guardOn = useSettings((s) => s.trainingGuard);
+  // Entraînement : indice de la position courante (niveau 1 à 3), et coup en attente de
+  // confirmation après un avertissement du garde-fou.
+  const [hint, setHint] = useState<{ ply: number; data: HintResponse } | null>(null);
+  const [guard, setGuard] = useState<{ move: LocalMove; warning: string; ply: number } | null>(
+    null,
+  );
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -60,9 +70,32 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     pendingState && pendingState.base === plyCount && pendingState.rej === rejections
       ? pendingState.move
       : null;
-  const play = (move: LocalMove) => {
+  const commit = (move: LocalMove) => {
     setPending({ move, base: plyCount, rej: rejections });
     send({ type: 'move', clientMoveId: crypto.randomUUID(), move });
+  };
+  const play = (move: LocalMove) => {
+    if (!state.training || !guardOn) return commit(move);
+    // Garde-fou : le coup est affiché pendant la vérification, annulé s'il faut confirmer.
+    setPending({ move, base: plyCount, rej: rejections });
+    setChecking(true);
+    const uci = `${move.from}${move.to}${move.promotion ?? ''}`;
+    void api.checkMove(state.gameId, uci).then((res) => {
+      setChecking(false);
+      if (res?.warning) {
+        setPending(null);
+        setGuard({ move, warning: res.warning, ply: plyCount });
+      } else {
+        send({ type: 'move', clientMoveId: crypto.randomUUID(), move });
+      }
+    });
+  };
+  const currentHint = hint && hint.ply === plyCount ? hint.data : null;
+  const askHint = () => {
+    const level = currentHint ? Math.min(3, currentHint.level + 1) : 1;
+    void api.hint(state.gameId, level).then((data) => {
+      if (data) setHint({ ply: plyCount, data });
+    });
   };
 
   // À mon tour, le premier premove part (un refus reçoit le message générique, comme un coup,
@@ -105,7 +138,11 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const shownPly = cursor ?? plyCount;
   const pieces = live
     ? applyLocalMoves(board.pieces, [...(pending ? [pending] : []), ...premoves])
-    : publicPositionAt(board.moves, shownPly);
+    : publicPositionAt(
+        board.moves,
+        shownPly,
+        state.initialFen ? piecesFromFen(state.initialFen) : undefined,
+      );
   // Ma dame secrète suit l'affichage local (coup en attente, premoves).
   const ownSecretId = board.ownSecret?.pieceId;
   const ownSecretSquare = ownSecretId
@@ -129,7 +166,13 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   }
   // Mon camp peut jouer (mode bot : seulement à mon tour ; hot-seat : le camp au trait).
   const movable =
-    ended || !live || pending ? null : isBot ? (board.turn === me ? me : null) : board.turn;
+    ended || !live || pending || checking || guard
+      ? null
+      : isBot
+        ? board.turn === me
+          ? me
+          : null
+        : board.turn;
   const actor = isBot ? (me ?? 'w') : board.turn;
 
   // Hot-seat : option « retourner le plateau vers le camp au trait ».
@@ -173,6 +216,12 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
       legalMoves={classic && showLegalMoves && live ? board.legalMoves : null}
       ownSecretSquare={isBot ? ownSecretSquare : null}
       lastMove={lastMove ? { from: lastMove.from, to: lastMove.to } : null}
+      highlighted={live && currentHint?.from ? (currentHint.from as Square) : null}
+      extraArrows={
+        live && currentHint?.from && currentHint.to
+          ? [{ from: currentHint.from as Square, to: currentHint.to as Square }]
+          : []
+      }
       checkSquare={checkSquare}
       crowns={crowns}
       onMove={(from, to, promotion) => play(promotion ? { from, to, promotion } : { from, to })}
@@ -227,6 +276,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
             : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`}
           <span className="variant-badge">{VARIANT_LABEL[state.variant]}</span>
           {state.rated && <span className="rated-badge">Classée</span>}
+          {state.training && <span className="rated-badge">Entraînement</span>}
         </div>
         <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />
         <div className="nav">
@@ -250,6 +300,32 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           </button>
         </div>
 
+        {!ended && state.training && (
+          <div className="training" data-testid="training-panel">
+            <div className="actions">
+              <button onClick={askHint} disabled={board.turn !== me} data-testid="hint">
+                💡 {currentHint ? (currentHint.level < 3 ? 'Indice suivant' : 'Indice') : 'Indice'}
+              </button>
+              <button
+                onClick={() => {
+                  // Le coup affiché en attente et les premoves n'ont plus lieu d'être.
+                  setPending(null);
+                  setQueue({ list: [], rej: rejections });
+                  send({ type: 'takeback' });
+                }}
+                disabled={plyCount === 0}
+                data-testid="takeback"
+              >
+                ↶ Reprendre le coup
+              </button>
+            </div>
+            {currentHint && (
+              <p className="hint-text" data-testid="hint-text">
+                {currentHint.text}
+              </p>
+            )}
+          </div>
+        )}
         {!ended && (
           <>
             {!isBot && !classic && (
@@ -313,6 +389,28 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           </div>
         )}
       </aside>
+
+      {guard && guard.ply === plyCount && (
+        <div className="modal-backdrop">
+          <div className="modal" data-testid="guard">
+            <h2>Es-tu sûr ?</h2>
+            <p>{guard.warning}</p>
+            <div className="actions">
+              <button className="primary" onClick={() => setGuard(null)}>
+                Je cherche un autre coup
+              </button>
+              <button
+                onClick={() => {
+                  setGuard(null);
+                  commit(guard.move);
+                }}
+              >
+                Jouer quand même
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {ended && board.result && (classic || board.reveal) && showEnd && (
         <div className="modal-backdrop" onClick={() => setShowEnd(false)}>

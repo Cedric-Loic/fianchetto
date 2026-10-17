@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { Color, MoveClass, ReviewMove, ReviewResponse, Square } from '@sq/shared';
+import type {
+  Color,
+  ExplanationKind,
+  MoveClass,
+  ReviewMove,
+  ReviewResponse,
+  Square,
+} from '@sq/shared';
 import { EvalBar, EvalChart } from '../game/Analysis';
 import { CLASS_COLOR, CLASS_LABEL, CLASS_SYMBOL } from '../lib/classes';
 import { Board } from '../game/Board';
@@ -58,12 +65,78 @@ function ReviewMoveList(props: {
  * précision des deux camps, courbe d'évaluation, meilleur coup en flèche. Partie locale
  * terminée ou importée ; l'analyse se fait en arrière-plan sur le serveur.
  */
+/** Conseil du coach selon l'erreur la plus fréquente de la partie. */
+const TIPS: Record<ExplanationKind, string> = {
+  'hanging-piece':
+    'Avant chaque coup, vérifie que la pièce jouée, et celles qu’elle protégeait, restent défendues.',
+  'allowed-mate':
+    'Après ton coup envisagé, regarde les échecs possibles de l’adversaire : ton roi est-il en sécurité ?',
+  'allowed-fork':
+    'Repère les cases d’où un cavalier ou un pion adverse attaquerait deux de tes pièces à la fois.',
+  'material-loss':
+    'Avant de jouer, cherche les prises et menaces de l’adversaire après ton coup (routine « échecs, prises, menaces »).',
+  'missed-mate': 'À chaque coup, cherche d’abord tes échecs : un mat se cache parfois derrière.',
+  'missed-fork':
+    'Cherche les coups qui attaquent deux cibles à la fois : fourchettes, échecs doubles.',
+  'missed-material':
+    'Avant de jouer, vérifie si une pièce adverse est en prise : prends ce qu’on te donne.',
+  generic:
+    'Compare deux ou trois coups candidats avant de jouer, surtout dans les positions tendues.',
+};
+
+/** Les 3 plus grosses erreurs du joueur et un conseil (bilan du coach). */
+function CoachSummary(props: {
+  moves: readonly ReviewMove[];
+  color: Color;
+  onSelect: (ply: number) => void;
+}) {
+  const errors = props.moves.filter((m) => m.color === props.color && isError(m));
+  const key = [...errors]
+    .sort((a, b) => b.winBefore - b.winAfter - (a.winBefore - a.winAfter))
+    .slice(0, 3)
+    .sort((a, b) => a.ply - b.ply);
+  const kinds = new Map<ExplanationKind, number>();
+  for (const m of errors) {
+    if (m.explanation) kinds.set(m.explanation.kind, (kinds.get(m.explanation.kind) ?? 0) + 1);
+  }
+  const main = [...kinds.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  return (
+    <div className="move-card" data-testid="coach-summary">
+      <p>
+        <strong>Bilan du coach</strong>
+      </p>
+      {key.length === 0 ? (
+        <p>Aucune erreur notable de ta part : bravo ! Essaie un niveau de bot au-dessus.</p>
+      ) : (
+        <>
+          {key.map((m) => (
+            <p key={m.ply} className="key-moment">
+              <button className="link" onClick={() => props.onSelect(m.ply)}>
+                {Math.ceil(m.ply / 2)}
+                {m.color === 'w' ? '.' : '…'} {m.san} {CLASS_SYMBOL[m.classification]}
+              </button>{' '}
+              {m.explanation?.text}
+            </p>
+          ))}
+          {main && (
+            <p data-testid="coach-tip">
+              <strong>Conseil :</strong> {TIPS[main]}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function Review({ id }: { id: string }) {
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [replayLevel, setReplayLevel] = useState(4);
+  const [replayError, setReplayError] = useState<string | null>(null);
 
   // Chargement, lancement de l'analyse si besoin, puis suivi de sa progression.
   useEffect(() => {
@@ -164,6 +237,22 @@ export function Review({ id }: { id: string }) {
   const nextKey = keyMoves.find((m) => m.ply > ply);
   const name = (c: Color) => (c === 'w' ? info.white : info.black);
 
+  /** Entraînement depuis la position d'avant l'erreur, côté du joueur qui s'est trompé. */
+  const replay = async (m: ReviewMove) => {
+    setReplayError(null);
+    const res = await api.createGame({
+      mode: 'bot',
+      variant: 'classic',
+      level: replayLevel,
+      color: m.color,
+      timeControl: 'untimed',
+      training: true,
+      fen: review.positions[m.ply - 1],
+    });
+    if (res) location.hash = `#/game/${res.gameId}`;
+    else setReplayError('Connecte-toi pour rejouer contre le bot.');
+  };
+
   const accuracyCard = (c: Color) => (
     <div className="accuracy-card" data-testid={`accuracy-${c}`} key={c}>
       <span className="muted">
@@ -210,6 +299,9 @@ export function Review({ id }: { id: string }) {
         )}
         <div className="accuracy-row">{(['w', 'b'] as const).map(accuracyCard)}</div>
         <EvalChart evals={review.evals} cursor={ply} onSelect={setCursor} marks={marks} />
+        {info.userColor && (
+          <CoachSummary moves={review.moves} color={info.userColor} onSelect={setCursor} />
+        )}
 
         <div className="move-card" data-testid="move-card">
           {move ? (
@@ -228,6 +320,25 @@ export function Review({ id }: { id: string }) {
                 <span className="muted">({evalLabel(here)})</span>
               </p>
               {move.explanation && <p data-testid="explanation">{move.explanation.text}</p>}
+              {isError(move) && (info.userColor === null || move.color === info.userColor) && (
+                <div className="replay">
+                  <button data-testid="replay" onClick={() => void replay(move)}>
+                    ↺ Rejouer d'ici contre le bot
+                  </button>
+                  <select
+                    value={replayLevel}
+                    aria-label="Niveau du bot"
+                    onChange={(e) => setReplayLevel(Number(e.target.value))}
+                  >
+                    {[1, 2, 3, 4, 5].map((l) => (
+                      <option key={l} value={l}>
+                        Niveau {l}
+                      </option>
+                    ))}
+                  </select>
+                  {replayError && <span className="error"> {replayError}</span>}
+                </div>
+              )}
               {move.classification !== 'best' &&
                 move.explanation?.kind !== 'generic' &&
                 before?.bestMoveSan && (

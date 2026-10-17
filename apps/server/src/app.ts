@@ -15,7 +15,7 @@ import {
 import { currentUser, registerAuthRoutes } from './auth.js';
 import type { BotDriver } from './bot/driver.js';
 import { loadConfig } from './config.js';
-import { GameManager } from './games/manager.js';
+import { GameManager, InvalidGameRequest } from './games/manager.js';
 import type { GameSession, Participant } from './games/session.js';
 import { GameStore } from './persistence/db.js';
 import type { JsonFetcher } from './review/chesscom.js';
@@ -23,6 +23,8 @@ import { registerPuzzleRoutes } from './puzzles/routes.js';
 import { PuzzleService } from './puzzles/service.js';
 import { registerReviewRoutes } from './review/routes.js';
 import { ReviewService } from './review/service.js';
+import { registerTrainingRoutes } from './training/routes.js';
+import { TrainingService } from './training/service.js';
 import { serializeOutgoing } from './send.js';
 
 const DEFAULT_DB = fileURLToPath(new URL('../../../data/secret-queen.db', import.meta.url));
@@ -63,8 +65,19 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     initialRating: config.elo.initial,
     ...(options.puzzlesPath ? { puzzlesPath: options.puzzlesPath } : {}),
   });
-  const games = new GameManager({ store, config, createBot: options.createBot });
   const reviews = new ReviewService(store, { movetimeMs: options.reviewMovetimeMs });
+  const games = new GameManager({
+    store,
+    config,
+    createBot: options.createBot,
+    // Revue lancée d'office à la fin d'une partie classique contre le bot (bilan du coach).
+    afterEnd: (session) => {
+      if (session.variant === 'classic' && session.mode === 'bot') {
+        reviews.request(session.id, () => session.reviewInput());
+      }
+    },
+  });
+  const training = new TrainingService((fen) => reviews.evaluate(fen));
   const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen));
   app.addHook('onClose', () => {
     reviews.dispose();
@@ -125,6 +138,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   };
 
   registerPuzzleRoutes(app, store, puzzles);
+  registerTrainingRoutes(app, training, (id, request) => viewable(id, request));
   registerReviewRoutes(app, {
     store,
     reviews,
@@ -174,8 +188,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       return { gameId: games.createHotseat({ ...parsed.data, ownerId: user?.id ?? null }).id };
     }
     if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
-    const session = games.createBotGame({ ...parsed.data, userId: user.id });
-    return { gameId: session.id };
+    try {
+      const session = games.createBotGame({ ...parsed.data, userId: user.id });
+      return { gameId: session.id };
+    } catch (error) {
+      if (error instanceof InvalidGameRequest)
+        return reply.code(400).send({ error: 'BAD_REQUEST' });
+      throw error;
+    }
   });
 
   void app.register(websocket);

@@ -1,5 +1,7 @@
 import type {
   BotLevelInfo,
+  CheckMoveResponse,
+  HintResponse,
   ImportedGamesResponse,
   ImportResult,
   LeaderboardResponse,
@@ -54,6 +56,11 @@ export const api = {
     call<ProfileResponse>('GET', `/api/profile/${encodeURIComponent(username)}`),
   activeGame: () => call<{ gameId: string | null }>('GET', '/api/games/active'),
   createGame: (body: unknown) => call<{ gameId: string }>('POST', '/api/games', body),
+  // Entraînement.
+  hint: (gameId: string, level: number) =>
+    call<HintResponse>('POST', `/api/games/${gameId}/hint`, { level }),
+  checkMove: (gameId: string, uci: string) =>
+    call<CheckMoveResponse>('POST', `/api/games/${gameId}/check-move`, { uci }),
   // Coach : revues et imports.
   review: (id: string) => request<ReviewResponse>('GET', `/api/reviews/${id}`),
   startReview: (id: string) => request<ReviewResponse>('POST', `/api/reviews/${id}`),

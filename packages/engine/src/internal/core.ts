@@ -18,6 +18,7 @@ import { REDACTED } from '@sq/shared/secret';
 import type { PersistedGame, PlayResult, SecretChoice } from '../types.js';
 import {
   initialPieces,
+  piecesFromBoard,
   realPlacement,
   type PublicBoard,
   type PublicPiece,
@@ -40,6 +41,7 @@ const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 
 const INVALID_SECRETS = 'Choix de dame secrète invalide.';
 const NOT_SECRET_QUEEN = 'Partie classique : aucune dame secrète.';
+const INVALID_START = 'Position de départ invalide.';
 
 /**
  * Marqueur d'une partie classique (aucune dame secrète). Un symbole ne peut pas provenir d'un
@@ -119,7 +121,7 @@ export class GameCore {
    * `CLASSIC` : partie classique. Sinon, lève une erreur si une case n'est pas une case de
    * départ de pion de la bonne couleur.
    */
-  constructor(secrets: SecretChoice | typeof CLASSIC) {
+  constructor(secrets: SecretChoice | typeof CLASSIC, startFen?: string) {
     if (secrets === CLASSIC) {
       this.#secrets = null;
       this.#secretIds = null;
@@ -128,8 +130,15 @@ export class GameCore {
       this.#secrets = { w: secrets.w, b: secrets.b };
       this.#secretIds = { w: `wp${secrets.w}`, b: `bp${secrets.b}` };
     }
-    this.#pieces = initialPieces(this.#secrets ?? {});
-    this.#chess = new Chess(`${realPlacement(this.#pieces)} w KQkq - 0 1`);
+    if (startFen !== undefined && secrets === CLASSIC) {
+      // Partie classique depuis une position quelconque (rejouer à partir d'une erreur).
+      this.#chess = new Chess(startFen);
+      if (this.#chess.isGameOver()) throw new Error(INVALID_START);
+      this.#pieces = piecesFromBoard(this.#chess.board());
+    } else {
+      this.#pieces = initialPieces(this.#secrets ?? {});
+      this.#chess = new Chess(`${realPlacement(this.#pieces)} w KQkq - 0 1`);
+    }
     this.#realInitialFen = this.#chess.fen();
     this.#countRepetition(this.#realInitialFen);
   }
@@ -149,6 +158,11 @@ export class GameCore {
 
   get result(): GameResult | null {
     return this.#result === null ? null : { ...this.#result };
+  }
+
+  /** Numéro du coup complet (position de départ quelconque comprise). */
+  get fullmoveNumber(): number {
+    return this.#chess.moveNumber();
   }
 
   get isClassic(): boolean {

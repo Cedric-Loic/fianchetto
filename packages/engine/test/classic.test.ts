@@ -172,3 +172,54 @@ describe('ClassicGame — persistance', () => {
     expect(() => SecretQueenGame.restore(persisted as unknown as Secret<PersistedGame>)).toThrow();
   });
 });
+
+describe('ClassicGame — position de départ quelconque et reprise de coups', () => {
+  const FEN = 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3';
+
+  it('partie depuis une FEN : trait, numéro de coup, coups légaux, persistance', () => {
+    const game = ClassicGame.create(FEN);
+    const view = projectClassic(game, 'w');
+    expect(view.turn).toBe('w');
+    expect(view.fullmoveNumber).toBe(3);
+    expect(view.pieces.find((p) => p.square === 'c6')).toMatchObject({ id: 'bnc6', type: 'n' });
+    expect(game.positions()[0]).toBe(FEN);
+    expect(play(game, 'f1b5 a7a6')).toEqual(['Bb5', 'a6']);
+    const restored = ClassicGame.restore(game.toPersisted());
+    expect(projectClassic(restored, 'b')).toEqual(projectClassic(game, 'b'));
+    expect(restored.toPersisted().expose().initialFen).toBe(FEN);
+    // La position initiale standard n'est pas enregistrée comme FEN particulière.
+    expect(ClassicGame.create(START).toPersisted().expose().initialFen).toBeUndefined();
+  });
+
+  it('FEN invalide, ou partie déjà finie, refusée', () => {
+    expect(() => ClassicGame.create('pas une fen')).toThrow();
+    // Mat du lion : les Blancs sont matés, rien à jouer.
+    expect(() =>
+      ClassicGame.create('rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3'),
+    ).toThrow('Position de départ invalide.');
+    const bad = (initialFen: unknown) => () =>
+      ClassicGame.restore(
+        new Secret({
+          version: 1,
+          variant: 'classic',
+          initialFen,
+          moves: [],
+          externalResult: null,
+        } as unknown as PersistedClassicGame),
+      );
+    expect(bad(12)).toThrow('Partie persistée invalide.');
+    expect(bad('pas une fen')).toThrow('Partie persistée invalide.');
+  });
+
+  it('reprise de coups : position antérieure, fin de partie annulée', () => {
+    const game = ClassicGame.create(FEN);
+    play(game, 'f1b5 a7a6 b5c6');
+    game.resign('b');
+    const back = game.withoutLastMoves(2);
+    expect(back.result).toBeNull();
+    expect(back.plyCount).toBe(1);
+    expect(projectClassic(back, 'w').turn).toBe('b');
+    expect(back.positions()[0]).toBe(FEN);
+    expect(game.withoutLastMoves(10).plyCount).toBe(0);
+  });
+});

@@ -38,6 +38,14 @@ test('import PGN, analyse, revue avec explication, point de départ', async ({ p
     'Le cavalier joué en e5 est en prise',
   );
   await page.screenshot({ path: 'test-results/revue.png' });
+  // Bilan du coach : la gaffe fait partie des moments clés, avec un conseil.
+  await expect(page.getByTestId('coach-summary')).toContainText('Nxe5');
+  await expect(page.getByTestId('coach-tip')).toBeVisible();
+
+  // Rejouer d'ici : entraînement depuis la position d'avant la gaffe (cavalier encore en f3).
+  await page.getByTestId('replay').click();
+  await expect(page.getByTestId('training-panel')).toBeVisible();
+  await expect(page.locator('img[data-square="f3"]')).toHaveAttribute('alt', 'wn');
 
   // Point de départ mesuré sur la partie analysée.
   await page.getByRole('link', { name: 'Analyse' }).click();

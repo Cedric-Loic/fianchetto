@@ -9,12 +9,14 @@ export function MoveList(props: {
   onSelect: (ply: number) => void;
 }) {
   const rows = [];
-  for (let i = 0; i < props.moves.length; i += 2) {
-    const white = props.moves[i];
+  // Partie commencée par les Noirs (entraînement depuis une position) : case blanche vide.
+  const offset = props.moves[0]?.color === 'b' ? 1 : 0;
+  for (let i = -offset; i < props.moves.length; i += 2) {
+    const white = i >= 0 ? props.moves[i] : undefined;
     const black = props.moves[i + 1];
     rows.push(
-      <div className="move-row" key={i}>
-        <span className="move-number">{i / 2 + 1}.</span>
+      <div className="move-row" key={i + offset}>
+        <span className="move-number">{(i + offset) / 2 + 1}.</span>
         {[white, black].map((m) =>
           m ? (
             <button

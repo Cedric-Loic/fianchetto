@@ -13,6 +13,8 @@ import {
   type MoveIntent,
 } from '@sq/shared';
 
+const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
 /** Observation telle que le serveur la construirait : projection pour le camp du bot. */
 export function observe(
   game: SecretQueenGame | ClassicGame,
@@ -29,6 +31,13 @@ export function observe(
       viewer: botColor,
       phase: 'playing',
       rated: true,
+      training: false,
+      initialFen:
+        game instanceof ClassicGame
+          ? game.positions()[0] === START
+            ? null
+            : (game.positions()[0] ?? null)
+          : null,
       timeControl: 'untimed',
       players: {
         w: { name: 'w', rating: null, isBot: botColor === 'w', botLevel: null },

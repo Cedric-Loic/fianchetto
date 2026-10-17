@@ -18,6 +18,8 @@ const sampleState: ViewerGameState = {
   viewer: 'w',
   phase: 'playing',
   rated: true,
+  training: false,
+  initialFen: null,
   timeControl: 'blitz-3+2',
   players: {
     w: { name: 'moi', rating: 1200, isBot: false, botLevel: null },

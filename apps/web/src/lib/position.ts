@@ -24,10 +24,15 @@ export function initialPieces(): DisplayedPiece[] {
 
 /**
  * Rejoue les coups PUBLICS pour obtenir la position affichée après `count` demi-coups
- * (navigation dans l'historique). N'utilise que des données publiques : aucun moteur.
+ * (navigation dans l'historique) depuis `start` (position initiale, ou FEN de départ d'un
+ * entraînement). N'utilise que des données publiques : aucun moteur.
  */
-export function publicPositionAt(moves: readonly PublicMove[], count: number): DisplayedPiece[] {
-  const pieces = new Map(initialPieces().map((p) => [p.id, { ...p }]));
+export function publicPositionAt(
+  moves: readonly PublicMove[],
+  count: number,
+  start: readonly DisplayedPiece[] = initialPieces(),
+): DisplayedPiece[] {
+  const pieces = new Map(start.map((p) => [p.id, { ...p }]));
   for (const move of moves.slice(0, count)) {
     if (move.capture) pieces.delete(move.capture.pieceId);
     const piece = pieces.get(move.pieceId);

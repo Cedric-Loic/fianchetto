@@ -27,7 +27,7 @@ export function projectClassic(game: ClassicGame, viewer: Viewer): ViewerBoardSt
     viewer,
     pieces,
     turn: core.turn,
-    fullmoveNumber: Math.floor(core.plyCount / 2) + 1,
+    fullmoveNumber: core.fullmoveNumber,
     inCheck: core.inCheck,
     moves: core.publicMoves(),
     captured: core.capturedDisplayed(),

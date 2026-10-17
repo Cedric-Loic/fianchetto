@@ -36,6 +36,9 @@ function TimeControls(props: { value: TimeControlId; onChange: (id: TimeControlI
 export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   const user = useSession((s) => s.user);
   const [variant, setVariant] = useState<Variant>('classic');
+  const [trainingChoice, setTraining] = useState(false);
+  // Entraînement : variante classique seulement.
+  const training = trainingChoice && variant === 'classic';
   const [levels, setLevels] = useState<BotLevelInfo[]>([]);
   const [level, setLevel] = useState(3);
   const [color, setColor] = useState<'w' | 'b' | 'random'>('random');
@@ -132,11 +135,30 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
                   </button>
                 ))}
               </div>
-              <TimeControls value={botTc} onChange={setBotTc} />
+              {variant === 'classic' && (
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    data-testid="training-toggle"
+                    checked={trainingChoice}
+                    onChange={(e) => setTraining(e.target.checked)}
+                  />{' '}
+                  Entraînement avec le coach : indices, garde-fou, reprise de coups (sans pendule,
+                  non classée)
+                </label>
+              )}
+              {!training && <TimeControls value={botTc} onChange={setBotTc} />}
               <button
                 className="primary big"
                 onClick={() =>
-                  void create({ mode: 'bot', variant, level, color, timeControl: botTc })
+                  void create({
+                    mode: 'bot',
+                    variant,
+                    level,
+                    color,
+                    timeControl: training ? 'untimed' : botTc,
+                    ...(training ? { training: true } : {}),
+                  })
                 }
               >
                 Jouer contre le bot

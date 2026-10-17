@@ -25,6 +25,8 @@ export type PlayResult =
 export interface PersistedClassicGame {
   version: 1;
   variant: 'classic';
+  /** Position de départ, si ce n'est pas la position initiale standard. */
+  initialFen?: string;
   moves: MoveIntent[];
   externalResult: GameResult | null;
 }

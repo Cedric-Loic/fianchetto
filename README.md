@@ -8,6 +8,8 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Variantes : **Classique** (échecs standard, coups possibles affichés en option) et
   **Secret Queen**, chacune avec son propre Elo.
 - Modes : contre un bot (5 niveaux, partie classée Elo) ou à deux sur le même écran (hot-seat).
+- **Entraînement contre le bot** (coach) : indices progressifs, garde-fou avant une gaffe,
+  reprise de coups, bilan de fin de partie, rejouer à partir d'une erreur.
 - **Puzzles** (coach) : base Lichess au niveau ou par thème, révisions des puzzles ratés,
   puzzles tirés de tes propres erreurs, classement puzzle (Glicko-2).
 - **Analyse** (coach) : revue de chaque partie (classe de chaque coup, explication des erreurs,
@@ -15,7 +17,7 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étapes 0 à 8 terminées** (Secret Queen, puis plateforme et variante classique).
+> **État : étapes 0 à 9 terminées** (Secret Queen, puis plateforme et variante classique).
 > Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Suite prévue (coach personnel) :
 > [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md).
 
@@ -91,15 +93,21 @@ docs/
 7. **Revue de la partie** (bouton de fin de partie, ou 📊 dans le profil) : Stockfish analyse
    chaque coup ; meilleur coup en flèche, explication des imprécisions (?!), erreurs (?) et
    gaffes (??), précision des deux camps, ◀ !? ▶ pour sauter d'erreur en erreur.
-8. **Puzzles** (menu ; lance d'abord `pnpm puzzles:import` une fois) :
+8. **Entraînement** (accueil → Classique → Contre le bot → case « Entraînement avec le coach ») :
+   partie non classée et sans pendule ; 💡 Indice (1 clic : l'idée, 2 : la pièce, 3 : le coup),
+   ↶ Reprendre le coup, et le coach demande « Es-tu sûr ? » avant une gaffe (désactivable dans
+   ⚙ Réglages). À la fin : la revue s'ouvre avec le **bilan du coach** (3 moments clés et un
+   conseil). Dans toute revue, **↺ Rejouer d'ici** relance la partie depuis la position d'avant
+   ton erreur.
+9. **Puzzles** (menu ; lance d'abord `pnpm puzzles:import` une fois) :
    - **Au niveau** : légèrement au-dessus de ton classement puzzle ;
    - **Thème** : fourchette, clouage, mat en 2… (le thème du jour suit le plan de progression) ;
    - **Révisions** : les puzzles ratés reviennent après 1, 3, 7 puis 21 jours ;
    - **Mes erreurs** : les positions où tu t'es trompé dans tes parties analysées.
      💡 Indice : montre la pièce à jouer (une réussite avec indice ne compte pas au classement).
-9. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
-   fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
-   est le seul accès à Internet de l'application, uniquement quand tu cliques.
+10. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
+    fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
+    est le seul accès à Internet de l'application, uniquement quand tu cliques.
 
 ## Comment le secret est protégé (résumé)
 
@@ -121,7 +129,8 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 6     | Plateforme : variante classique, Elo par variante              | ✅   |
 | 7     | Coach : revue de partie, import PGN et chess.com               | ✅   |
 | 8     | Coach : puzzles (Lichess, thèmes, révisions, mes erreurs)      | ✅   |
-| 9–11  | Coach : bot coach, leçons, tableau de bord                     | ⏳   |
+| 9     | Coach : entraînement (indices, garde-fou, reprise), bilan      | ✅   |
+| 10–11 | Coach : leçons, tableau de bord                                | ⏳   |
 
 ## Licences et crédits
 

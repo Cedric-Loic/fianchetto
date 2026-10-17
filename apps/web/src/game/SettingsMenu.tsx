@@ -82,6 +82,15 @@ export function SettingsMenu() {
             />{' '}
             Classique : afficher les coups possibles
           </label>
+          <label>
+            <input
+              type="checkbox"
+              data-testid="setting-guard"
+              checked={settings.trainingGuard}
+              onChange={(e) => settings.update({ trainingGuard: e.target.checked })}
+            />{' '}
+            Entraînement : demander confirmation avant une gaffe
+          </label>
         </div>
       )}
     </>
