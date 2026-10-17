@@ -19,6 +19,7 @@ import { GameManager, InvalidGameRequest } from './games/manager.js';
 import type { GameSession, Participant } from './games/session.js';
 import { GameStore } from './persistence/db.js';
 import type { JsonFetcher } from './review/chesscom.js';
+import { registerCoachRoutes } from './coach/routes.js';
 import { registerLessonRoutes } from './lessons/routes.js';
 import { LessonService } from './lessons/service.js';
 import { registerPuzzleRoutes } from './puzzles/routes.js';
@@ -142,6 +143,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   registerPuzzleRoutes(app, store, puzzles);
   registerLessonRoutes(app, store, lessons);
+  registerCoachRoutes(app, store, puzzles);
   registerTrainingRoutes(app, training, (id, request) => viewable(id, request));
   registerReviewRoutes(app, {
     store,

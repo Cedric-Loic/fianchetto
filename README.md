@@ -8,6 +8,8 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Variantes : **Classique** (échecs standard, coups possibles affichés en option) et
   **Secret Queen**, chacune avec son propre Elo.
 - Modes : contre un bot (5 niveaux, partie classée Elo) ou à deux sur le même écran (hot-seat).
+- **Coach** : tableau de bord (phase du programme, plan de la semaine, recommandations, profil de
+  faiblesses, courbes de progression, objectifs, bilan mensuel).
 - **Leçons** (coach) : les 10 leçons de la phase 1 (routine anti-gaffe, tactiques de base, mats,
   ouverture), avec exercices validés par le serveur.
 - **Entraînement contre le bot** (coach) : indices progressifs, garde-fou avant une gaffe,
@@ -19,7 +21,7 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étapes 0 à 10 terminées** (Secret Queen, puis plateforme et variante classique).
+> **État : étapes 0 à 11 terminées** (plateforme et coach complets ; leçons des phases 2 à 4 à venir) (Secret Queen, puis plateforme et variante classique).
 > Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Suite prévue (coach personnel) :
 > [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md).
 
@@ -95,15 +97,19 @@ docs/
 7. **Revue de la partie** (bouton de fin de partie, ou 📊 dans le profil) : Stockfish analyse
    chaque coup ; meilleur coup en flèche, explication des imprécisions (?!), erreurs (?) et
    gaffes (??), précision des deux camps, ◀ !? ▶ pour sauter d'erreur en erreur.
-8. **Leçons** (menu) : lis la leçon, regarde les positions commentées, puis fais les exercices ;
+8. **Coach** (menu) : ta page d'accueil d'entraînement. Elle dit où tu en es (phase du plan et
+   critères pour passer à la suivante), ce qu'il reste à faire cette semaine, et quoi faire
+   maintenant ; les courbes suivent ton Elo chess.com (lu dans tes parties importées), ton
+   classement puzzle et ta précision.
+9. **Leçons** (menu) : lis la leçon, regarde les positions commentées, puis fais les exercices ;
    la leçon est validée à 80 % d'exercices réussis du premier coup.
-9. **Entraînement** (accueil → Classique → Contre le bot → case « Entraînement avec le coach ») :
-   partie non classée et sans pendule ; 💡 Indice (1 clic : l'idée, 2 : la pièce, 3 : le coup),
-   ↶ Reprendre le coup, et le coach demande « Es-tu sûr ? » avant une gaffe (désactivable dans
-   ⚙ Réglages). À la fin : la revue s'ouvre avec le **bilan du coach** (3 moments clés et un
-   conseil). Dans toute revue, **↺ Rejouer d'ici** relance la partie depuis la position d'avant
-   ton erreur.
-10. **Puzzles** (menu ; lance d'abord `pnpm puzzles:import` une fois) :
+10. **Entraînement** (accueil → Classique → Contre le bot → case « Entraînement avec le coach ») :
+    partie non classée et sans pendule ; 💡 Indice (1 clic : l'idée, 2 : la pièce, 3 : le coup),
+    ↶ Reprendre le coup, et le coach demande « Es-tu sûr ? » avant une gaffe (désactivable dans
+    ⚙ Réglages). À la fin : la revue s'ouvre avec le **bilan du coach** (3 moments clés et un
+    conseil). Dans toute revue, **↺ Rejouer d'ici** relance la partie depuis la position d'avant
+    ton erreur.
+11. **Puzzles** (menu ; lance d'abord `pnpm puzzles:import` une fois) :
 
 - **Au niveau** : légèrement au-dessus de ton classement puzzle ;
 - **Thème** : fourchette, clouage, mat en 2… (le thème du jour suit le plan de progression) ;
@@ -111,7 +117,7 @@ docs/
 - **Mes erreurs** : les positions où tu t'es trompé dans tes parties analysées.
   💡 Indice : montre la pièce à jouer (une réussite avec indice ne compte pas au classement).
 
-11. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
+12. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
     fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
     est le seul accès à Internet de l'application, uniquement quand tu cliques.
 
@@ -137,7 +143,7 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 8     | Coach : puzzles (Lichess, thèmes, révisions, mes erreurs)      | ✅   |
 | 9     | Coach : entraînement (indices, garde-fou, reprise), bilan      | ✅   |
 | 10    | Coach : leçons (moteur et 10 leçons de la phase 1)             | ✅   |
-| 11    | Coach : tableau de bord                                        | ⏳   |
+| 11    | Coach : tableau de bord                                        | ✅   |
 
 ## Licences et crédits
 

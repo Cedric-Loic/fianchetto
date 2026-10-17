@@ -313,6 +313,8 @@ export class PuzzleService {
     const p = this.#store.puzzles;
     // Un indice rend la réussite non classée (l'échec, lui, compte).
     const rated = live.rated && live.rating !== null && !(success && live.hinted);
+    const before = this.#glicko(live.userId);
+    const after = rated && live.rating ? updateGlicko(before, live.rating, success ? 1 : 0) : null;
     p.recordAttempt({
       userId: live.userId,
       source: live.source,
@@ -320,12 +322,11 @@ export class PuzzleService {
       success,
       rated,
       themes: live.themes,
+      ratingAfter: after?.rating ?? null,
     });
     if (success) p.scheduleSuccess(live.userId, live.source, live.puzzleId);
     else p.scheduleFailure(live.userId, live.source, live.puzzleId);
-    if (!rated || !live.rating) return null;
-    const before = this.#glicko(live.userId);
-    const after = updateGlicko(before, live.rating, success ? 1 : 0);
+    if (!after) return null;
     p.setGlicko(live.userId, after);
     return { before: Math.round(before.rating), after: Math.round(after.rating) };
   }

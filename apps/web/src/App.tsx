@@ -4,6 +4,7 @@ import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
 import { Analyse } from './screens/Analyse';
+import { Coach } from './screens/Coach';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
@@ -21,7 +22,8 @@ type Route =
   | { page: 'leaderboard' }
   | { page: 'profile'; username: string }
   | { page: 'analyse' }
-  | { page: 'puzzles' }
+  | { page: 'puzzles'; mode?: 'theme' | 'review' | 'mine'; theme?: string }
+  | { page: 'coach' }
   | { page: 'lessons' }
   | { page: 'lesson'; id: string }
   | { page: 'review'; id: string }
@@ -38,6 +40,12 @@ function parseHash(): Route {
   if (m?.[1]) return { page: 'review', id: m[1] };
   if (h === '#/analyse') return { page: 'analyse' };
   if (h === '#/puzzles') return { page: 'puzzles' };
+  if (h === '#/coach') return { page: 'coach' };
+  // Liens du coach : #/puzzles/theme/fork, #/puzzles/review, #/puzzles/mine.
+  m = /^#\/puzzles\/theme\/([A-Za-z0-9]+)$/.exec(h);
+  if (m?.[1]) return { page: 'puzzles', mode: 'theme', theme: m[1] };
+  if (h === '#/puzzles/review') return { page: 'puzzles', mode: 'review' };
+  if (h === '#/puzzles/mine') return { page: 'puzzles', mode: 'mine' };
   if (h === '#/lessons') return { page: 'lessons' };
   m = /^#\/lessons\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'lesson', id: m[1] };
@@ -54,6 +62,7 @@ function Nav() {
         ♞ Fianchetto
       </a>
       <a href="#/">Jouer</a>
+      <a href="#/coach">Coach</a>
       <a href="#/lessons">Leçons</a>
       <a href="#/puzzles">Puzzles</a>
       <a href="#/analyse">Analyse</a>
@@ -113,7 +122,15 @@ export function App() {
   else if (route.page === 'leaderboard') content = <Leaderboard />;
   else if (route.page === 'profile') content = <Profile username={route.username} />;
   else if (route.page === 'analyse') content = <Analyse />;
-  else if (route.page === 'puzzles') content = <Puzzles />;
+  else if (route.page === 'puzzles') {
+    content = (
+      <Puzzles
+        key={location.hash}
+        initialMode={route.mode ?? 'rated'}
+        initialTheme={route.theme ?? null}
+      />
+    );
+  } else if (route.page === 'coach') content = <Coach />;
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'lesson') content = <LessonPage key={route.id} id={route.id} />;
   else if (route.page === 'review') content = <Review key={route.id} id={route.id} />;

@@ -114,6 +114,11 @@ export class PuzzleStore {
         game_id TEXT NOT NULL,
         PRIMARY KEY (user_id, game_id)
       );`);
+    // Migration (étape 11) : classement puzzle après chaque tentative classée (courbe).
+    const columns = db.prepare(`PRAGMA table_info(puzzle_attempts)`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'rating_after')) {
+      db.exec(`ALTER TABLE puzzle_attempts ADD COLUMN rating_after REAL`);
+    }
   }
 
   // --- Base Lichess ------------------------------------------------------------------------
@@ -169,11 +174,13 @@ export class PuzzleStore {
     success: boolean;
     rated: boolean;
     themes: string;
+    /** Classement puzzle après la tentative (tentatives classées). */
+    ratingAfter?: number | null;
   }): void {
     this.#db
       .prepare(
-        `INSERT INTO puzzle_attempts (user_id, source, puzzle_id, success, rated, themes, at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO puzzle_attempts (user_id, source, puzzle_id, success, rated, themes, at,
+           rating_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         a.userId,
@@ -183,13 +190,29 @@ export class PuzzleStore {
         a.rated ? 1 : 0,
         a.themes,
         Date.now(),
+        a.ratingAfter ?? null,
       );
   }
 
-  attempts(userId: string): { source: string; success: number; themes: string }[] {
+  attempts(userId: string): {
+    source: string;
+    success: number;
+    themes: string;
+    at: number;
+    ratingAfter: number | null;
+  }[] {
     return this.#db
-      .prepare(`SELECT source, success, themes FROM puzzle_attempts WHERE user_id = ?`)
-      .all(userId) as { source: string; success: number; themes: string }[];
+      .prepare(
+        `SELECT source, success, themes, at, rating_after AS ratingAfter FROM puzzle_attempts
+         WHERE user_id = ? ORDER BY at`,
+      )
+      .all(userId) as {
+      source: string;
+      success: number;
+      themes: string;
+      at: number;
+      ratingAfter: number | null;
+    }[];
   }
 
   // --- Révisions (répétition espacée) ----------------------------------------------------------

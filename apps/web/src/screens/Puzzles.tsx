@@ -42,11 +42,11 @@ const STEP_DELAY = 450;
  * Puzzles : base Lichess au niveau ou par thème, révisions des puzzles ratés, positions tirées de
  * mes erreurs. Le serveur valide chaque coup ; l'écran affiche les positions reçues.
  */
-export function Puzzles() {
+export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string | null }) {
   const user = useSession((s) => s.user);
   const showLegalMoves = useSettings((s) => s.showLegalMoves);
-  const [mode, setMode] = useState<PuzzleMode>('rated');
-  const [theme, setTheme] = useState<string | null>(null);
+  const [mode, setMode] = useState<PuzzleMode>(props.initialMode ?? 'rated');
+  const [theme, setTheme] = useState<string | null>(props.initialTheme ?? null);
   const [round, setRound] = useState(0);
   const [stats, setStats] = useState<PuzzleStats | null>(null);
   const [attempt, setAttempt] = useState<PuzzleAttempt | null>(null);

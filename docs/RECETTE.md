@@ -124,6 +124,17 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Validation des coups par le serveur (exact, choix, tolérance Stockfish)  | ✅     | `apps/server/test/lessons.test.ts`                               |
 | Progression : meilleur score, leçon validée à 80 %                       | ✅     | `lessons.test.ts`, `tests/e2e/lessons.spec.ts`                   |
 
+## Étape 11 : tableau de bord du coach
+
+| Exigence                                                              | État   | Preuve                                                         |
+| --------------------------------------------------------------------- | ------ | -------------------------------------------------------------- |
+| Phase du programme et critères de passage                             | ✅     | `packages/coach/test/dashboard.test.ts`                        |
+| Plan de la semaine suivi (puzzles, parties lentes, analyses, leçon)   | ✅     | `dashboard.test.ts`, `apps/server/test/coach.test.ts`          |
+| Profil de faiblesses (20 dernières parties : erreurs, phases, thèmes) | ✅     | `dashboard.test.ts`, `coach.test.ts`                           |
+| Courbes : chess.com (en-têtes PGN), puzzle, précision, Elo classique  | ✅ / 👁 | `coach.test.ts`, `tests/e2e/dashboard.spec.ts` ; rendu à l'œil |
+| Objectifs du plan et bilan mensuel                                    | ✅     | `dashboard.test.ts`                                            |
+| Recommandations menant au bon exercice                                | ✅     | `dashboard.spec.ts`                                            |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).

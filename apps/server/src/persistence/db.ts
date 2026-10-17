@@ -309,6 +309,16 @@ export class GameStore {
     return row?.best ?? null;
   }
 
+  /** Progression de toutes les leçons commencées. */
+  lessonProgress(userId: string): { lessonId: string; best: number; updatedAt: number }[] {
+    return this.#db
+      .prepare(
+        `SELECT lesson_id AS lessonId, best, updated_at AS updatedAt FROM lesson_progress
+         WHERE user_id = ?`,
+      )
+      .all(userId) as { lessonId: string; best: number; updatedAt: number }[];
+  }
+
   saveLessonResult(userId: string, lessonId: string, correct: number): void {
     this.#db
       .prepare(
@@ -325,6 +335,13 @@ export class GameStore {
     const row = this.#db.prepare(`SELECT review FROM reviews WHERE game_id = ?`).get(gameId) as
       { review: string } | undefined;
     return row ? (JSON.parse(row.review) as GameReview) : undefined;
+  }
+
+  /** Instant (ms) de la revue d'une partie, `null` si elle n'est pas analysée. */
+  reviewDate(gameId: string): number | null {
+    const row = this.#db.prepare(`SELECT created_at FROM reviews WHERE game_id = ?`).get(gameId) as
+      { created_at: number } | undefined;
+    return row?.created_at ?? null;
   }
 
   saveReview(gameId: string, review: GameReview): void {

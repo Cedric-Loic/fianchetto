@@ -25,3 +25,11 @@ export {
   type Lesson,
   type Section,
 } from './lessons/index.js';
+export {
+  buildDashboard,
+  timeClassOf,
+  weekStart,
+  type DashboardGame,
+  type DashboardInput,
+  type TimeClass,
+} from './dashboard.js';

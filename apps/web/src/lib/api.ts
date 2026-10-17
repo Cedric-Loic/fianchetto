@@ -1,5 +1,6 @@
 import type {
   BotLevelInfo,
+  CoachDashboard,
   CheckMoveResponse,
   HintResponse,
   ImportedGamesResponse,
@@ -75,6 +76,7 @@ export const api = {
     request<ImportResult>('POST', '/api/imports/chesscom', { username, max }),
   deleteImport: (id: string) => call<{ ok: true }>('DELETE', `/api/imports/${id}`),
   reviewAll: () => call<{ queued: number }>('POST', '/api/imports/review-all'),
+  dashboard: () => call<CoachDashboard>('GET', '/api/coach/dashboard'),
   // Leçons.
   lessons: () => call<LessonsResponse>('GET', '/api/lessons'),
   lesson: (id: string) => call<LessonView>('GET', `/api/lessons/${id}`),
