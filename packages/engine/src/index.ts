@@ -1,7 +1,12 @@
 /*
- * @sq/engine — implémenté à l'étape 1 par l'agent `engine`.
- * Exposera notamment : création de partie à partir des deux secrets, application d'un coup,
- * détection des fins de partie, `projectForViewer` (→ ViewerBoardState de @sq/shared),
- * notation publique et réelle. Aucun I/O.
+ * @sq/engine — moteur Secret Queen : position réelle, secrets, légalité, fins de partie,
+ * projection par spectateur, notation publique et réelle. Logique pure : aucun I/O, aucun
+ * aléatoire, aucune horloge.
+ *
+ * L'état réel ne sort du moteur que par deux chemins :
+ * - `projectForViewer` (ce que voit un spectateur, révélation comprise après la fin) ;
+ * - `toPersisted()` (reprise après redémarrage), enveloppé dans `Secret<T>`.
  */
-export const ENGINE_STAGE = 0;
+export type { PersistedGame, PlayResult, SecretChoice } from './types.js';
+export { SecretQueenGame } from './internal/game.js';
+export { projectForViewer } from './projection.js';
