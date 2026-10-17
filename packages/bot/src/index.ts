@@ -6,6 +6,7 @@ export { analyzeGame } from './analysis.js';
 export { computeBelief, type Hypothesis } from './belief.js';
 export { LEVELS, type LevelSettings } from './levels.js';
 export { SecretQueenBot } from './player.js';
+export { targetThinkMs } from './think-time.js';
 export { UciEngine, type UciLine } from './uci.js';
 export type { BotRequest, BotResponse } from './worker.js';
 

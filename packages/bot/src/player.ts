@@ -10,6 +10,7 @@ import type {
 } from '@sq/shared';
 import { computeBelief, type Hypothesis } from './belief.js';
 import { LEVELS, type LevelSettings } from './levels.js';
+import { targetThinkMs } from './think-time.js';
 import type { UciEngine, UciLine } from './uci.js';
 
 interface Candidate {
@@ -31,7 +32,11 @@ export class SecretQueenBot implements BotPlayer {
   readonly #engine: UciEngine;
   readonly #level: LevelSettings;
 
-  constructor(engine: UciEngine, level: BotLevel) {
+  readonly #humanPace: boolean;
+
+  /** `humanPace` : attendre un temps de réflexion humain avant de jouer (désactivé en test). */
+  constructor(engine: UciEngine, level: BotLevel, options: { humanPace?: boolean } = {}) {
+    this.#humanPace = options.humanPace ?? true;
     this.#engine = engine;
     const settings = LEVELS[level];
     if (!settings) throw new Error('Niveau inconnu.');
@@ -68,6 +73,7 @@ export class SecretQueenBot implements BotPlayer {
   }
 
   async chooseMove(observation: BotObservation): Promise<MoveIntent> {
+    const started = Date.now();
     const worlds = computeBelief(observation);
     const plies = observation.state.board?.moves.length ?? 0;
     const rejectedNow = new Set(
@@ -103,6 +109,11 @@ export class SecretQueenBot implements BotPlayer {
     const pool = ranked.length > 0 ? ranked : [...candidates.values()];
     const chosen = this.#pick(pool.slice(0, this.#level.multipv));
     if (!chosen) throw new Error('Aucun coup candidat.');
+    // Temps de réflexion humain, seulement pour le premier essai du coup (pas après un refus).
+    if (this.#humanPace && rejectedNow.size === 0) {
+      const wait = targetThinkMs(observation) - (Date.now() - started);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
     return chosen.intent;
   }
 

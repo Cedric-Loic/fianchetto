@@ -26,8 +26,11 @@ export class WorkerBot implements BotDriver {
   #nextId = 1;
   readonly #pending = new Map<number, (response: BotResponse) => void>();
 
-  constructor(level: BotLevel) {
-    this.#worker = new Worker(BOT_WORKER_URL, { workerData: { level } });
+  /** `humanPace: false` : le bot joue sans temps de réflexion simulé (tests). */
+  constructor(level: BotLevel, options: { humanPace?: boolean } = {}) {
+    this.#worker = new Worker(BOT_WORKER_URL, {
+      workerData: { level, humanPace: options.humanPace ?? true },
+    });
     this.#worker.on('message', (response: BotResponse) => {
       this.#pending.get(response.id)?.(response);
       this.#pending.delete(response.id);

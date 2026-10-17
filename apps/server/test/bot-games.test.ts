@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SQUARES, type BotObservation, type MoveIntent, type UserPublic } from '@sq/shared';
-import type { BotDriver } from '../src/bot/driver.js';
+import { WorkerBot, type BotDriver } from '../src/bot/driver.js';
 import { testServer } from './client.js';
 
 /** Joue des coups humains au hasard jusqu'à ce que l'un soit accepté. */
@@ -28,7 +28,10 @@ function rng(seed: number) {
 
 describe('parties classées contre le bot (Stockfish dans un worker)', () => {
   it('une partie contre chacun des 5 niveaux met à jour l’Elo', async () => {
-    const { app, http, ws } = await testServer();
+    // Bot sans temps de réflexion simulé : le test reste rapide.
+    const { app, http, ws } = await testServer({
+      createBot: (level) => new WorkerBot(level, { humanPace: false }),
+    });
     const reg = await http('POST', '/api/auth/register', {
       username: 'cedric',
       password: 'motdepasse',

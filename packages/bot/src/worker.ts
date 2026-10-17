@@ -16,6 +16,7 @@ const engine = new UciEngine();
 const bot = new SecretQueenBot(
   engine,
   BotLevelSchema.parse((workerData as { level: unknown }).level),
+  { humanPace: (workerData as { humanPace?: boolean }).humanPace !== false },
 );
 
 parentPort?.on('message', (request: BotRequest | 'stop') => {
