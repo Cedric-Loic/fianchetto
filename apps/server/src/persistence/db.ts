@@ -133,6 +133,13 @@ export class GameStore {
         summary       TEXT NOT NULL,
         ended_at      INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS lesson_progress (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        lesson_id  TEXT NOT NULL,
+        best       INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, lesson_id)
+      );
       CREATE TABLE IF NOT EXISTS ratings (
         user_id      TEXT NOT NULL REFERENCES users(id),
         variant      TEXT NOT NULL,
@@ -290,6 +297,26 @@ export class GameStore {
     const row = this.#db.prepare(`SELECT record, secret_state FROM games WHERE id = ?`).get(id) as
       { record: string; secret_state: string } | undefined;
     return row ? this.#parse(row) : undefined;
+  }
+
+  // --- Leçons ------------------------------------------------------------------------------
+
+  /** Meilleur score d'une leçon (exercices réussis du premier coup), `null` si jamais finie. */
+  lessonBest(userId: string, lessonId: string): number | null {
+    const row = this.#db
+      .prepare(`SELECT best FROM lesson_progress WHERE user_id = ? AND lesson_id = ?`)
+      .get(userId, lessonId) as { best: number } | undefined;
+    return row?.best ?? null;
+  }
+
+  saveLessonResult(userId: string, lessonId: string, correct: number): void {
+    this.#db
+      .prepare(
+        `INSERT INTO lesson_progress (user_id, lesson_id, best, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, lesson_id) DO UPDATE SET best = MAX(best, excluded.best),
+           updated_at = excluded.updated_at`,
+      )
+      .run(userId, lessonId, correct, Date.now());
   }
 
   // --- Revues et parties importées (coach) ------------------------------------------------

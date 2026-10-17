@@ -8,6 +8,7 @@ import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
 import { Login } from './screens/Login';
+import { LessonPage, Lessons } from './screens/Lessons';
 import { Profile } from './screens/Profile';
 import { Puzzles } from './screens/Puzzles';
 import { Review } from './screens/Review';
@@ -21,6 +22,8 @@ type Route =
   | { page: 'profile'; username: string }
   | { page: 'analyse' }
   | { page: 'puzzles' }
+  | { page: 'lessons' }
+  | { page: 'lesson'; id: string }
   | { page: 'review'; id: string }
   | { page: 'game'; gameId: string };
 
@@ -35,6 +38,9 @@ function parseHash(): Route {
   if (m?.[1]) return { page: 'review', id: m[1] };
   if (h === '#/analyse') return { page: 'analyse' };
   if (h === '#/puzzles') return { page: 'puzzles' };
+  if (h === '#/lessons') return { page: 'lessons' };
+  m = /^#\/lessons\/([\w-]+)$/.exec(h);
+  if (m?.[1]) return { page: 'lesson', id: m[1] };
   if (h === '#/login') return { page: 'login' };
   if (h === '#/leaderboard') return { page: 'leaderboard' };
   return { page: 'home' };
@@ -48,6 +54,7 @@ function Nav() {
         ♞ Fianchetto
       </a>
       <a href="#/">Jouer</a>
+      <a href="#/lessons">Leçons</a>
       <a href="#/puzzles">Puzzles</a>
       <a href="#/analyse">Analyse</a>
       <a href="#/leaderboard">Classement</a>
@@ -107,6 +114,8 @@ export function App() {
   else if (route.page === 'profile') content = <Profile username={route.username} />;
   else if (route.page === 'analyse') content = <Analyse />;
   else if (route.page === 'puzzles') content = <Puzzles />;
+  else if (route.page === 'lessons') content = <Lessons />;
+  else if (route.page === 'lesson') content = <LessonPage key={route.id} id={route.id} />;
   else if (route.page === 'review') content = <Review key={route.id} id={route.id} />;
   else if (route.page === 'home') {
     content = <Home onStart={(id) => (location.hash = `#/game/${id}`)} />;

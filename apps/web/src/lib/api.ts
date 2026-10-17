@@ -5,6 +5,10 @@ import type {
   ImportedGamesResponse,
   ImportResult,
   LeaderboardResponse,
+  LessonMoveResponse,
+  LessonsResponse,
+  LessonSummary,
+  LessonView,
   ProfileResponse,
   PuzzleMode,
   PuzzleMoveResponse,
@@ -71,6 +75,13 @@ export const api = {
     request<ImportResult>('POST', '/api/imports/chesscom', { username, max }),
   deleteImport: (id: string) => call<{ ok: true }>('DELETE', `/api/imports/${id}`),
   reviewAll: () => call<{ queued: number }>('POST', '/api/imports/review-all'),
+  // Leçons.
+  lessons: () => call<LessonsResponse>('GET', '/api/lessons'),
+  lesson: (id: string) => call<LessonView>('GET', `/api/lessons/${id}`),
+  lessonMove: (id: string, index: number, step: number, uci: string) =>
+    call<LessonMoveResponse>('POST', `/api/lessons/${id}/exercises/${index}/move`, { step, uci }),
+  lessonResult: (id: string, correct: number) =>
+    call<LessonSummary>('POST', `/api/lessons/${id}/result`, { correct }),
   // Puzzles.
   puzzleStats: () => call<PuzzleStats>('GET', '/api/puzzles/stats'),
   puzzleNext: (mode: PuzzleMode, theme: string | null) =>

@@ -32,8 +32,10 @@ export interface BoardProps {
   onPremove?: (move: Arrow & { promotion?: PromotionPiece }) => void;
   /** Clic droit : annule tous les premoves. */
   onCancelPremove?: () => void;
-  /** Flèches imposées (meilleur coup en analyse). */
+  /** Flèches imposées (meilleur coup en analyse, illustrations des leçons). */
   extraArrows?: readonly Arrow[];
+  /** Cases marquées imposées (illustrations des leçons). */
+  markedSquares?: readonly Square[];
   /**
    * Classique, si le réglage est actif : coups légaux du camp au trait, fournis par le serveur.
    * Les cases accessibles à la pièce sélectionnée sont marquées. Toujours absent en Secret Queen.
@@ -246,7 +248,7 @@ export function Board(props: BoardProps) {
         classes.push('premove');
       }
       if (drag?.over === square) classes.push('drag-over');
-      if (marks.includes(square)) classes.push('marked');
+      if (marks.includes(square) || props.markedSquares?.includes(square)) classes.push('marked');
       if (props.checkSquare === square) classes.push('check');
       squares.push(
         <div

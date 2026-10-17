@@ -114,6 +114,16 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Bilan du coach : 3 moments clés et un conseil ; revue lancée d'office | ✅     | `training.test.ts`, `coach.spec.ts`, `training.spec.ts`           |
 | Rejouer à partir d'une erreur (partie depuis une FEN)                 | ✅     | `packages/engine/test/classic.test.ts`, `coach.spec.ts`           |
 
+## Étape 10 : leçons
+
+| Exigence                                                                 | État   | Preuve                                                           |
+| ------------------------------------------------------------------------ | ------ | ---------------------------------------------------------------- |
+| 10 leçons de la phase 1 : texte, positions commentées, exercices         | ✅ / 👁 | `packages/coach/test/lessons.test.ts` ; qualité du texte à juger |
+| Positions légales et solutions jouables                                  | ✅     | `lessons.test.ts`                                                |
+| Solutions uniques (meilleur coup de Stockfish), pièges vraiment perdants | ✅     | `apps/server/test/lessons.stress.ts` (`pnpm test:stress`)        |
+| Validation des coups par le serveur (exact, choix, tolérance Stockfish)  | ✅     | `apps/server/test/lessons.test.ts`                               |
+| Progression : meilleur score, leçon validée à 80 %                       | ✅     | `lessons.test.ts`, `tests/e2e/lessons.spec.ts`                   |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).

@@ -28,11 +28,19 @@ export class UciEngine {
   #buffer = '';
   #listeners: ((line: string) => void)[] = [];
   #queue: Promise<unknown> = Promise.resolve();
+  /** Processus arrêté (fin normale ou plantage) : toute recherche échoue aussitôt. */
+  #dead = false;
+  #onDeath: (() => void)[] = [];
 
   constructor() {
     const require = createRequire(import.meta.url);
     const { findEngine } = require('stockfish') as { findEngine: (name: string) => string };
     this.#child = spawn(process.execPath, [findEngine('lite-single')], { stdio: 'pipe' });
+    this.#child.on('exit', () => {
+      this.#dead = true;
+      for (const fail of this.#onDeath.splice(0)) fail();
+    });
+    this.#child.on('error', () => undefined);
     this.#child.stdout.on('data', (chunk: Buffer) => {
       this.#buffer += chunk.toString();
       const lines = this.#buffer.split('\n');
@@ -42,20 +50,53 @@ export class UciEngine {
     this.#send('uci');
   }
 
-  #send(command: string): void {
-    this.#child.stdin.write(`${command}\n`);
+  /** Faux si le processus Stockfish s'est arrêté (il faut alors en créer un autre). */
+  get alive(): boolean {
+    return !this.#dead;
   }
 
-  #waitFor(predicate: (line: string) => boolean, onLine?: (line: string) => void) {
-    return new Promise<string>((resolve) => {
+  #send(command: string): void {
+    if (!this.#dead) this.#child.stdin.write(`${command}\n`);
+  }
+
+  /**
+   * Attend une ligne du moteur. Échoue si le processus meurt ou si rien n'arrive avant
+   * `timeoutMs` (le moteur reçoit alors « stop », au cas où il serait seulement en retard).
+   */
+  #waitFor(
+    predicate: (line: string) => boolean,
+    onLine?: (line: string) => void,
+    timeoutMs = 10_000,
+  ) {
+    return new Promise<string>((resolve, reject) => {
+      if (this.#dead) return reject(new Error('Moteur arrêté.'));
+      let timer: NodeJS.Timeout | null = null;
+      const done = () => {
+        this.#listeners = this.#listeners.filter((l) => l !== listener);
+        this.#onDeath = this.#onDeath.filter((f) => f !== fail);
+        if (timer) clearTimeout(timer);
+      };
       const listener = (line: string) => {
         onLine?.(line);
         if (predicate(line)) {
-          this.#listeners = this.#listeners.filter((l) => l !== listener);
+          done();
           resolve(line);
         }
       };
+      const fail = () => {
+        done();
+        reject(new Error('Moteur arrêté.'));
+      };
       this.#listeners.push(listener);
+      this.#onDeath.push(fail);
+      timer = setTimeout(() => {
+        // Dernière chance : « stop » force une réponse immédiate d'une recherche en cours.
+        this.#send('stop');
+        timer = setTimeout(() => {
+          done();
+          reject(new Error('Moteur sans réponse.'));
+        }, 2000);
+      }, timeoutMs);
     });
   }
 
@@ -81,6 +122,7 @@ export class UciEngine {
           const pv = (m[4] ?? '').trim().split(/\s+/);
           lines.set(Number(m[1]), { move: pv[0] ?? '', score, mate, pv });
         },
+        options.movetimeMs + 10_000,
       );
       const result = [...lines.entries()].sort((a, b) => a[0] - b[0]).map(([, l]) => l);
       const bestMove = best.split(' ')[1];

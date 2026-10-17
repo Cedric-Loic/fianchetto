@@ -17,3 +17,11 @@ export { buildReview, type ReviewInput } from './review.js';
 export { classify, formatEval, gameAccuracy, moveAccuracy, winChance } from './win.js';
 export { INITIAL_GLICKO, updateGlicko, type Glicko } from './glicko.js';
 export { puzzlesFromReview, type OwnPuzzleCandidate } from './own-puzzles.js';
+export {
+  LESSONS,
+  PASS_RATIO,
+  lessonById,
+  type Exercise,
+  type Lesson,
+  type Section,
+} from './lessons/index.js';

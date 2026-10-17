@@ -73,7 +73,7 @@ export class ReviewService {
       const input = job.load();
       if (!input) throw new Error('Partie introuvable.');
       this.#state.set(job.id, { status: 'running', progress: 0 });
-      this.#engine ??= new UciEngine();
+      if (!this.#engine?.alive) this.#engine = new UciEngine();
       const evals = await evaluatePositions(this.#engine, input.positions, {
         movetimeMs: this.#movetimeMs,
         onProgress: (progress) => this.#state.set(job.id, { status: 'running', progress }),
@@ -92,7 +92,7 @@ export class ReviewService {
    */
   async evaluate(fen: string, movetimeMs = 200): Promise<PositionAnalysis | null> {
     if (this.#disposed) return null;
-    this.#engine ??= new UciEngine();
+    if (!this.#engine?.alive) this.#engine = new UciEngine();
     const [result] = await evaluatePositions(this.#engine, [fen], { movetimeMs });
     return result ?? null;
   }
