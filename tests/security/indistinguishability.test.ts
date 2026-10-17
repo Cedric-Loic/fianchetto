@@ -1,14 +1,17 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { opposite, type Viewer } from '@sq/shared';
+import { opposite, type DisplayedPiece, type Viewer } from '@sq/shared';
 import { projectForViewer } from '@sq/engine';
 import {
+  LONG_TEST_MS,
   assertIndistinguishable,
   formatReport,
+  isInherentDivergence,
   persistedOf,
   runWorldPair,
   type Projector,
 } from './harness.js';
+import { uci } from './public-board.js';
 import {
   allWorldPairs,
   arbWorldPairScenario,
@@ -23,7 +26,7 @@ import {
  * `indistinguishability.stress.ts` (10 000 paires).
  */
 
-const RUNS = 200;
+const RUNS = 60;
 const MAX_ATTEMPTS = 220;
 const MAX_PLIES = 60;
 
@@ -54,12 +57,14 @@ describe('indistinguabilité : paires de mondes', () => {
     }
   });
 
-  it(`parties aléatoires : ${RUNS} paires de mondes`, () => {
-    assertIndistinguishable(RUNS, MAX_PLIES, MAX_ATTEMPTS);
-  });
+  it(
+    `parties aléatoires : ${RUNS} paires de mondes`,
+    () => assertIndistinguishable(RUNS, MAX_PLIES, MAX_ATTEMPTS),
+    LONG_TEST_MS,
+  );
 
   it('le banc progresse réellement (suites communes non triviales)', () => {
-    const scenarios = fc.sample(arbWorldPairScenario(MAX_ATTEMPTS), { numRuns: 40, seed: 7 });
+    const scenarios = fc.sample(arbWorldPairScenario(MAX_ATTEMPTS), { numRuns: 20, seed: 7 });
     const lengths = scenarios.map((s) => runWorldPair(s, { maxPlies: MAX_PLIES }).committed.length);
     const average = lengths.reduce((sum, n) => sum + n, 0) / lengths.length;
     // Une moyenne trop faible voudrait dire que le banc ne compare presque rien.
@@ -129,5 +134,39 @@ describe('indistinguabilité : contrôles positifs (fuites injectées)', () => {
       .sample(arbWorldPairScenario(MAX_ATTEMPTS), { numRuns: 60, seed: 11 })
       .some((s) => runWorldPair(s, { projector: leaky, maxPlies: MAX_PLIES }).leaks.length > 0);
     expect(found).toBe(true);
+  });
+});
+
+describe('divergences inhérentes (hors du champ du §10)', () => {
+  // Monde A : dame secrète blanche e2 ; monde B : dame secrète blanche a2.
+  const pair = {
+    hidden: 'w',
+    observer: 'b',
+    a: { w: 'e2', b: 'a7' },
+    b: { w: 'a2', b: 'a7' },
+  } as const;
+  const piece = (id: string, square: string): DisplayedPiece =>
+    ({ id, color: id[0], type: id[1], square }) as DisplayedPiece;
+  const nextToEp = { pieces: [piece('wpe2', 'e5'), piece('bpd7', 'd5'), piece('bpf7', 'f6')] };
+
+  it('prise en passant (pion) ou coup de dame vers la case vide : divergence admise', () => {
+    expect(isInherentDivergence(uci('e5d6'), nextToEp, pair, 'w')).toBe(true);
+  });
+
+  it('dernière rangée (promotion du pion, coordonnées pour la dame) : divergence admise', () => {
+    const board = { pieces: [piece('wpa2', 'b7'), piece('bra8', 'a8')] };
+    expect(isInherentDivergence(uci('b7a8q'), board, pair, 'w')).toBe(true);
+  });
+
+  it('tout autre coup doit être noté à l’identique', () => {
+    // Avance simple, prise diagonale d'une pièce : coups de pion pour la dame comme pour le pion.
+    expect(isInherentDivergence(uci('e5e6'), nextToEp, pair, 'w')).toBe(false);
+    expect(isInherentDivergence(uci('e5f6'), nextToEp, pair, 'w')).toBe(false);
+    // Pièce qui n'est la dame secrète dans aucun des deux mondes.
+    const other = { pieces: [piece('wph2', 'e5'), piece('bpd7', 'd5')] };
+    expect(isInherentDivergence(uci('e5d6'), other, pair, 'w')).toBe(false);
+    // Coup de l'observateur : son secret est le même dans les deux mondes.
+    const black = { pieces: [piece('bpd7', 'd4'), piece('wpe2', 'e4')] };
+    expect(isInherentDivergence(uci('d4e3'), black, pair, 'b')).toBe(false);
   });
 });

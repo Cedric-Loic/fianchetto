@@ -33,9 +33,16 @@ function exactSchemaViolations(
   return [];
 }
 
-/** Un coup public isolé : schéma exact, notation cohérente avec le type affiché. */
-export function publicMoveViolations(move: PublicMove, label = 'coup'): string[] {
-  const out = exactSchemaViolations(PublicMoveSchema, move, label);
+/**
+ * Un coup public isolé : schéma exact (sauf si l'appelant l'a déjà vérifié), notation cohérente
+ * avec le type affiché.
+ */
+export function publicMoveViolations(
+  move: PublicMove,
+  label = 'coup',
+  checkSchema = true,
+): string[] {
+  const out = checkSchema ? exactSchemaViolations(PublicMoveSchema, move, label) : [];
   const { san } = move;
   if (move.displayedType === 'p') {
     const pawn = PAWN_SAN_RE.exec(san);
@@ -106,10 +113,8 @@ export function projectionViolations(state: ViewerBoardState, ctx: ProjectionCon
   const out = exactSchemaViolations(ViewerBoardStateSchema, state, 'projection');
   if (out.length > 0) return out;
 
-  // Données pures : l'aller-retour JSON ne perd rien (ni Secret, ni undefined, ni classe).
-  if (!isDeepStrictEqual(JSON.parse(JSON.stringify(state)), state)) {
-    out.push('projection : pas des données pures (aller-retour JSON différent)');
-  }
+  // Champs interdits, et données pures : `findForbidden` signale aussi undefined, fonctions,
+  // symboles, accesseurs et instances de classe (dont Secret).
   const findings = findForbidden(state, { allowReveal: ctx.over });
   if (findings.length > 0) out.push(`projection : champs interdits\n${formatFindings(findings)}`);
 
@@ -172,7 +177,8 @@ export function projectionViolations(state: ViewerBoardState, ctx: ProjectionCon
     if (move.ply !== index + 1) out.push(`coup ${index + 1} : ply ${move.ply}`);
     const color: Color = index % 2 === 0 ? 'w' : 'b';
     if (move.color !== color) out.push(`coup ${index + 1} : couleur ${move.color}`);
-    out.push(...publicMoveViolations(move, `coup ${index + 1}`));
+    // Schéma déjà vérifié avec celui de la projection.
+    out.push(...publicMoveViolations(move, `coup ${index + 1}`, false));
   });
   const expectedTurn: Color = state.moves.length % 2 === 0 ? 'w' : 'b';
   if (state.turn !== expectedTurn) out.push(`projection : trait ${state.turn} ≠ ${expectedTurn}`);

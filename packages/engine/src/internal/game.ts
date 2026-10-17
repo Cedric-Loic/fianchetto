@@ -21,6 +21,7 @@ const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 
 const INVALID_PERSISTED = 'Partie persistée invalide.';
 const INVALID_COLOR = 'Camp invalide.';
+const INVALID_GAME = 'Partie invalide.';
 
 let readCore: (game: SecretQueenGame) => GameCore;
 
@@ -65,12 +66,13 @@ export class SecretQueenGame {
   readonly #core: GameCore;
 
   private constructor(core: GameCore) {
+    if (!(core instanceof GameCore)) throw new Error(INVALID_GAME);
     this.#core = core;
   }
 
   static {
     readCore = (game) => {
-      if (!(#core in game)) throw new Error('Partie invalide.');
+      if (!(#core in game)) throw new Error(INVALID_GAME);
       return game.#core;
     };
   }

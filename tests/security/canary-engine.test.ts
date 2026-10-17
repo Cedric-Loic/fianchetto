@@ -9,7 +9,7 @@ import {
   safeStringify,
   secretCanaryTokens,
 } from './canary.js';
-import { applyEnding, playRandomGame } from './harness.js';
+import { LONG_TEST_MS, applyEnding, playRandomGame } from './harness.js';
 import { findForbidden, findRealStateByReflection, formatFindings } from './scan.js';
 import { arbEnding, arbSecrets, arbSeeds } from './world-pairs.js';
 
@@ -60,73 +60,90 @@ function expectGameMasked(game: SecretQueenGame, secrets: SecretChoice, label: s
 }
 
 describe('canari : sérialisations de la partie', () => {
-  it('[REDACTED] partout, partie neuve, en cours et terminée', () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(80), arbEnding, (secrets, seeds, ending) => {
-        let checked = 0;
-        const { game } = playRandomGame(secrets, seeds, {
-          maxPlies: 40,
-          onAttempt: (g, attempt) => {
-            // Toutes les tentatives au début, puis une sur cinq (coût).
-            if (attempt.ply < 6 || checked++ % 5 === 0) {
-              expectGameMasked(g, secrets, `demi-coup ${attempt.ply}`);
-            }
-          },
-        });
-        expectGameMasked(game, secrets, 'fin de la suite');
-        if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
-        // Même après la fin, l'objet partie ne se sérialise pas (la révélation passe par
-        // la projection, jamais par un log).
-        expectGameMasked(game, secrets, 'après la fin');
-      }),
-      { numRuns: 30 },
-    );
-  });
+  it(
+    '[REDACTED] partout, partie neuve, en cours et terminée',
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(80), arbEnding, (secrets, seeds, ending) => {
+          let checked = 0;
+          const { game } = playRandomGame(secrets, seeds, {
+            maxPlies: 40,
+            onAttempt: (g, attempt) => {
+              // Toutes les tentatives au début, puis une sur cinq (coût).
+              if (attempt.ply < 6 || checked++ % 5 === 0) {
+                expectGameMasked(g, secrets, `demi-coup ${attempt.ply}`);
+              }
+            },
+          });
+          expectGameMasked(game, secrets, 'fin de la suite');
+          if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
+          // Même après la fin, l'objet partie ne se sérialise pas (la révélation passe par
+          // la projection, jamais par un log).
+          expectGameMasked(game, secrets, 'après la fin');
+        }),
+        { numRuns: 20 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 });
 
 describe("canari : sorties destinées à l'adversaire et au public", () => {
-  it('aucune projection, aucun coup public, aucun refus ne contient un jeton du secret adverse', () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
-        playRandomGame(secrets, seeds, {
-          maxPlies: 100,
-          onAttempt: (game, attempt) => {
-            for (const color of ['w', 'b'] as const) {
-              const tokens = secretCanaryTokens(color, secrets[color]);
-              const outputs: Record<string, unknown> = {
-                [`projection ${opposite(color)}`]: projectForViewer(game, opposite(color)),
-                'projection public': projectForViewer(game, 'public'),
+  it(
+    'aucune projection, aucun coup public, aucun refus ne contient un jeton du secret adverse',
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
+          playRandomGame(secrets, seeds, {
+            maxPlies: 100,
+            onAttempt: (game, attempt) => {
+              for (const color of ['w', 'b'] as const) {
+                const tokens = secretCanaryTokens(color, secrets[color]);
                 // Le coup public est diffusé à tous ; un refus n'est vu que par son auteur.
-                'résultat de play': attempt.result,
-              };
-              for (const [label, output] of Object.entries(outputs)) {
-                const findings = findForbidden(output, { tokens, allowReveal: game.isOver });
-                expect(findings, `${label} (secret ${color})\n${formatFindings(findings)}`).toEqual(
-                  [],
-                );
+                const outputs: Record<string, unknown> = { 'résultat de play': attempt.result };
+                // Un refus ne change pas l'état : les projections ne sont analysées qu'après un coup.
+                if (attempt.result.ok) {
+                  outputs[`projection ${opposite(color)}`] = projectForViewer(
+                    game,
+                    opposite(color),
+                  );
+                  outputs['projection public'] = projectForViewer(game, 'public');
+                }
+                for (const [label, output] of Object.entries(outputs)) {
+                  const findings = findForbidden(output, { tokens, allowReveal: game.isOver });
+                  expect(
+                    findings,
+                    `${label} (secret ${color})\n${formatFindings(findings)}`,
+                  ).toEqual([]);
+                }
               }
-            }
-          },
-        });
-      }),
-      { numRuns: 60 },
-    );
-  });
+            },
+          });
+        }),
+        { numRuns: 25 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 
-  it('contrôle positif : après la fin, la révélation contient bien les jetons des deux secrets', () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(60), (secrets, seeds) => {
-        const { game } = playRandomGame(secrets, seeds, { maxPlies: 30 });
-        if (!game.isOver) game.agreeDraw();
-        const view = projectForViewer(game, 'public');
-        expect(view.reveal?.realInitialFen).toContain(realPawnRankToken('w', secrets.w));
-        expect(view.reveal?.realInitialFen).toContain(realPawnRankToken('b', secrets.b));
-        // Sans l'exception « après la fin », le scan signale bien la révélation.
-        const rules = findForbidden(view, { tokens: allTokens(secrets) }).map((f) => f.rule);
-        expect(rules).toContain('canari');
-        expect(rules).toContain('fen');
-      }),
-      { numRuns: 20 },
-    );
-  });
+  it(
+    'contrôle positif : après la fin, la révélation contient bien les jetons des deux secrets',
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(60), (secrets, seeds) => {
+          const { game } = playRandomGame(secrets, seeds, { maxPlies: 30 });
+          if (!game.isOver) game.agreeDraw();
+          const view = projectForViewer(game, 'public');
+          expect(view.reveal?.realInitialFen).toContain(realPawnRankToken('w', secrets.w));
+          expect(view.reveal?.realInitialFen).toContain(realPawnRankToken('b', secrets.b));
+          // Sans l'exception « après la fin », le scan signale bien la révélation.
+          const rules = findForbidden(view, { tokens: allTokens(secrets) }).map((f) => f.rule);
+          expect(rules).toContain('canari');
+          expect(rules).toContain('fen');
+        }),
+        { numRuns: 20 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 });

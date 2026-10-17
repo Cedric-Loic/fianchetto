@@ -7,7 +7,11 @@ describe('propriétés — parties aléatoires (2/2)', () => {
     assertRandomGames(500, 60, 20261018);
   });
 
-  it('indistinguabilité : deux secrets, mêmes coups publics → même projection adverse', { timeout: 300_000 }, () => {
-    assertTwinWorlds(100, 60, 20261019);
-  });
+  it(
+    'indistinguabilité : deux secrets, mêmes coups publics → même projection adverse',
+    { timeout: 300_000 },
+    () => {
+      assertTwinWorlds(100, 60, 20261019);
+    },
+  );
 });

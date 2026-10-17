@@ -58,6 +58,18 @@ export interface ScanOptions {
   allowPaths?: readonly RegExp[];
 }
 
+const keyRuleCache = new Map<string, readonly string[]>();
+
+/** Règles de clé déclenchées par un nom de clé (mis en cache : les clés se répètent). */
+function rulesMatchingKey(key: string): readonly string[] {
+  let rules = keyRuleCache.get(key);
+  if (!rules) {
+    rules = FORBIDDEN_KEY_RULES.filter((r) => r.key.test(key)).map((r) => r.rule);
+    keyRuleCache.set(key, rules);
+  }
+  return rules;
+}
+
 function isPlainObject(value: object): boolean {
   const proto: unknown = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
@@ -79,7 +91,8 @@ export function findForbidden(value: unknown, options: ScanOptions = {}): Findin
   const seen = new Set<object>();
 
   const visitString = (text: string, path: string): void => {
-    if (FEN_PLACEMENT_RE.test(text)) {
+    // Une FEN compte au moins 15 caractères (8 rangées et 7 « / »).
+    if (text.length >= 15 && FEN_PLACEMENT_RE.test(text)) {
       findings.push({ path, rule: 'fen', detail: `chaîne de type FEN : ${text}` });
     }
     if (forbidRedacted && text.includes(REDACTED)) {
@@ -125,8 +138,7 @@ export function findForbidden(value: unknown, options: ScanOptions = {}): Findin
     for (const key of Object.getOwnPropertyNames(node)) {
       const childPath = keyPath(path, key);
       if (options.allowReveal && key === 'reveal') continue;
-      for (const { rule, key: re } of FORBIDDEN_KEY_RULES) {
-        if (!re.test(key)) continue;
+      for (const rule of rulesMatchingKey(key)) {
         if (ALLOWED_KEYS.some((a) => a.rule === rule && a.path.test(childPath))) continue;
         if (options.allowPaths?.some((re) => re.test(childPath))) continue;
         findings.push({ path: childPath, rule, detail: `clé interdite « ${key} »` });

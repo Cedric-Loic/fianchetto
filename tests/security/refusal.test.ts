@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Color, MoveIntent } from '@sq/shared';
 import { SecretQueenGame, projectForViewer, type SecretChoice } from '@sq/engine';
 import { secretCanaryTokens } from './canary.js';
-import { playLine, snapshotAll } from './harness.js';
+import { LONG_TEST_MS, playLine, snapshotAll } from './harness.js';
 import { bareRefusalViolations } from './invariants.js';
 import { pickIntent, uci } from './public-board.js';
 import { findForbidden, formatFindings } from './scan.js';
@@ -153,44 +153,52 @@ describe('refus sans motif', () => {
     }
   });
 
-  it('parties aléatoires : chaque refus est nu et ne modifie aucune projection', () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(150), (secrets, seeds) => {
-        const game = SecretQueenGame.create(secrets);
-        for (const seed of seeds) {
-          if (game.isOver || game.plyCount >= 80) break;
-          const intent = pickIntent(projectForViewer(game, 'public'), seed);
-          // Une fois sur cinq, le mauvais camp tente le coup.
-          const turn = game.turn;
-          const color: Color = seed % 5 === 0 ? (turn === 'w' ? 'b' : 'w') : turn;
-          const before = JSON.stringify(snapshotAll(game));
-          const result = game.play(color, intent);
-          if (color !== turn) expect(result.ok).toBe(false);
-          if (!result.ok) {
-            expect(bareRefusalViolations(result)).toEqual([]);
-            expect(JSON.stringify(snapshotAll(game))).toBe(before);
+  it(
+    'parties aléatoires : chaque refus est nu et ne modifie aucune projection',
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(150), (secrets, seeds) => {
+          const game = SecretQueenGame.create(secrets);
+          for (const seed of seeds) {
+            if (game.isOver || game.plyCount >= 80) break;
+            const intent = pickIntent(projectForViewer(game, 'public'), seed);
+            // Une fois sur cinq, le mauvais camp tente le coup.
+            const turn = game.turn;
+            const color: Color = seed % 5 === 0 ? (turn === 'w' ? 'b' : 'w') : turn;
+            const before = JSON.stringify(snapshotAll(game));
+            const result = game.play(color, intent);
+            if (color !== turn) expect(result.ok).toBe(false);
+            if (!result.ok) {
+              expect(bareRefusalViolations(result)).toEqual([]);
+              expect(JSON.stringify(snapshotAll(game))).toBe(before);
+            }
           }
-        }
-      }),
-      { numRuns: 60 },
-    );
-  });
+        }),
+        { numRuns: 60 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 
-  it('un camp qui n’est pas au trait est toujours refusé', () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(40), (secrets, seeds) => {
-        const game = SecretQueenGame.create(secrets);
-        for (const seed of seeds) {
-          if (game.isOver) break;
-          const other: Color = game.turn === 'w' ? 'b' : 'w';
-          // Coup candidat du camp qui n'a pas le trait, calculé comme si c'était son tour.
-          const view = projectForViewer(game, 'public');
-          const intent = pickIntent({ pieces: view.pieces, turn: other }, seed);
-          expect(bareRefusalViolations(game.play(other, intent))).toEqual([]);
-          game.play(game.turn, pickIntent(view, seed));
-        }
-      }),
-      { numRuns: 40 },
-    );
-  });
+  it(
+    'un camp qui n’est pas au trait est toujours refusé',
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(40), (secrets, seeds) => {
+          const game = SecretQueenGame.create(secrets);
+          for (const seed of seeds) {
+            if (game.isOver) break;
+            const other: Color = game.turn === 'w' ? 'b' : 'w';
+            // Coup candidat du camp qui n'a pas le trait, calculé comme si c'était son tour.
+            const view = projectForViewer(game, 'public');
+            const intent = pickIntent({ pieces: view.pieces, turn: other }, seed);
+            expect(bareRefusalViolations(game.play(other, intent))).toEqual([]);
+            game.play(game.turn, pickIntent(view, seed));
+          }
+        }),
+        { numRuns: 40 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 });

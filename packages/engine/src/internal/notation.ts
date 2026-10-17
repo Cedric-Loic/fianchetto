@@ -56,7 +56,12 @@ function sanBody(input: PublicSanInput): string {
  * Le coup de la dame secrète a-t-il la géométrie d'un coup de pion sans promotion (§3.1, cas 2) ?
  * Une diagonale vers une case vide n'en est jamais un (pas de prise en passant).
  */
-export function isPawnGeometry(board: PublicBoard, color: Color, from: Square, to: Square): boolean {
+export function isPawnGeometry(
+  board: PublicBoard,
+  color: Color,
+  from: Square,
+  to: Square,
+): boolean {
   const forward = color === 'w' ? 1 : -1;
   const startRank = color === 'w' ? 2 : 7;
   const lastRank = color === 'w' ? 8 : 1;

@@ -124,7 +124,10 @@ export function checkNotation(move: PublicMove, real: string, isSecret: boolean)
   }
   const pub = PIECE_SAN.exec(move.san);
   const rl = PIECE_SAN.exec(real);
-  check(pub !== null && rl !== null && pub[1] === rl[1] && pub[2] === rl[2], `${move.san} / ${real}`);
+  check(
+    pub !== null && rl !== null && pub[1] === rl[1] && pub[2] === rl[2],
+    `${move.san} / ${real}`,
+  );
 }
 
 /**

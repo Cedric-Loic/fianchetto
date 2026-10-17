@@ -18,7 +18,7 @@ import {
 } from '@sq/engine';
 import { bareRefusalViolations, projectionViolations } from './invariants.js';
 import { compareObservations, describeDifference } from './normalize.js';
-import { intentKey, pickIntent, uci } from './public-board.js';
+import { fileIndex, intentKey, pickIntent, rankIndex, uci } from './public-board.js';
 import {
   arbWorldPairScenario,
   type ExternalEnding,
@@ -33,12 +33,11 @@ import {
 
 export const VIEWERS: readonly Viewer[] = ['w', 'b', 'public'];
 
+/** Délai des tests de propriétés (le moteur coûte ~0,5 ms par coup accepté). */
+export const LONG_TEST_MS = 120_000;
+
 export type Projector = (game: SecretQueenGame, viewer: Viewer) => ViewerBoardState;
 export const defaultProjector: Projector = (game, viewer) => projectForViewer(game, viewer);
-
-export function newGame(secrets: SecretChoice): SecretQueenGame {
-  return SecretQueenGame.create(secrets);
-}
 
 /** Rejoue une suite d'intentions (toutes doivent être acceptées) avec create + play. */
 export function replay(secrets: SecretChoice, intents: readonly MoveIntent[]): SecretQueenGame {
@@ -174,6 +173,12 @@ export interface WorldPairReport {
   oneSided: number;
   /** Coups acceptés dans les deux mondes mais aux annonces différentes : écartés. */
   announcementMismatch: number;
+  /**
+   * Coups de la pièce qui est la dame secrète dans un monde et un vrai pion dans l'autre,
+   * notés différemment par nature (prise en passant ou promotion du pion, coordonnées pour la
+   * dame : `RULES.md` §3.1 et §9) : la suite publique diverge, coup écarté.
+   */
+  inherentDivergence: number;
   ended: GameResult | null;
   leaks: Leak[];
 }
@@ -184,6 +189,36 @@ export interface WorldPairOptions {
   /** Vérifie aussi tous les invariants de projection à chaque demi-coup (plus lent). */
   checkInvariants?: boolean;
   maxLeaks?: number;
+}
+
+/**
+ * Le coup `intent` du camp caché peut-il LÉGITIMEMENT produire un coup public différent dans les
+ * deux mondes ? Seulement si la pièce jouée est la dame secrète dans un monde (donc un vrai pion
+ * dans l'autre) et si le coup est, pour le pion, une prise en passant (diagonale vers une case
+ * vide) ou une promotion (dernière rangée). Dans tous les autres cas, un coup de pion de la dame
+ * secrète doit être noté exactement comme celui du vrai pion (§3.1) : toute différence est une
+ * fuite.
+ */
+export function isInherentDivergence(
+  intent: MoveIntent,
+  before: Pick<ViewerBoardState, 'pieces'>,
+  pair: WorldPairScenario['pair'],
+  mover: Color,
+): boolean {
+  if (mover !== pair.hidden) return false;
+  const piece = before.pieces.find((p) => p.square === intent.from);
+  const secretIds = [
+    `${pair.hidden}p${pair.a[pair.hidden]}`,
+    `${pair.hidden}p${pair.b[pair.hidden]}`,
+  ];
+  if (!piece || !secretIds.includes(piece.id) || piece.type !== 'p') return false;
+  const forward = mover === 'w' ? 1 : -1;
+  const lastRank = mover === 'w' ? 7 : 0;
+  const diagonalToEmpty =
+    Math.abs(fileIndex(intent.to) - fileIndex(intent.from)) === 1 &&
+    rankIndex(intent.to) - rankIndex(intent.from) === forward &&
+    !before.pieces.some((p) => p.square === intent.to);
+  return diagonalToEmpty || rankIndex(intent.to) === lastRank;
 }
 
 function sameAnnouncements(
@@ -225,6 +260,7 @@ export function runWorldPair(
     refusedInBoth: 0,
     oneSided: 0,
     announcementMismatch: 0,
+    inherentDivergence: 0,
     ended: null,
     leaks: [],
   };
@@ -245,6 +281,8 @@ export function runWorldPair(
     if (violations.length > 0) leak(`refus (monde ${world})`, violations.join(' ; '));
   };
 
+  // Vue publique courante (monde A), base du choix des intentions ; inchangée après un refus.
+  let publicView: ViewerBoardState = project(gameA, 'public');
   const compareWorlds = () => {
     const over = gameA.isOver;
     const reveal = over ? ['reveal'] : [];
@@ -259,19 +297,22 @@ export function runWorldPair(
       ['ownSecret', ...reveal],
     );
     compare('getters', viewsA.getters, viewsB.getters);
+    publicView = viewsA.public;
     if (!checkInvariants) return;
-    for (const [world, views, secrets] of [
-      ['A', viewsA, pair.a],
-      ['B', viewsB, pair.b],
-    ] as const) {
-      for (const viewer of VIEWERS) {
-        const violations = projectionViolations(views[viewer], {
-          viewer,
-          over: views.getters.isOver,
-          ...(viewer === 'public' ? {} : { ownSecretStart: secrets[viewer] }),
-        });
-        if (violations.length > 0)
-          leak(`invariants (monde ${world}, ${viewer})`, violations.join(' ; '));
+    // Les vues observateur et publique du monde B sont comparées à celles du monde A : il suffit
+    // de contrôler les invariants du monde A et la vue du camp caché dans le monde B.
+    const checks = [
+      ...VIEWERS.map((viewer) => ['A', viewsA, pair.a, viewer] as const),
+      ['B', viewsB, pair.b, pair.hidden] as const,
+    ];
+    for (const [world, views, secrets, viewer] of checks) {
+      const violations = projectionViolations(views[viewer], {
+        viewer,
+        over: views.getters.isOver,
+        ...(viewer === 'public' ? {} : { ownSecretStart: secrets[viewer] }),
+      });
+      if (violations.length > 0) {
+        leak(`invariants (monde ${world}, ${viewer})`, violations.join(' ; '));
       }
     }
   };
@@ -282,7 +323,9 @@ export function runWorldPair(
     if (report.leaks.length >= maxLeaks) break;
     report.attempts++;
     const color = gameA.turn;
-    const intent = pickIntent(project(gameA, 'public'), seed);
+    // Les coups de dame d'un « pion » du camp caché ne peuvent être acceptés que dans un seul
+    // monde (écartés à coup sûr) : on ne les tente que pour l'observateur.
+    const intent = pickIntent(publicView, seed, { pawnAsQueen: color !== pair.hidden });
     const resultA = gameA.play(color, intent);
     const resultB = gameB.play(color, intent);
     if (!resultA.ok && !resultB.ok) {
@@ -299,6 +342,7 @@ export function runWorldPair(
       } else {
         checkRefusal(resultB, 'B');
         gameA = replay(pair.a, report.committed);
+        publicView = project(gameA, 'public');
       }
       continue;
     }
@@ -306,6 +350,17 @@ export function runWorldPair(
       report.announcementMismatch++;
       gameA = replay(pair.a, report.committed);
       gameB = replay(pair.b, report.committed);
+      publicView = project(gameA, 'public');
+      continue;
+    }
+    if (
+      !compareObservations(resultA.move, resultB.move).identical &&
+      isInherentDivergence(intent, publicView, pair, color)
+    ) {
+      report.inherentDivergence++;
+      gameA = replay(pair.a, report.committed);
+      gameB = replay(pair.b, report.committed);
+      publicView = project(gameA, 'public');
       continue;
     }
     report.committed.push(intent);

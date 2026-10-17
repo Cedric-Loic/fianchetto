@@ -10,6 +10,7 @@ import {
 } from '@sq/engine';
 import { REDACTED, secretCanaryTokens } from './canary.js';
 import {
+  LONG_TEST_MS,
   applyEnding,
   persistedOf,
   playLine,
@@ -39,17 +40,21 @@ function expectMasked(persisted: Secret<PersistedGame>, secrets: SecretChoice) {
 }
 
 describe('toPersisted() masqué', () => {
-  it('JSON, String, inspect, spread, structuredClone : aucune valeur, à toute étape', () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(100), arbEnding, (secrets, seeds, ending) => {
-        const { game } = playRandomGame(secrets, seeds, { maxPlies: 50 });
-        expectMasked(game.toPersisted(), secrets);
-        if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
-        expectMasked(game.toPersisted(), secrets);
-      }),
-      { numRuns: 30 },
-    );
-  });
+  it(
+    'JSON, String, inspect, spread, structuredClone : aucune valeur, à toute étape',
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(100), arbEnding, (secrets, seeds, ending) => {
+          const { game } = playRandomGame(secrets, seeds, { maxPlies: 50 });
+          expectMasked(game.toPersisted(), secrets);
+          if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
+          expectMasked(game.toPersisted(), secrets);
+        }),
+        { numRuns: 30 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 
   it('contenu : version 1, secrets, intentions ACCEPTÉES seulement, fin externe', () => {
     const secrets: SecretChoice = { w: 'e2', b: 'd7' };
@@ -67,34 +72,38 @@ describe('toPersisted() masqué', () => {
     expect(persistedOf(game).externalResult).toEqual(result);
   });
 
-  it('restauration fidèle : mêmes projections, mêmes getters, même suite de partie', () => {
-    fc.assert(
-      fc.property(
-        arbSecrets,
-        arbSeeds(150),
-        arbSeeds(40),
-        arbEnding,
-        (secrets, seeds, continuation, ending) => {
-          const { game } = playRandomGame(secrets, seeds, { maxPlies: 70 });
-          if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
-          const restored = SecretQueenGame.restore(game.toPersisted());
-          const cmp = compareObservations(snapshotAll(game), snapshotAll(restored));
-          expect(cmp.identical, describeDifference(cmp.difference)).toBe(true);
-          for (const seed of continuation) {
-            if (game.isOver) break;
-            const intent = pickIntent(projectForViewer(game, 'public'), seed);
-            const color = game.turn;
-            expect(JSON.stringify(restored.play(color, intent))).toBe(
-              JSON.stringify(game.play(color, intent)),
-            );
-          }
-          const after = compareObservations(snapshotAll(game), snapshotAll(restored));
-          expect(after.identical, describeDifference(after.difference)).toBe(true);
-        },
-      ),
-      { numRuns: 40 },
-    );
-  });
+  it(
+    'restauration fidèle : mêmes projections, mêmes getters, même suite de partie',
+    () => {
+      fc.assert(
+        fc.property(
+          arbSecrets,
+          arbSeeds(150),
+          arbSeeds(40),
+          arbEnding,
+          (secrets, seeds, continuation, ending) => {
+            const { game } = playRandomGame(secrets, seeds, { maxPlies: 70 });
+            if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
+            const restored = SecretQueenGame.restore(game.toPersisted());
+            const cmp = compareObservations(snapshotAll(game), snapshotAll(restored));
+            expect(cmp.identical, describeDifference(cmp.difference)).toBe(true);
+            for (const seed of continuation) {
+              if (game.isOver) break;
+              const intent = pickIntent(projectForViewer(game, 'public'), seed);
+              const color = game.turn;
+              expect(JSON.stringify(restored.play(color, intent))).toBe(
+                JSON.stringify(game.play(color, intent)),
+              );
+            }
+            const after = compareObservations(snapshotAll(game), snapshotAll(restored));
+            expect(after.identical, describeDifference(after.difference)).toBe(true);
+          },
+        ),
+        { numRuns: 40 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 });
 
 describe('entrées invalides', () => {

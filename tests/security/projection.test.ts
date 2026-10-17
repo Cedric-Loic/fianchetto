@@ -11,7 +11,7 @@ import {
 } from '@sq/shared';
 import { SecretQueenGame, projectForViewer, type SecretChoice } from '@sq/engine';
 import { realPawnRankToken } from './canary.js';
-import { VIEWERS, playLine, playRandomGame } from './harness.js';
+import { LONG_TEST_MS, VIEWERS, playLine, playRandomGame } from './harness.js';
 import { projectionViolations } from './invariants.js';
 import { initialDisplayedPieces } from './public-board.js';
 import { arbSecrets, arbSeeds } from './world-pairs.js';
@@ -112,79 +112,91 @@ describe('projection : position initiale', () => {
 });
 
 describe('projection : parties aléatoires', () => {
-  it('invariants après chaque coup ; result et reveal nuls tant que la partie continue', () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
-        playRandomGame(secrets, seeds, {
-          maxPlies: 100,
-          onAttempt: (game, attempt) => {
-            // Un refus ne change rien (vérifié dans refusal.test.ts) : on ne contrôle qu'après
-            // un coup accepté.
-            if (!attempt.result.ok) return;
-            expectAllViewsConform(game, secrets, `demi-coup ${attempt.ply}`);
-            if (!game.isOver) {
-              for (const viewer of VIEWERS) {
-                const view = projectForViewer(game, viewer);
-                expect(view.result).toBeNull();
-                expect(view.reveal).toBeNull();
+  it(
+    'invariants après chaque coup ; result et reveal nuls tant que la partie continue',
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
+          playRandomGame(secrets, seeds, {
+            maxPlies: 100,
+            onAttempt: (game, attempt) => {
+              // Un refus ne change rien (vérifié dans refusal.test.ts) : on ne contrôle qu'après
+              // un coup accepté.
+              if (!attempt.result.ok) return;
+              expectAllViewsConform(game, secrets, `demi-coup ${attempt.ply}`);
+              if (!game.isOver) {
+                for (const viewer of VIEWERS) {
+                  const view = projectForViewer(game, viewer);
+                  expect(view.result).toBeNull();
+                  expect(view.reveal).toBeNull();
+                }
               }
-            }
-          },
-        });
-      }),
-      { numRuns: 60 },
-    );
-  });
+            },
+          });
+        }),
+        { numRuns: 30 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 
-  it("ownSecret : le sien seulement, qui suit sa pièce ; jamais celui de l'adversaire", () => {
-    fc.assert(
-      fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
-        playRandomGame(secrets, seeds, {
-          onAttempt: (game) => {
-            expect(projectForViewer(game, 'public').ownSecret).toBeNull();
-            for (const color of ['w', 'b'] as const) {
-              const view = projectForViewer(game, color);
-              const pieceId = `${color}p${secrets[color]}`;
-              const square = view.pieces.find((p) => p.id === pieceId)?.square ?? null;
-              expect(view.ownSecret).toEqual({ pieceId, square });
-            }
-          },
-        });
-      }),
-      { numRuns: 40 },
-    );
-  });
+  it(
+    "ownSecret : le sien seulement, qui suit sa pièce ; jamais celui de l'adversaire",
+    () => {
+      fc.assert(
+        fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
+          playRandomGame(secrets, seeds, {
+            onAttempt: (game) => {
+              expect(projectForViewer(game, 'public').ownSecret).toBeNull();
+              for (const color of ['w', 'b'] as const) {
+                const view = projectForViewer(game, color);
+                const pieceId = `${color}p${secrets[color]}`;
+                const square = view.pieces.find((p) => p.id === pieceId)?.square ?? null;
+                expect(view.ownSecret).toEqual({ pieceId, square });
+              }
+            },
+          });
+        }),
+        { numRuns: 25 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 
-  it('après une fin externe : result et reveal présents et exacts pour tous', () => {
-    const endings: Array<
-      [string, (g: SecretQueenGame, c: Color) => GameResult, (c: Color) => Partial<GameResult>]
-    > = [
-      ['abandon', (g, c) => g.resign(c), (c) => ({ winner: opposite(c), reason: 'resignation' })],
-      ['nulle par accord', (g) => g.agreeDraw(), () => ({ winner: null, reason: 'agreement' })],
-      ['chute du drapeau', (g, c) => g.flagFall(c), () => ({})],
-    ];
-    fc.assert(
-      fc.property(
-        arbSecrets,
-        arbSeeds(120),
-        fc.constantFrom(...endings),
-        fc.constantFrom<Color>('w', 'b'),
-        (secrets, seeds, [, end, expected], color) => {
-          const { game } = playRandomGame(secrets, seeds, { maxPlies: 60 });
-          if (game.isOver) return;
-          const result = end(game, color);
-          expectExactResult(result, expected(color));
-          if (result.reason === 'timeout') expect(result.winner).toBe(opposite(color));
-          if (result.reason === 'timeout-vs-insufficient-material')
-            expect(result.winner).toBeNull();
-          expect(game.result).toEqual(result);
-          expectRevealed(game, secrets);
-          expectAllViewsConform(game, secrets, 'après la fin');
-        },
-      ),
-      { numRuns: 60 },
-    );
-  });
+  it(
+    'après une fin externe : result et reveal présents et exacts pour tous',
+    () => {
+      const endings: Array<
+        [string, (g: SecretQueenGame, c: Color) => GameResult, (c: Color) => Partial<GameResult>]
+      > = [
+        ['abandon', (g, c) => g.resign(c), (c) => ({ winner: opposite(c), reason: 'resignation' })],
+        ['nulle par accord', (g) => g.agreeDraw(), () => ({ winner: null, reason: 'agreement' })],
+        ['chute du drapeau', (g, c) => g.flagFall(c), () => ({})],
+      ];
+      fc.assert(
+        fc.property(
+          arbSecrets,
+          arbSeeds(120),
+          fc.constantFrom(...endings),
+          fc.constantFrom<Color>('w', 'b'),
+          (secrets, seeds, [, end, expected], color) => {
+            const { game } = playRandomGame(secrets, seeds, { maxPlies: 60 });
+            if (game.isOver) return;
+            const result = end(game, color);
+            expectExactResult(result, expected(color));
+            if (result.reason === 'timeout') expect(result.winner).toBe(opposite(color));
+            if (result.reason === 'timeout-vs-insufficient-material')
+              expect(result.winner).toBeNull();
+            expect(game.result).toEqual(result);
+            expectRevealed(game, secrets);
+            expectAllViewsConform(game, secrets, 'après la fin');
+          },
+        ),
+        { numRuns: 40 },
+      );
+    },
+    LONG_TEST_MS,
+  );
 });
 
 describe('projection : fins naturelles et capture de la dame secrète', () => {

@@ -198,12 +198,21 @@ export function arbitraryIntent(seed: number): MoveIntent {
 /**
  * Choisit une intention à partir d'un entier (fourni par fast-check, donc rejouable et
  * réductible) : ~65 % coups affichés, ~25 % coups de dame d'un « pion », ~10 % arbitraires.
+ * Sans coups de dame (`pawnAsQueen: false`) : ~90 % coups affichés, ~10 % arbitraires.
  */
-export function pickIntent(state: Pick<ViewerBoardState, 'pieces' | 'turn'>, seed: number) {
+export function pickIntent(
+  state: Pick<ViewerBoardState, 'pieces' | 'turn'>,
+  seed: number,
+  options: { pawnAsQueen?: boolean } = {},
+): MoveIntent {
   const { displayed, pawnAsQueen } = candidateIntents(state);
+  const useQueenMoves = options.pawnAsQueen ?? true;
   const bucket = seed % 100;
   const index = Math.floor(seed / 100);
-  if (bucket < 65 && displayed.length > 0) return displayed[index % displayed.length] as MoveIntent;
+  const displayedShare = useQueenMoves ? 65 : 90;
+  if (bucket < displayedShare && displayed.length > 0) {
+    return displayed[index % displayed.length] as MoveIntent;
+  }
   if (bucket < 90 && pawnAsQueen.length > 0) {
     return pawnAsQueen[index % pawnAsQueen.length] as MoveIntent;
   }

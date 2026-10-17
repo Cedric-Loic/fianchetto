@@ -162,8 +162,15 @@ export function compareObservations(
   b: unknown,
   options: NormalizeOptions = {},
 ): Comparison {
-  const na = normalizeVolatile(a, options);
-  const nb = normalizeVolatile(b, options);
+  const dropKeys = [...(options.dropKeys ?? [])];
+  const da = dropKeys.length > 0 ? omitKeysDeep(a, dropKeys) : a;
+  const db = dropKeys.length > 0 ? omitKeysDeep(b, dropKeys) : b;
+  // Chemin rapide : deux valeurs brutes identiques le restent après normalisation.
+  if (JSON.stringify(da) === JSON.stringify(db) && isDeepStrictEqual(da, db)) {
+    return { identical: true, deepEqual: true, sameBytes: true, difference: null };
+  }
+  const na = normalizeVolatile(da, { extraKeys: options.extraKeys ?? [] });
+  const nb = normalizeVolatile(db, { extraKeys: options.extraKeys ?? [] });
   const deepEqual = isDeepStrictEqual(na, nb);
   const sameBytes = JSON.stringify(na) === JSON.stringify(nb);
   return {
