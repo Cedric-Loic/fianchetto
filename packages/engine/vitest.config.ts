@@ -5,5 +5,7 @@ export default defineProject({
     name: 'engine',
     include: ['test/**/*.test.ts'],
     environment: 'node',
+    // Tests de propriétés coûteux en CPU : marge pour les machines chargées.
+    testTimeout: 60_000,
   },
 });

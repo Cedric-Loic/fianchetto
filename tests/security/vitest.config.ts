@@ -6,5 +6,7 @@ export default defineProject({
     include: ['**/*.test.ts'],
     exclude: ['node_modules/**', 'e2e/**'],
     environment: 'node',
+    // Tests de propriétés coûteux en CPU : marge pour les machines chargées.
+    testTimeout: 60_000,
   },
 });

@@ -9,8 +9,8 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étape 0 terminée** (monorepo, contrats, CI locale). Le jeu n'est pas encore
-> jouable : voir la feuille de route ci-dessous.
+> **État : étape 2 terminée** : une partie à deux sur le même écran (hot-seat) est jouable de
+> bout en bout. Le bot, les comptes et l'Elo arrivent à l'étape 3.
 
 ## Prérequis
 
@@ -24,7 +24,7 @@ pnpm install
 pnpm dev
 ```
 
-Puis ouvre <http://127.0.0.1:5173>. Le serveur écoute sur `127.0.0.1:3001` ; les deux écoutent
+Puis ouvre <http://127.0.0.1:5173>, choisis les noms et la cadence, et clique sur « Jouer ». Le serveur écoute sur `127.0.0.1:3001` ; les deux écoutent
 uniquement sur la boucle locale.
 
 ## Commandes
@@ -75,14 +75,12 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | Étape | Contenu                                                        | État    |
 | ----- | -------------------------------------------------------------- | ------- |
 | 0     | Monorepo, contrats, CI locale, journal des décisions           | ✅      |
-| 1     | Moteur (règles, projection, notation) + banc de tests de fuite | à venir |
-| 2     | Serveur + interface : partie hot-seat complète                 | à venir |
+| 1     | Moteur (règles, projection, notation) + banc de tests de fuite | ✅      |
+| 2     | Serveur + interface : partie hot-seat complète                 | ✅      |
 | 3     | Bot, comptes, Elo, pendules                                    | à venir |
 | 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | à venir |
 | 5     | Audit de sécurité du secret, recette                           | à venir |
 
 ## Licences et crédits
 
-Usage strictement personnel. Aucun asset, logo, police ni son de chess.com. Les crédits des
-pièces (jeux open source Lichess) et du moteur Stockfish (GPLv3) seront listés dans `CREDITS.md`
-quand ils seront intégrés.
+Usage strictement personnel. Aucun asset, logo, police ni son de chess.com. Crédits : voir `CREDITS.md`.

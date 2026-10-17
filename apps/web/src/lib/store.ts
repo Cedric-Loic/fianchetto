@@ -1,0 +1,73 @@
+import { create } from 'zustand';
+import {
+  GENERIC_ILLEGAL_MOVE_MESSAGE,
+  type Color,
+  type GameEvent,
+  type ServerMessage,
+  type Square,
+  type ViewerGameState,
+} from '@sq/shared';
+
+/**
+ * Store de l'interface : uniquement la vue reçue du serveur et de l'état d'affichage local.
+ * Rien n'est persisté dans le navigateur.
+ */
+interface GameStore {
+  state: ViewerGameState | null;
+  lastCause: GameEvent | null;
+  /** Instant de réception du dernier snapshot (pour faire tourner les pendules localement). */
+  receivedAt: number;
+  toast: string | null;
+  /** Hot-seat : case de la dame secrète du camp au trait, seulement pendant le maintien. */
+  peek: { color: Color; square: Square | null } | null;
+  peekHeld: boolean;
+  receive: (message: ServerMessage) => void;
+  setPeekHeld: (held: boolean) => void;
+  clearToast: () => void;
+  reset: () => void;
+}
+
+export const useGame = create<GameStore>((set, get) => ({
+  state: null,
+  lastCause: null,
+  receivedAt: 0,
+  toast: null,
+  peek: null,
+  peekHeld: false,
+  receive(message) {
+    switch (message.type) {
+      case 'snapshot': {
+        const turn = message.state.board?.turn ?? null;
+        const peek = get().peek;
+        // Le marqueur disparaît au changement de trait, même si le bouton reste enfoncé.
+        const keepPeek = peek !== null && peek.color === turn && message.state.phase === 'playing';
+        set({
+          state: message.state,
+          lastCause: message.cause,
+          receivedAt: performance.now(),
+          peek: keepPeek ? peek : null,
+          peekHeld: keepPeek ? get().peekHeld : false,
+        });
+        return;
+      }
+      case 'move-rejected':
+        set({ toast: GENERIC_ILLEGAL_MOVE_MESSAGE });
+        return;
+      case 'secret-peek':
+        if (get().peekHeld) set({ peek: { color: message.color, square: message.square } });
+        return;
+      case 'error':
+        set({ toast: message.code === 'GAME_NOT_FOUND' ? 'Partie introuvable.' : 'Erreur.' });
+        return;
+    }
+  },
+  setPeekHeld(held) {
+    set(held ? { peekHeld: true } : { peekHeld: false, peek: null });
+  },
+  clearToast() {
+    set({ toast: null });
+  },
+  reset() {
+    set({ state: null, lastCause: null, toast: null, peek: null, peekHeld: false });
+  },
+}));
