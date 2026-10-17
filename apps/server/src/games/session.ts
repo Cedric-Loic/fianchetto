@@ -17,7 +17,40 @@ import {
   type Viewer,
   type ViewerGameState,
 } from '@sq/shared';
-import { SecretQueenGame, projectForViewer } from '@sq/engine';
+import { SecretQueenGame, projectForViewer, type PersistedGame } from '@sq/engine';
+import { Secret } from '@sq/shared/secret';
+
+/** Partie publique d'un enregistrement de partie (aucun secret) : colonnes ordinaires. */
+export interface SessionRecord {
+  id: string;
+  mode: GameMode;
+  timeControl: TimeControlId;
+  whiteName: string;
+  blackName: string;
+  phase: GamePhase;
+  chooser: Color;
+  clockMs: Record<Color, number> | null;
+  drawOffer: Color | null;
+  rematchOffer: Color | null;
+  nextGameId: string | null;
+}
+
+/** Partie secrète : choix déjà verrouillés et partie persistée. Colonne dédiée, jamais loggée. */
+export interface SessionSecrets {
+  selection: Partial<Record<Color, Square>>;
+  game: Secret<PersistedGame> | null;
+}
+
+export interface SessionOptions {
+  id: string;
+  timeControl: TimeControlId;
+  whiteName: string;
+  blackName: string;
+  now?: () => number;
+  onRematch: (session: GameSession) => string;
+  /** Appelé après chaque changement d'état (sauvegarde). */
+  onChange?: (session: GameSession) => void;
+}
 
 /** Un client connecté à la partie : son camp de vue et sa fonction d'envoi. */
 export interface Participant {
@@ -62,14 +95,9 @@ export class GameSession {
   readonly #now: () => number;
   readonly #onRematch: (session: GameSession) => string;
 
-  constructor(options: {
-    id: string;
-    timeControl: TimeControlId;
-    whiteName: string;
-    blackName: string;
-    now?: () => number;
-    onRematch: (session: GameSession) => string;
-  }) {
+  readonly #onChange: ((session: GameSession) => void) | undefined;
+
+  constructor(options: SessionOptions) {
     this.id = options.id;
     this.timeControl = options.timeControl;
     this.players = {
@@ -78,6 +106,7 @@ export class GameSession {
     };
     this.#now = options.now ?? (() => Date.now());
     this.#onRematch = options.onRematch;
+    this.#onChange = options.onChange;
     const tc = TIME_CONTROLS[options.timeControl];
     this.#clock =
       tc.initialMs === null
@@ -302,9 +331,66 @@ export class GameSession {
   // --- Projection et diffusion -------------------------------------------------------------
 
   #broadcast(cause: GameEvent | null): void {
+    this.#onChange?.(this);
     for (const p of this.#participants) {
       p.send({ type: 'snapshot', state: this.stateFor(p.viewer), cause });
     }
+  }
+
+  // --- Persistance (reprise après redémarrage) ---------------------------------------------
+
+  toRecord(): { record: SessionRecord; secrets: Secret<SessionSecrets> } {
+    const now = this.#now();
+    return {
+      record: {
+        id: this.id,
+        mode: this.mode,
+        timeControl: this.timeControl,
+        whiteName: this.players.w.name,
+        blackName: this.players.b.name,
+        phase: this.#phase,
+        chooser: this.#chooser,
+        clockMs: this.#clock
+          ? { w: this.#liveRemaining('w', now), b: this.#liveRemaining('b', now) }
+          : null,
+        drawOffer: this.#drawOffer,
+        rematchOffer: this.#rematchOffer,
+        nextGameId: this.#nextGameId,
+      },
+      secrets: new Secret({
+        selection: { ...this.#secrets },
+        game: this.#game ? this.#game.toPersisted() : null,
+      }),
+    };
+  }
+
+  /**
+   * Recrée une partie sauvegardée. Pendant le choix, on revient à l'écran de passage du camp
+   * qui choisissait ; en cours de partie, la pendule repart avec le temps sauvegardé (le temps
+   * pendant lequel le serveur était arrêté n'est pas décompté).
+   */
+  static restore(
+    record: SessionRecord,
+    secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedGame> | null },
+    options: Omit<SessionOptions, 'id' | 'timeControl' | 'whiteName' | 'blackName'>,
+  ): GameSession {
+    const session = new GameSession({
+      ...options,
+      id: record.id,
+      timeControl: record.timeControl,
+      whiteName: record.whiteName,
+      blackName: record.blackName,
+    });
+    session.#phase = record.phase;
+    session.#chooser = record.chooser;
+    session.#secrets = { ...secrets.selection };
+    session.#drawOffer = record.drawOffer;
+    session.#rematchOffer = record.rematchOffer;
+    session.#nextGameId = record.nextGameId;
+    if (session.#clock && record.clockMs) session.#clock.remainingMs = { ...record.clockMs };
+    if (secrets.game) session.#game = SecretQueenGame.restore(secrets.game);
+    if (record.phase === 'playing') session.#startClock();
+    return session;
   }
 
   /** Vue complète pour un spectateur : seule la projection du moteur décrit l'échiquier. */

@@ -13,7 +13,7 @@ afterEach(async () => {
 
 /** Client de test : envoie des messages et attend le prochain snapshot ou refus. */
 async function connect() {
-  app = await startServer(0, { logLevel: 'silent' });
+  app = await startServer(0, { logLevel: 'silent', dbPath: ':memory:' });
   const { port } = app.server.address() as AddressInfo;
   const res = await fetch(`http://127.0.0.1:${port}/api/games`, {
     method: 'POST',

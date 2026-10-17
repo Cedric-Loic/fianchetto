@@ -1,4 +1,5 @@
 import websocket from '@fastify/websocket';
+import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
   ClientMessageSchema,
@@ -7,12 +8,17 @@ import {
   type ServerMessage,
 } from '@sq/shared';
 import { GameManager } from './games/manager.js';
+import { GameStore } from './persistence/db.js';
 import type { Participant } from './games/session.js';
 import { serializeOutgoing } from './send.js';
+
+const DEFAULT_DB = fileURLToPath(new URL('../../../data/secret-queen.db', import.meta.url));
 
 export interface ServerOptions {
   /** Niveau de log pino ; `silent` dans les tests. */
   logLevel?: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'silent';
+  /** Fichier SQLite ; `:memory:` pour les tests. Défaut : <racine du dépôt>/data/secret-queen.db. */
+  dbPath?: string;
 }
 
 /**
@@ -21,8 +27,12 @@ export interface ServerOptions {
  */
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({ logger: { level: options.logLevel ?? 'info' } });
-  const games = new GameManager();
-  app.addHook('onClose', () => games.disposeAll());
+  const store = new GameStore(options.dbPath ?? DEFAULT_DB);
+  const games = new GameManager(store);
+  app.addHook('onClose', () => {
+    games.disposeAll();
+    store.close();
+  });
 
   app.get('/api/health', () => ({ status: 'ok' }));
 
