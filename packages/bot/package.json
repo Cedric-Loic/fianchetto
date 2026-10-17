@@ -1,0 +1,16 @@
+{
+  "name": "@sq/bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bot Secret Queen : croyance sur la dame adverse, moteur, 5 niveaux, analyse de fin de partie.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sq/shared": "workspace:*"
+  }
+}

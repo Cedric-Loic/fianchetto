@@ -1,0 +1,15 @@
+{
+  "elo": {
+    "initial": 1200,
+    "kProvisional": 40,
+    "provisionalGames": 20,
+    "kEstablished": 20
+  },
+  "botLevels": [
+    { "level": 1, "name": "Recrue", "elo": 600 },
+    { "level": 2, "name": "Amateur", "elo": 900 },
+    { "level": 3, "name": "Joueur de club", "elo": 1200 },
+    { "level": 4, "name": "Expert", "elo": 1500 },
+    { "level": 5, "name": "Maître", "elo": 1800 }
+  ]
+}

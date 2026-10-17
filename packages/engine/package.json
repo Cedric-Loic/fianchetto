@@ -1,0 +1,20 @@
+{
+  "name": "@sq/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Moteur Secret Queen : position réelle, secrets, légalité, fins de partie, projection par joueur, notation. Aucun I/O.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sq/shared": "workspace:*",
+    "chess.js": "^1.4.0"
+  },
+  "devDependencies": {
+    "fast-check": "^4.10.2"
+  }
+}

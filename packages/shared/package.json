@@ -1,0 +1,17 @@
+{
+  "name": "@sq/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Contrats partagés (types + schémas Zod). Modifiables uniquement par décision tracée dans docs/DECISIONS.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./secret": "./src/secret.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

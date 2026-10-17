@@ -1,0 +1,31 @@
+/* Jetons de thème (§6) : thème sombre inspiré de chess.com, valeurs approximatives. */
+:root {
+  --bg: #312e2b;
+  --panel: #262421;
+  --text: #ffffffd9;
+  --text-muted: #ffffff80;
+  --square-light: #eeeed2;
+  --square-dark: #769656;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+.app {
+  padding: 2rem;
+}
