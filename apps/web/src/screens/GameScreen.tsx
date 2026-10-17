@@ -3,6 +3,7 @@ import type { Color, GameResult, HintResponse, Square, ViewerGameState } from '@
 import { api } from '../lib/api';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { Board } from '../game/Board';
+import { usePremoves } from '../game/usePremoves';
 import { MoveList } from '../game/MoveList';
 import { PlayerBar } from '../game/PlayerBar';
 import { send } from '../lib/net';
@@ -34,10 +35,11 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   // Position consultée dans l'historique ; oubliée dès qu'un nouveau coup arrive.
   const [nav, setNav] = useState<{ ply: number; base: number } | null>(null);
   const [showEnd, setShowEnd] = useState(true);
-  // Premoves (mode bot) : file de coups préparés pendant le tour du bot. `rej` mémorise le
-  // compteur de refus : un refus (premove devenu illégal) annule toute la file.
-  const [queue, setQueue] = useState<{ list: LocalMove[]; rej: number }>({ list: [], rej: 0 });
-  const premoves = queue.rej === rejections ? queue.list : [];
+  // Premoves (mode bot, pas à deux sur l'écran) : file de coups préparés pendant le tour du bot.
+  // Un refus (premove devenu illégal) change le compteur de refus et annule toute la file.
+  const premoveOn = useSettings((s) => s.premoves);
+  const queue = usePremoves(rejections, premoveOn && isBot);
+  const premoves = queue.premoves;
   // Coup joué affiché tout de suite (sans attendre le serveur), oublié au snapshot suivant ou
   // au refus.
   const [pendingState, setPending] = useState<{
@@ -101,15 +103,16 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   // À mon tour, le premier premove part (un refus reçoit le message générique, comme un coup,
   // et annule les suivants).
   const myTurn = board?.turn === me && state.phase === 'playing';
-  const nextPremove = myTurn && !pending ? premoves[0] : undefined;
+  const nextPremove = myTurn && !pending ? queue.next : undefined;
+  const shiftPremove = queue.shift;
   useEffect(() => {
     if (!nextPremove) return;
     /* eslint-disable react-hooks/set-state-in-effect -- chaque premove n'est envoyé qu'une fois */
     setPending({ move: nextPremove, base: plyCount, rej: rejections });
-    setQueue((q) => ({ list: q.list.slice(1), rej: q.rej }));
+    shiftPremove();
     /* eslint-enable react-hooks/set-state-in-effect */
     send({ type: 'move', clientMoveId: crypto.randomUUID(), move: nextPremove });
-  }, [nextPremove, plyCount, rejections]);
+  }, [nextPremove, plyCount, rejections, shiftPremove]);
 
   // Mode concentration : Échap ou sortie du plein écran ramène à l'affichage classique.
   useEffect(() => {
@@ -208,10 +211,12 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     <Board
       pieces={pieces}
       orientation={view}
-      premoveColor={isBot && !ended && live && (board.turn !== me || pending) ? me : null}
+      premoveColor={
+        premoveOn && isBot && !ended && live && (board.turn !== me || pending) ? me : null
+      }
       premoves={premoves}
-      onPremove={(m) => setQueue({ list: [...premoves, m], rej: rejections })}
-      onCancelPremove={() => setQueue({ list: [], rej: rejections })}
+      onPremove={queue.add}
+      onCancelPremove={queue.clear}
       movable={movable}
       legalMoves={classic && showLegalMoves && live ? board.legalMoves : null}
       ownSecretSquare={isBot ? ownSecretSquare : null}
@@ -310,7 +315,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
                 onClick={() => {
                   // Le coup affiché en attente et les premoves n'ont plus lieu d'être.
                   setPending(null);
-                  setQueue({ list: [], rej: rejections });
+                  queue.clear();
                   send({ type: 'takeback' });
                 }}
                 disabled={plyCount === 0}

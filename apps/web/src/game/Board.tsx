@@ -121,6 +121,8 @@ export function Board(props: BoardProps) {
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [marks, setMarks] = useState<Square[]>([]);
   const rightStart = useRef<Square | null>(null);
+  /** Boutons dont le prochain relâchement est ignoré (ils ont servi à annuler une sélection). */
+  const ignoreUp = useRef(new Set<number>());
   const bySquare = new Map(pieces.map((p) => [p.square, p]));
 
   // Camp manipulable maintenant : le mien à mon tour, ou mes pièces en premove.
@@ -158,7 +160,33 @@ export function Board(props: BoardProps) {
     props.onMove?.(from, to);
   };
 
+  /** Fin du glisser en cours (la pièce revient sur sa case), sans toucher à la sélection. */
+  const resetDrag = () => {
+    dragStart.current = null;
+    setDrag(null);
+  };
+
+  /**
+   * Un bouton autre que le gauche, pendant une sélection ou un glisser : tout est annulé et la
+   * pièce revient sur sa case d'origine. Le relâchement de ce bouton sera ignoré.
+   */
+  const cancelHand = (e: ReactPointerEvent<HTMLDivElement>, button: number) => {
+    const board = boardRef.current;
+    if (board?.hasPointerCapture?.(e.pointerId)) board.releasePointerCapture(e.pointerId);
+    resetDrag();
+    setSelected(null);
+    rightStart.current = null;
+    ignoreUp.current.add(button);
+    // Le clic droit annule aussi les premoves en attente (comportement habituel).
+    if (button === 2 && props.premoves?.length) props.onCancelPremove?.();
+  };
+
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // Nouvelle pression : un ancien drapeau « relâchement à ignorer » n'a plus de sens.
+    ignoreUp.current.delete(e.button);
+    if (e.button !== 0 && (selected !== null || dragStart.current !== null)) {
+      return cancelHand(e, e.button);
+    }
     const square = squareFromEvent(e);
     if (!square) return;
     if (e.button === 2) {
@@ -196,6 +224,9 @@ export function Board(props: BoardProps) {
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const start = dragStart.current;
     if (!start) return;
+    // Un second bouton pressé pendant le glisser arrive en pointermove (Pointer Events) :
+    // tout bouton autre que le gauche annule le glisser et la sélection.
+    if ((e.buttons & ~1) !== 0) return cancelHand(e, e.button > 0 ? e.button : 2);
     // Petit seuil : en dessous, c'est un clic (clic-clic), pas un glisser.
     if (!drag && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 4) return;
     const pos = pointerInBoard(e);
@@ -204,6 +235,7 @@ export function Board(props: BoardProps) {
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (ignoreUp.current.delete(e.button)) return;
     if (e.button === 2) {
       const from = rightStart.current;
       rightStart.current = null;
@@ -221,10 +253,10 @@ export function Board(props: BoardProps) {
       }
       return;
     }
+    if (e.button !== 0) return;
     const start = dragStart.current;
     const wasDragging = drag !== null;
-    dragStart.current = null;
-    setDrag(null);
+    resetDrag();
     if (!start) return;
     const target = squareFromEvent(e);
     // Relâché sur sa propre case : on garde la sélection pour un clic-clic.
@@ -283,6 +315,8 @@ export function Board(props: BoardProps) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={resetDrag}
+      onLostPointerCapture={resetDrag}
       onContextMenu={(e) => e.preventDefault()}
     >
       {squares}

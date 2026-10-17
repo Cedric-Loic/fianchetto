@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 import type {
   DisplayedPiece,
   LegalMove,
@@ -9,10 +9,12 @@ import type {
   Square,
 } from '@sq/shared';
 import { Board } from '../game/Board';
+import { usePremoves } from '../game/usePremoves';
 import { api } from '../lib/api';
 import { carryIds, piecesFromFen } from '../lib/fen';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
+import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
 
 const PHASES: Record<number, string> = {
@@ -126,6 +128,11 @@ function ExerciseBoard(props: {
   const [progress, setProgress] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Mon coup envoyé, affiché tout de suite en attendant la réponse du serveur. */
+  const [pending, setPending] = useState<LocalMove | null>(null);
+  // Premoves pendant la réponse adverse, oubliés dès que l'exercice est terminé.
+  const premoveOn = useSettings((s) => s.premoves);
+  const queue = usePremoves(phase, premoveOn);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(
     () => () => {
@@ -140,16 +147,20 @@ function ExerciseBoard(props: {
   };
   const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(fn, ms));
 
-  const onMove = async (from: Square, to: Square, promotion?: string) => {
+  const onMove = async (move: LocalMove) => {
     if (phase !== 'playing' || busy) return;
     setBusy(true);
+    setPending(move);
     const res = await api.lessonMove(
       props.lessonId,
       props.index,
       step,
-      `${from}${to}${promotion ?? ''}`,
+      `${move.from}${move.to}${move.promotion ?? ''}`,
     );
+    setPending(null);
     if (!res || res.status === 'illegal') {
+      // Coup (ou premove) refusé : la pièce revient, les premoves suivants sont annulés.
+      queue.clear();
       setBusy(false);
       return;
     }
@@ -182,16 +193,34 @@ function ExerciseBoard(props: {
     else finish();
   };
 
+  // Position de nouveau jouable : le premier premove part comme un coup normal.
+  const playable = phase === 'playing' && !busy;
+  const nextPremove = playable ? queue.next : undefined;
+  const playPremove = useEffectEvent((move: LocalMove) => {
+    queue.shift();
+    void onMove(move);
+  });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- chaque premove ne part qu'une fois
+    if (nextPremove) playPremove(nextPremove);
+  }, [nextPremove]);
+
   return (
     <div className="exercise">
       <div className="example-board">
         <Board
-          pieces={pieces}
+          pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
           orientation={exercise.color}
-          movable={phase === 'playing' && !busy ? exercise.color : null}
+          movable={playable ? exercise.color : null}
+          premoveColor={premoveOn && phase === 'playing' && busy ? exercise.color : null}
+          premoves={queue.premoves}
+          onPremove={queue.add}
+          onCancelPremove={queue.clear}
           legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
           lastMove={lastMove}
-          onMove={(from, to, promotion) => void onMove(from, to, promotion)}
+          onMove={(from, to, promotion) =>
+            void onMove(promotion ? { from, to, promotion } : { from, to })
+          }
         />
       </div>
       <div className="exercise-side">

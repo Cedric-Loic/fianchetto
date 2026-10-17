@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   PUZZLE_THEME_LABELS,
   PUZZLE_THEMES,
@@ -11,10 +11,12 @@ import {
   type Square,
 } from '@sq/shared';
 import { Board } from '../game/Board';
+import { usePremoves } from '../game/usePremoves';
 import { api } from '../lib/api';
 import { carryIds, piecesFromFen } from '../lib/fen';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
+import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
 
 type Phase = 'loading' | 'playing' | 'solved' | 'failed' | 'empty' | 'no-bank';
@@ -59,6 +61,12 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
   const [ratingChange, setRatingChange] = useState<{ before: number; after: number } | null>(null);
   const [hint, setHint] = useState<Square | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Mon coup envoyé, affiché tout de suite en attendant la réponse du serveur. */
+  const [pending, setPending] = useState<LocalMove | null>(null);
+  // Premoves pendant la réponse adverse : file vidée à chaque nouveau puzzle et à la fin du
+  // puzzle (réussi ou raté).
+  const premoveOn = useSettings((s) => s.premoves);
+  const queue = usePremoves(`${attempt?.attemptId ?? ''}:${phase}`, premoveOn);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const later = (fn: () => void, ms: number) => {
@@ -115,26 +123,19 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
     [],
   );
 
-  if (!user) {
-    return (
-      <div className="page">
-        <div className="panel page-panel">
-          <h2>Puzzles</h2>
-          <p className="muted">Connecte-toi pour suivre ton classement puzzle.</p>
-          <a className="button primary" href="#/login">
-            Se connecter
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const onMove = async (from: Square, to: Square, promotion?: string) => {
+  const onMove = async (move: LocalMove) => {
     if (!attempt || phase !== 'playing' || busy) return;
     setBusy(true);
     setHint(null);
-    const res = await api.puzzleMove(attempt.attemptId, `${from}${to}${promotion ?? ''}`);
+    setPending(move);
+    const res = await api.puzzleMove(
+      attempt.attemptId,
+      `${move.from}${move.to}${move.promotion ?? ''}`,
+    );
+    setPending(null);
     if (!res || res.status === 'illegal') {
+      // Coup (ou premove) refusé : la pièce revient, les premoves suivants n'ont plus de sens.
+      queue.clear();
       setBusy(false);
       return;
     }
@@ -164,6 +165,19 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
     } else finish();
   };
 
+  // Quand la position redevient jouable, le premier premove part comme un coup normal (jugé par
+  // le serveur : un mauvais coup fait rater le puzzle, un coup illégal vide la file).
+  const playable = phase === 'playing' && !busy && attempt !== null;
+  const nextPremove = playable ? queue.next : undefined;
+  const playPremove = useEffectEvent((move: LocalMove) => {
+    queue.shift();
+    void onMove(move);
+  });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- chaque premove ne part qu'une fois
+    if (nextPremove) playPremove(nextPremove);
+  }, [nextPremove]);
+
   const showSolution = () => {
     if (!solution) return;
     setBusy(true);
@@ -177,6 +191,20 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
     void api.puzzleHint(attempt.attemptId).then((h) => h && setHint(h.from as Square));
   };
 
+  if (!user) {
+    return (
+      <div className="page">
+        <div className="panel page-panel">
+          <h2>Puzzles</h2>
+          <p className="muted">Connecte-toi pour suivre ton classement puzzle.</p>
+          <a className="button primary" href="#/login">
+            Se connecter
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   const ended = phase === 'solved' || phase === 'failed';
   const color = attempt?.color ?? 'w';
   const themeOfDay = stats?.themeOfDay ?? 'fork';
@@ -187,13 +215,19 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
       <div className="board-column">
         <div className="board-wrap">
           <Board
-            pieces={pieces}
+            pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
             orientation={color}
-            movable={phase === 'playing' && !busy ? color : null}
+            movable={playable ? color : null}
+            premoveColor={premoveOn && phase === 'playing' && busy ? color : null}
+            premoves={queue.premoves}
+            onPremove={queue.add}
+            onCancelPremove={queue.clear}
             legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
             lastMove={lastMove}
             highlighted={hint}
-            onMove={(from, to, promotion) => void onMove(from, to, promotion)}
+            onMove={(from, to, promotion) =>
+              void onMove(promotion ? { from, to, promotion } : { from, to })
+            }
           />
         </div>
       </div>
@@ -314,7 +348,10 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
               className={ended ? 'primary' : ''}
               data-testid="next-puzzle"
               disabled={busy}
-              onClick={() => setRound((r) => r + 1)}
+              onClick={() => {
+                queue.clear();
+                setRound((r) => r + 1);
+              }}
             >
               {ended ? 'Puzzle suivant ▶' : 'Passer'}
             </button>

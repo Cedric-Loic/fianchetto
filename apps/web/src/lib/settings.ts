@@ -29,6 +29,8 @@ interface Settings {
   chessComUsername: string;
   /** Entraînement : demander confirmation avant une gaffe. */
   trainingGuard: boolean;
+  /** Coups anticipés (premoves) : partout sauf à deux sur le même écran. */
+  premoves: boolean;
 }
 
 const KEY = 'sq-settings';
@@ -40,6 +42,7 @@ const DEFAULTS: Settings = {
   showLegalMoves: true,
   chessComUsername: '',
   trainingGuard: true,
+  premoves: true,
 };
 const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
 
@@ -54,6 +57,7 @@ function load(): Settings {
       autoFlip: bool(parsed.autoFlip, DEFAULTS.autoFlip),
       showLegalMoves: bool(parsed.showLegalMoves, DEFAULTS.showLegalMoves),
       trainingGuard: bool(parsed.trainingGuard, DEFAULTS.trainingGuard),
+      premoves: bool(parsed.premoves, DEFAULTS.premoves),
       chessComUsername:
         typeof parsed.chessComUsername === 'string'
           ? parsed.chessComUsername.slice(0, 40)
@@ -69,8 +73,16 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
     ...load(),
     update(patch) {
       set(patch);
-      const { board, pieces, sound, autoFlip, showLegalMoves, chessComUsername, trainingGuard } =
-        get();
+      const {
+        board,
+        pieces,
+        sound,
+        autoFlip,
+        showLegalMoves,
+        chessComUsername,
+        trainingGuard,
+        premoves,
+      } = get();
       try {
         localStorage.setItem(
           KEY,
@@ -82,6 +94,7 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
             showLegalMoves,
             chessComUsername,
             trainingGuard,
+            premoves,
           }),
         );
       } catch {

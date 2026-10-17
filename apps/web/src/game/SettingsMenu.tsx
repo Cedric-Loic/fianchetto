@@ -10,7 +10,7 @@ import {
 
 /**
  * Réglages : thème du plateau, jeu de pièces, sons, retournement automatique en hot-seat, coups
- * possibles (classique).
+ * possibles (classique), garde-fou d'entraînement, coups anticipés.
  */
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
@@ -90,6 +90,15 @@ export function SettingsMenu() {
               onChange={(e) => settings.update({ trainingGuard: e.target.checked })}
             />{' '}
             Entraînement : demander confirmation avant une gaffe
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              data-testid="setting-premoves"
+              checked={settings.premoves}
+              onChange={(e) => settings.update({ premoves: e.target.checked })}
+            />{' '}
+            Coups anticipés (premove)
           </label>
         </div>
       )}
