@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
-import type { Color, GameResult, Square, ViewerGameState } from '@sq/shared';
+import type {
+  AnalysisResponse,
+  Color,
+  GameResult,
+  PromotionPiece,
+  Square,
+  ViewerGameState,
+} from '@sq/shared';
+import { EvalBar, EvalChart } from '../game/Analysis';
+import { evalLabel, evalValue } from '../lib/eval';
+import { api } from '../lib/api';
+import { piecesFromFen } from '../lib/fen';
 import { Board } from '../game/Board';
 import { MoveList } from '../game/MoveList';
 import { PlayerBar } from '../game/PlayerBar';
@@ -8,6 +19,7 @@ import { publicPositionAt } from '../lib/position';
 import { useGame } from '../lib/store';
 import { useSession } from '../lib/session';
 import { REASONS, SIDE } from './labels';
+import { useSettings } from '../lib/settings';
 
 function resultText(result: GameResult, state: ViewerGameState): string {
   if (result.winner === null) return `Partie nulle ${REASONS[result.reason]}`;
@@ -25,6 +37,16 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   // Position consultée dans l'historique ; oubliée dès qu'un nouveau coup arrive.
   const [nav, setNav] = useState<{ ply: number; base: number } | null>(null);
   const [showEnd, setShowEnd] = useState(true);
+  // Premove (mode bot uniquement) : un seul coup préparé pendant le tour du bot.
+  const [premove, setPremove] = useState<{
+    from: Square;
+    to: Square;
+    promotion?: PromotionPiece;
+  } | null>(null);
+  const autoFlip = useSettings((s) => s.autoFlip);
+  // Analyse après la fin : positions réelles, évaluation, meilleur coup.
+  const [analysis, setAnalysis] = useState<AnalysisResponse | 'loading' | 'error' | null>(null);
+  const analysing = analysis !== null && analysis !== 'loading' && analysis !== 'error';
 
   useEffect(() => {
     if (!toast) return;
@@ -36,17 +58,42 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const cursor = nav !== null && nav.base === plyCount ? nav.ply : null;
   const setCursor = (ply: number | null) => setNav(ply === null ? null : { ply, base: plyCount });
 
+  // À mon tour, le premove est envoyé (un refus reçoit le message générique, comme un coup).
+  const myTurn = board?.turn === me && state.phase === 'playing';
+  useEffect(() => {
+    if (!myTurn || !premove) return;
+    send({ type: 'move', clientMoveId: crypto.randomUUID(), move: premove });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- le premove est consommé une fois
+    setPremove(null);
+  }, [myTurn, premove]);
+
   if (!board) return null;
   const ended = state.phase === 'ended';
   const live = cursor === null || cursor === plyCount;
   const shownPly = cursor ?? plyCount;
-  const pieces = live ? board.pieces : publicPositionAt(board.moves, shownPly);
+  const reveal = board.reveal;
+  const realFens = reveal
+    ? [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)]
+    : [];
+  const showReal = analysing && realFens.length > shownPly;
+  const pieces = showReal
+    ? piecesFromFen(realFens[shownPly] ?? '')
+    : live
+      ? board.pieces
+      : publicPositionAt(board.moves, shownPly);
   const lastMove = shownPly > 0 ? board.moves[shownPly - 1] : null;
   const king = pieces.find((p) => p.type === 'k' && p.color === board.turn);
   const checkSquare = live && board.inCheck && king ? king.square : null;
 
   const crowns: Square[] = [];
-  if (ended && board.reveal && live) {
+  if (showReal && reveal) {
+    // Analyse : on marque où se trouvent les deux dames secrètes à cette position.
+    const atPly = publicPositionAt(board.moves, shownPly);
+    for (const c of ['w', 'b'] as const) {
+      const piece = atPly.find((p) => p.id === reveal.secrets[c].pieceId);
+      if (piece) crowns.push(piece.square);
+    }
+  } else if (ended && board.reveal && live) {
     for (const c of ['w', 'b'] as const) {
       const sq = board.reveal.secrets[c].finalSquare;
       if (sq) crowns.push(sq);
@@ -61,8 +108,10 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const movable = ended || !live ? null : isBot ? (board.turn === me ? me : null) : board.turn;
   const actor = isBot ? (me ?? 'w') : board.turn;
 
-  const bottom = orientation;
-  const top: Color = orientation === 'w' ? 'b' : 'w';
+  // Hot-seat : option « retourner le plateau vers le camp au trait ».
+  const view: Color = !isBot && autoFlip && !ended ? board.turn : orientation;
+  const bottom = view;
+  const top: Color = view === 'w' ? 'b' : 'w';
   const bar = (color: Color) => (
     <PlayerBar
       color={color}
@@ -82,6 +131,16 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     />
   );
 
+  const current = analysing ? analysis.plies[shownPly] : undefined;
+  const best = current?.bestMoveUci;
+  const bestArrow = best
+    ? { from: best.slice(0, 2) as Square, to: best.slice(2, 4) as Square }
+    : null;
+  const startAnalysis = () => {
+    setAnalysis('loading');
+    void api.analysis(state.gameId).then((a) => setAnalysis(a ?? 'error'));
+  };
+
   const holdStart = () => {
     setPeekHeld(true);
     send({ type: 'peek-secret' });
@@ -90,12 +149,18 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
 
   return (
     <div className="game">
+      {analysing && <EvalBar value={evalValue(current)} />}
       <div className="board-column">
         {bar(top)}
         <div className="board-wrap">
           <Board
+            extraArrows={bestArrow ? [bestArrow] : []}
             pieces={pieces}
-            orientation={orientation}
+            orientation={view}
+            premoveColor={isBot && !ended && live && board.turn !== me ? me : null}
+            premove={premove}
+            onPremove={setPremove}
+            onCancelPremove={() => setPremove(null)}
             movable={movable}
             ownSecretSquare={isBot ? (board.ownSecret?.square ?? null) : null}
             lastMove={lastMove ? { from: lastMove.from, to: lastMove.to } : null}
@@ -121,7 +186,26 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
             : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`}
           {state.rated && <span className="rated-badge">Classée</span>}
         </div>
-        <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />
+        {analysing && (
+          <div className="analysis-panel" data-testid="analysis">
+            <EvalChart analysis={analysis} cursor={shownPly} onSelect={setCursor} />
+            <p>
+              Évaluation : <strong>{evalLabel(current)}</strong>
+              {current?.bestMoveSan && (
+                <>
+                  {' '}
+                  · meilleur coup : <span className="best-move">{current.bestMoveSan}</span>
+                </>
+              )}
+            </p>
+          </div>
+        )}
+        <MoveList
+          moves={board.moves}
+          labels={analysing ? reveal?.plies.map((p) => p.realSan) : undefined}
+          cursor={shownPly}
+          onSelect={setCursor}
+        />
         <div className="nav">
           <button title="Début" onClick={() => setCursor(0)}>
             ⏮
@@ -192,6 +276,20 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
             <button onClick={onLeave}>Nouvelle partie</button>
           </div>
         )}
+        {ended && (
+          <div className="actions">
+            {!analysing && (
+              <button onClick={startAnalysis} disabled={analysis === 'loading'}>
+                {analysis === 'loading' ? 'Analyse en cours…' : '🔍 Analyser la partie'}
+              </button>
+            )}
+            {analysing && <button onClick={() => setAnalysis(null)}>Vue publique</button>}
+            <a className="button" href={`/api/games/${state.gameId}/pgn`} download="partie.pgn">
+              ⬇ PGN
+            </a>
+          </div>
+        )}
+        {analysis === 'error' && <p className="error">Analyse impossible.</p>}
       </aside>
 
       {ended && board.result && board.reveal && showEnd && (

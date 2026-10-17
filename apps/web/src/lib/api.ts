@@ -1,4 +1,10 @@
-import type { BotLevelInfo, LeaderboardResponse, ProfileResponse, UserPublic } from '@sq/shared';
+import type {
+  AnalysisResponse,
+  BotLevelInfo,
+  LeaderboardResponse,
+  ProfileResponse,
+  UserPublic,
+} from '@sq/shared';
 
 /** Appel REST ; `null` en cas d'erreur HTTP ou réseau (serveur arrêté…). */
 async function call<T>(method: string, path: string, body?: unknown): Promise<T | null> {
@@ -28,5 +34,6 @@ export const api = {
   profile: (username: string) =>
     call<ProfileResponse>('GET', `/api/profile/${encodeURIComponent(username)}`),
   activeGame: () => call<{ gameId: string | null }>('GET', '/api/games/active'),
+  analysis: (gameId: string) => call<AnalysisResponse>('GET', `/api/games/${gameId}/analysis`),
   createGame: (body: unknown) => call<{ gameId: string }>('POST', '/api/games', body),
 };

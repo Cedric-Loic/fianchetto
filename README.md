@@ -9,9 +9,9 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étape 3 terminée** : parties contre le bot (5 niveaux, classées Elo) avec comptes
-> locaux, profil et classement, et parties à deux sur le même écran. Thèmes, sons, flèches,
-> premoves et analyse arrivent à l'étape 4.
+> **État : étape 4 terminée** : parties contre le bot (5 niveaux, classées Elo) ou à deux,
+> comptes, profil, classement, thèmes, sons, flèches, premoves, rejeu et analyse Stockfish.
+> Reste l'étape 5 : audit de sécurité du secret et recette.
 
 ## Prérequis
 
@@ -79,7 +79,7 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 1     | Moteur (règles, projection, notation) + banc de tests de fuite | ✅      |
 | 2     | Serveur + interface : partie hot-seat complète                 | ✅      |
 | 3     | Bot, comptes, Elo, pendules                                    | ✅      |
-| 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | à venir |
+| 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | ✅      |
 | 5     | Audit de sécurité du secret, recette                           | à venir |
 
 ## Licences et crédits

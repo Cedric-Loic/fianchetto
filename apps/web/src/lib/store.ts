@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { playSound } from './sound';
 import {
   GENERIC_ILLEGAL_MOVE_MESSAGE,
   type Color,
@@ -27,6 +28,16 @@ interface GameStore {
   reset: () => void;
 }
 
+/** Son associé à un événement public (échec > prise > coup). */
+function soundFor(cause: GameEvent | null): void {
+  if (!cause) return;
+  if (cause.kind === 'game-started') return playSound('start');
+  if (cause.kind === 'game-ended') return playSound('end');
+  if (cause.kind !== 'move') return;
+  if (cause.move.check) return playSound('check');
+  playSound(cause.move.capture ? 'capture' : 'move');
+}
+
 export const useGame = create<GameStore>((set, get) => ({
   state: null,
   lastCause: null,
@@ -37,6 +48,7 @@ export const useGame = create<GameStore>((set, get) => ({
   receive(message) {
     switch (message.type) {
       case 'snapshot': {
+        soundFor(message.cause);
         const turn = message.state.board?.turn ?? null;
         const peek = get().peek;
         // Le marqueur disparaît au changement de trait, même si le bouton reste enfoncé.
@@ -51,6 +63,7 @@ export const useGame = create<GameStore>((set, get) => ({
         return;
       }
       case 'move-rejected':
+        playSound('illegal');
         set({ toast: GENERIC_ILLEGAL_MOVE_MESSAGE });
         return;
       case 'secret-peek':

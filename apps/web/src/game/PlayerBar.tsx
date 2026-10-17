@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { materialAdvantage, type Color, type PieceType, type PlayerInfo } from '@sq/shared';
+import { pieceUrl, useSettings } from '../lib/settings';
+import { playSound } from '../lib/sound';
 
 const ORDER: PieceType[] = ['q', 'r', 'b', 'n', 'p'];
 
@@ -21,6 +23,11 @@ function Clock({ ms, running, receivedAt }: { ms: number; running: boolean; rece
     return () => clearInterval(id);
   }, [running]);
   const shown = running ? ms - Math.max(0, now - receivedAt) : ms;
+  // Bip unique quand il reste 10 secondes.
+  const low = running && shown < 10_000;
+  useEffect(() => {
+    if (low) playSound('lowtime');
+  }, [low]);
   return (
     <div className={`clock${running ? ' running' : ''}${shown < 20_000 ? ' low' : ''}`}>
       {formatClock(shown)}
@@ -47,6 +54,7 @@ export function PlayerBar({
   clock,
   active,
 }: PlayerBarProps) {
+  const set = useSettings((s) => s.pieces);
   const advantage = materialAdvantage(captured, color);
   const sorted = [...capturedByMe].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   const opponent = color === 'w' ? 'b' : 'w';
@@ -60,7 +68,7 @@ export function PlayerBar({
         </div>
         <div className="captured">
           {sorted.map((t, i) => (
-            <img key={i} src={`/pieces/cburnett/${opponent}${t.toUpperCase()}.svg`} alt={t} />
+            <img key={i} src={pieceUrl(set, opponent, t)} alt={t} />
           ))}
           {advantage > 0 && <span className="advantage">+{advantage}</span>}
         </div>

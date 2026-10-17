@@ -11,6 +11,7 @@ import {
   type ProfileResponse,
   type ServerMessage,
 } from '@sq/shared';
+import { analyzeGame, UciEngine } from '@sq/bot';
 import { currentUser, registerAuthRoutes, toPublicUser } from './auth.js';
 import type { BotDriver } from './bot/driver.js';
 import { loadConfig } from './config.js';
@@ -73,6 +74,67 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
     const id = store.activeGameOf(user.id);
     return { gameId: id && games.get(id) ? id : null };
+  });
+
+  /**
+   * Partie consultable par l'utilisateur courant, avec le camp de sa vue : mode bot →
+   * propriétaire seulement ; hot-seat → vue publique.
+   */
+  const viewable = (id: string, request: Parameters<typeof currentUser>[1]) => {
+    const session = games.get(id);
+    if (!session) return null;
+    if (session.mode === 'hotseat') return { session, viewer: 'public' as const };
+    const user = currentUser(store, request);
+    if (!user || user.id !== session.ownerId || !session.botColor) return null;
+    return { session, viewer: session.botColor === 'w' ? ('b' as const) : ('w' as const) };
+  };
+
+  // Analyse : uniquement après la fin (positions réelles révélées), mise en cache dans SQLite.
+  let analysisEngine: UciEngine | null = null;
+  app.addHook('onClose', () => analysisEngine?.quit());
+  app.get<{ Params: { id: string } }>('/api/games/:id/analysis', async (request, reply) => {
+    const found = viewable(request.params.id, request);
+    if (!found) return reply.code(404).send({ error: 'NOT_FOUND' });
+    const reveal = found.session.stateFor(found.viewer).board?.reveal;
+    if (found.session.phase !== 'ended' || !reveal) {
+      return reply.code(409).send({ error: 'GAME_NOT_OVER' });
+    }
+    const cached = store.getAnalysis(found.session.id);
+    if (cached) return cached;
+    analysisEngine ??= new UciEngine();
+    const fens = [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)];
+    const analysis = await analyzeGame(analysisEngine, fens);
+    store.saveAnalysis(found.session.id, analysis);
+    return analysis;
+  });
+
+  // Export de la notation : publique pendant la partie, réelle (PGN avec FEN de départ) après.
+  app.get<{ Params: { id: string } }>('/api/games/:id/pgn', (request, reply) => {
+    const found = viewable(request.params.id, request);
+    if (!found) return reply.code(404).send({ error: 'NOT_FOUND' });
+    const state = found.session.stateFor(found.viewer);
+    const board = state.board;
+    const result = board?.result
+      ? board.result.winner === null
+        ? '1/2-1/2'
+        : board.result.winner === 'w'
+          ? '1-0'
+          : '0-1'
+      : '*';
+    const reveal = board?.reveal ?? null;
+    const sans = reveal
+      ? reveal.plies.map((p) => p.realSan)
+      : (board?.moves ?? []).map((m) => m.san);
+    const body = sans.map((san, i) => (i % 2 === 0 ? `${i / 2 + 1}. ${san}` : san)).join(' ');
+    const headers = [
+      `[Event "Secret Queen${reveal ? '' : ' (notation publique)'}"]`,
+      `[White "${state.players.w.name}"]`,
+      `[Black "${state.players.b.name}"]`,
+      `[Result "${result}"]`,
+      ...(reveal ? ['[SetUp "1"]', `[FEN "${reveal.realInitialFen}"]`] : []),
+    ];
+    void reply.type('application/x-chess-pgn; charset=utf-8');
+    return `${headers.join('\n')}\n\n${body} ${result}\n`;
   });
 
   app.post('/api/games', (request, reply) => {

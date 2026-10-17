@@ -40,3 +40,19 @@ describe('bot (Stockfish)', () => {
     expect(game.play('b', move).ok).toBe(true);
   }, 60_000);
 });
+
+describe('analyse de fin de partie', () => {
+  it('évalue chaque position réelle, du point de vue des Blancs', async () => {
+    const { analyzeGame } = await import('../src/analysis.js');
+    const fens = [
+      // Blancs avec une dame de plus (dame secrète en e2).
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPQPPP/RNBQKBNR w KQkq - 0 1',
+      // Mat du berger : les Noirs sont matés.
+      'r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4',
+    ];
+    const result = await analyzeGame(engine, fens, 80);
+    expect(result.plies[0]?.evalCp).toBeGreaterThan(500);
+    expect(result.plies[0]?.bestMoveSan).toBeTruthy();
+    expect(result.plies[1]?.evalCp).toBe(10_000);
+  }, 60_000);
+});

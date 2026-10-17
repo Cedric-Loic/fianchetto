@@ -185,8 +185,19 @@ export class GameManager {
     this.#store.saveResult(session.id, user.id, summary);
   }
 
+  /** Partie en mémoire, ou partie terminée rechargée depuis SQLite (rejeu, analyse). */
   get(id: string): GameSession | undefined {
-    return this.#games.get(id);
+    const live = this.#games.get(id);
+    if (live) return live;
+    const saved = this.#store.load(id);
+    if (!saved || saved.record.phase !== 'ended') return undefined;
+    try {
+      const session = GameSession.restore(saved.record, saved.secrets, this.#hooks());
+      this.#games.set(id, session);
+      return session;
+    } catch {
+      return undefined;
+    }
   }
 
   disposeAll(): void {

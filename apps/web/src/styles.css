@@ -151,12 +151,10 @@ button.big {
   background: var(--square-dark);
 }
 .sq.light.last,
-.sq.light.selected {
-  background: var(--last-light);
-}
 .sq.dark.last,
+.sq.light.selected,
 .sq.dark.selected {
-  background: var(--last-dark);
+  box-shadow: inset 0 0 0 100px #ffff3366;
 }
 .sq.check {
   background: radial-gradient(circle, #ff0000 0%, #e70000 25%, #a5000000 89%) !important;
@@ -553,4 +551,82 @@ a.button.primary {
 }
 .elo-change {
   font-size: 1.1rem;
+}
+
+/* --- Étape 4 : annotations, premoves, réglages, analyse --- */
+.sq.premove {
+  background: #c9543d !important;
+}
+.sq.marked {
+  box-shadow: inset 0 0 0 100px #e0503ab0;
+}
+.arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+.settings-menu {
+  position: absolute;
+  right: 16px;
+  top: 52px;
+  z-index: 60;
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 14px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 8px 24px #000a;
+}
+.settings-menu .row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.swatch,
+.swatch:hover:not(:disabled) {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  padding: 0;
+  background: linear-gradient(135deg, var(--l) 50%, var(--d) 50%);
+}
+.swatch.selected,
+.piece-choice.selected {
+  outline: 2px solid var(--accent);
+}
+.piece-choice img {
+  width: 34px;
+}
+.eval-bar {
+  width: 18px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #403d39;
+  display: flex;
+  flex-direction: column;
+}
+.eval-bar .white-part {
+  background: #f0f0f0;
+  margin-top: auto;
+  transition: height 0.3s;
+}
+.analysis-row {
+  display: flex;
+  gap: 8px;
+}
+.eval-chart {
+  width: 100%;
+  height: 90px;
+  background: var(--panel-2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.best-move {
+  color: #4a9eea;
+  font-weight: 700;
 }

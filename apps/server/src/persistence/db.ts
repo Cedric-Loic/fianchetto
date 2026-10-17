@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
-import type { Color, GameSummary, Square } from '@sq/shared';
+import type { AnalysisResponse, Color, GameSummary, Square } from '@sq/shared';
 import { Secret } from '@sq/shared/secret';
 import type { PersistedGame } from '@sq/engine';
 import type { SessionRecord, SessionSecrets } from '../games/session.js';
@@ -23,6 +23,11 @@ export interface UserRow {
 
 const USER_SELECT = `SELECT id, username, password_hash AS passwordHash, rating,
   games_played AS gamesPlayed FROM users`;
+
+export interface SavedGame {
+  record: SessionRecord;
+  secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedGame> | null };
+}
 
 export class GameStore {
   readonly #db: Database.Database;
@@ -51,6 +56,10 @@ export class GameStore {
         token      TEXT PRIMARY KEY,
         user_id    TEXT NOT NULL REFERENCES users(id),
         expires_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS analyses (
+        game_id  TEXT PRIMARY KEY,
+        analysis TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS results (
         game_id       TEXT PRIMARY KEY,
@@ -170,27 +179,45 @@ export class GameStore {
       });
   }
 
+  /** Une partie précise (par exemple terminée, pour le rejeu), quelle que soit sa phase. */
+  load(id: string): SavedGame | undefined {
+    const row = this.#db.prepare(`SELECT record, secret_state FROM games WHERE id = ?`).get(id) as
+      { record: string; secret_state: string } | undefined;
+    return row ? this.#parse(row) : undefined;
+  }
+
+  getAnalysis(gameId: string): AnalysisResponse | undefined {
+    const row = this.#db.prepare(`SELECT analysis FROM analyses WHERE game_id = ?`).get(gameId) as
+      { analysis: string } | undefined;
+    return row ? (JSON.parse(row.analysis) as AnalysisResponse) : undefined;
+  }
+
+  saveAnalysis(gameId: string, analysis: AnalysisResponse): void {
+    this.#db
+      .prepare(`INSERT OR REPLACE INTO analyses (game_id, analysis) VALUES (?, ?)`)
+      .run(gameId, JSON.stringify(analysis));
+  }
+
   /** Parties à reprendre au démarrage : toutes celles qui ne sont pas terminées. */
-  loadUnfinished(): {
-    record: SessionRecord;
-    secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedGame> | null };
-  }[] {
+  loadUnfinished(): SavedGame[] {
     const rows = this.#db
       .prepare(`SELECT record, secret_state FROM games WHERE phase != 'ended'`)
       .all() as { record: string; secret_state: string }[];
-    return rows.map((row) => {
-      const secret = JSON.parse(row.secret_state) as {
-        selection: Partial<Record<Color, Square>>;
-        game: PersistedGame | null;
-      };
-      return {
-        record: JSON.parse(row.record) as SessionRecord,
-        secrets: {
-          selection: secret.selection,
-          game: secret.game ? new Secret(secret.game) : null,
-        },
-      };
-    });
+    return rows.map((row) => this.#parse(row));
+  }
+
+  #parse(row: { record: string; secret_state: string }): SavedGame {
+    const secret = JSON.parse(row.secret_state) as {
+      selection: Partial<Record<Color, Square>>;
+      game: PersistedGame | null;
+    };
+    return {
+      record: JSON.parse(row.record) as SessionRecord,
+      secrets: {
+        selection: secret.selection,
+        game: secret.game ? new Secret(secret.game) : null,
+      },
+    };
   }
 
   close(): void {

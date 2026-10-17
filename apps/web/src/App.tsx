@@ -9,6 +9,7 @@ import { Leaderboard } from './screens/Leaderboard';
 import { Login } from './screens/Login';
 import { Profile } from './screens/Profile';
 import { Selection } from './screens/Selection';
+import { SettingsMenu } from './game/SettingsMenu';
 
 type Route =
   | { page: 'home' }
@@ -39,6 +40,7 @@ function Nav() {
       <a href="#/">Jouer</a>
       <a href="#/leaderboard">Classement</a>
       <span className="spacer" />
+      <SettingsMenu />
       {user ? (
         <>
           <a href={`#/profile/${user.username}`} data-testid="nav-user">

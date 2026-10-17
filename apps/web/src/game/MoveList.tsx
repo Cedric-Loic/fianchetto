@@ -3,6 +3,8 @@ import type { PublicMove } from '@sq/shared';
 /** Liste des coups sur deux colonnes (notation publique) ; clic = aller à la position. */
 export function MoveList(props: {
   moves: readonly PublicMove[];
+  /** Notation à afficher à la place de la notation publique (analyse : notation réelle). */
+  labels?: readonly string[] | undefined;
   cursor: number;
   onSelect: (ply: number) => void;
 }) {
@@ -20,7 +22,7 @@ export function MoveList(props: {
               className={`move${props.cursor === m.ply ? ' current' : ''}`}
               onClick={() => props.onSelect(m.ply)}
             >
-              {m.san}
+              {props.labels?.[m.ply - 1] ?? m.san}
             </button>
           ) : (
             <span key="empty" className="move" />
