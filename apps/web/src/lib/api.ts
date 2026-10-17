@@ -1,14 +1,19 @@
 import type {
-  AnalysisResponse,
   BotLevelInfo,
+  ImportedGamesResponse,
+  ImportResult,
   LeaderboardResponse,
   ProfileResponse,
+  ReviewResponse,
   UserPublic,
   Variant,
 } from '@sq/shared';
 
-/** Appel REST ; `null` en cas d'erreur HTTP ou réseau (serveur arrêté…). */
-async function call<T>(method: string, path: string, body?: unknown): Promise<T | null> {
+/** Réponse d'un appel REST : données, ou statut et code d'erreur du serveur. */
+export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
+
+/** Appel REST détaillé (statut et code d'erreur en cas d'échec ; statut 0 = réseau). */
+async function request<T>(method: string, path: string, body?: unknown): Promise<Result<T>> {
   try {
     const res = await fetch(path, {
       method,
@@ -16,11 +21,19 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T 
       body: body ? JSON.stringify(body) : undefined,
       credentials: 'same-origin',
     });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
+    const json = (await res.json().catch(() => ({}))) as unknown;
+    if (res.ok) return { ok: true, data: json as T };
+    const error = (json as { error?: unknown }).error;
+    return { ok: false, status: res.status, error: typeof error === 'string' ? error : '' };
   } catch {
-    return null;
+    return { ok: false, status: 0, error: 'NETWORK' };
   }
+}
+
+/** Appel REST ; `null` en cas d'erreur HTTP ou réseau (serveur arrêté…). */
+async function call<T>(method: string, path: string, body?: unknown): Promise<T | null> {
+  const res = await request<T>(method, path, body);
+  return res.ok ? res.data : null;
 }
 
 export const api = {
@@ -36,6 +49,15 @@ export const api = {
   profile: (username: string) =>
     call<ProfileResponse>('GET', `/api/profile/${encodeURIComponent(username)}`),
   activeGame: () => call<{ gameId: string | null }>('GET', '/api/games/active'),
-  analysis: (gameId: string) => call<AnalysisResponse>('GET', `/api/games/${gameId}/analysis`),
   createGame: (body: unknown) => call<{ gameId: string }>('POST', '/api/games', body),
+  // Coach : revues et imports.
+  review: (id: string) => request<ReviewResponse>('GET', `/api/reviews/${id}`),
+  startReview: (id: string) => request<ReviewResponse>('POST', `/api/reviews/${id}`),
+  imports: () => call<ImportedGamesResponse>('GET', '/api/imports'),
+  importPgn: (pgn: string, as: string) =>
+    request<ImportResult>('POST', '/api/imports/pgn', { pgn, ...(as ? { as } : {}) }),
+  importChessCom: (username: string, max: number) =>
+    request<ImportResult>('POST', '/api/imports/chesscom', { username, max }),
+  deleteImport: (id: string) => call<{ ok: true }>('DELETE', `/api/imports/${id}`),
+  reviewAll: () => call<{ queued: number }>('POST', '/api/imports/review-all'),
 };

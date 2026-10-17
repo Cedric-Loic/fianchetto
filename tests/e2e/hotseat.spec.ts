@@ -78,14 +78,13 @@ test('partie hot-seat complète : choix secrets, passage, mat par la dame secrè
   await expect(page.getByTestId('reveal-b')).toContainText('d7');
   await page.screenshot({ path: 'test-results/hotseat-fin.png' });
 
-  // Analyse : positions réelles, notation réelle, courbe et meilleur coup.
-  await page.getByRole('button', { name: 'Voir le plateau' }).click();
-  await page.getByRole('button', { name: /Analyser la partie/ }).click();
-  await expect(page.getByTestId('analysis')).toBeVisible({ timeout: 30_000 });
+  // Revue : positions réelles, notation réelle, courbe, classe et meilleur coup.
+  await modal.getByRole('link', { name: /Revue de la partie/ }).click();
+  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('move-list')).toContainText('Qh5#');
   await expect(page.getByTestId('eval-chart')).toBeVisible();
-  await page.getByTestId('move-list').getByRole('button', { name: 'a3' }).click();
-  await expect(page.getByTestId('analysis')).toContainText('meilleur coup');
+  await page.getByTestId('move-list').locator('button.move', { hasText: 'a3' }).first().click();
+  await expect(page.getByTestId('move-card')).toContainText('a3');
   // Dans la position réelle, la dame secrète blanche (e2) apparaît comme une dame.
   await expect(page.locator('img[data-square="e2"]')).toHaveAttribute('alt', 'wq');
 
@@ -97,7 +96,9 @@ test('partie hot-seat complète : choix secrets, passage, mat par la dame secrè
   await page.mouse.down({ button: 'right' });
   await page.mouse.move(box.x + 4.5 * s, box.y + 4.5 * s);
   await page.mouse.up({ button: 'right' });
-  await expect(page.getByTestId('arrows').locator('line')).toHaveCount(2); // la mienne + meilleur coup
+  // La mienne (+ celle du meilleur coup si a3 n'était pas le meilleur). Une ligne verticale a
+  // une largeur nulle : on compte les lignes plutôt que de tester leur visibilité.
+  await expect(page.locator('[data-testid="arrows"] line')).not.toHaveCount(0);
 
   // Thème du plateau.
   await page.getByTestId('settings').click();

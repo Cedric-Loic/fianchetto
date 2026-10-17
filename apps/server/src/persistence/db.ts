@@ -3,8 +3,8 @@ import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
 import {
   VARIANTS,
-  type AnalysisResponse,
   type Color,
+  type GameReview,
   type GameSummary,
   type Rating,
   type Square,
@@ -28,6 +28,30 @@ export interface UserRow {
 }
 
 const USER_SELECT = `SELECT id, username, password_hash AS passwordHash FROM users`;
+
+/** Partie importée (PGN ou chess.com) : le PGN complet et ses en-têtes utiles. */
+export interface ImportedGameRow {
+  id: string;
+  userId: string;
+  source: 'pgn' | 'chesscom';
+  /** Clé anti-doublon : lien chess.com, ou empreinte du PGN. */
+  externalId: string;
+  pgn: string;
+  white: string;
+  black: string;
+  whiteElo: number | null;
+  blackElo: number | null;
+  result: string;
+  date: string | null;
+  timeControl: string | null;
+  userColor: Color | null;
+  plies: number;
+  url: string | null;
+}
+
+const IMPORTED_SELECT = `SELECT id, user_id AS userId, source, external_id AS externalId, pgn,
+  white, black, white_elo AS whiteElo, black_elo AS blackElo, result, date,
+  time_control AS timeControl, user_color AS userColor, plies, url FROM imported_games`;
 
 export interface SavedGame {
   record: SessionRecord;
@@ -67,9 +91,34 @@ export class GameStore {
         user_id    TEXT NOT NULL REFERENCES users(id),
         expires_at INTEGER NOT NULL
       );
+      -- Ancienne analyse (étapes 4 à 6), remplacée par la revue : table laissée en place.
       CREATE TABLE IF NOT EXISTS analyses (
         game_id  TEXT PRIMARY KEY,
         analysis TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS reviews (
+        game_id    TEXT PRIMARY KEY,
+        review     TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS imported_games (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id),
+        source      TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        pgn         TEXT NOT NULL,
+        white       TEXT NOT NULL,
+        black       TEXT NOT NULL,
+        white_elo   INTEGER,
+        black_elo   INTEGER,
+        result      TEXT NOT NULL,
+        date        TEXT,
+        time_control TEXT,
+        user_color  TEXT,
+        plies       INTEGER NOT NULL,
+        url         TEXT,
+        created_at  INTEGER NOT NULL,
+        UNIQUE (user_id, external_id)
       );
       CREATE TABLE IF NOT EXISTS results (
         game_id       TEXT PRIMARY KEY,
@@ -232,16 +281,53 @@ export class GameStore {
     return row ? this.#parse(row) : undefined;
   }
 
-  getAnalysis(gameId: string): AnalysisResponse | undefined {
-    const row = this.#db.prepare(`SELECT analysis FROM analyses WHERE game_id = ?`).get(gameId) as
-      { analysis: string } | undefined;
-    return row ? (JSON.parse(row.analysis) as AnalysisResponse) : undefined;
+  // --- Revues et parties importées (coach) ------------------------------------------------
+
+  getReview(gameId: string): GameReview | undefined {
+    const row = this.#db.prepare(`SELECT review FROM reviews WHERE game_id = ?`).get(gameId) as
+      { review: string } | undefined;
+    return row ? (JSON.parse(row.review) as GameReview) : undefined;
   }
 
-  saveAnalysis(gameId: string, analysis: AnalysisResponse): void {
+  saveReview(gameId: string, review: GameReview): void {
     this.#db
-      .prepare(`INSERT OR REPLACE INTO analyses (game_id, analysis) VALUES (?, ?)`)
-      .run(gameId, JSON.stringify(analysis));
+      .prepare(`INSERT OR REPLACE INTO reviews (game_id, review, created_at) VALUES (?, ?, ?)`)
+      .run(gameId, JSON.stringify(review), Date.now());
+  }
+
+  /** Enregistre une partie importée ; `false` si elle l'était déjà (même `externalId`). */
+  addImported(game: ImportedGameRow): boolean {
+    const result = this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO imported_games (id, user_id, source, external_id, pgn, white, black,
+           white_elo, black_elo, result, date, time_control, user_color, plies, url, created_at)
+         VALUES (@id, @userId, @source, @externalId, @pgn, @white, @black, @whiteElo, @blackElo,
+           @result, @date, @timeControl, @userColor, @plies, @url, @now)`,
+      )
+      .run({ ...game, now: Date.now() });
+    return result.changes > 0;
+  }
+
+  /** Parties importées d'un utilisateur, les plus récentes d'abord. */
+  listImported(userId: string): ImportedGameRow[] {
+    return this.#db
+      .prepare(
+        `${IMPORTED_SELECT} WHERE user_id = ? ORDER BY COALESCE(date, '') DESC, created_at DESC`,
+      )
+      .all(userId) as ImportedGameRow[];
+  }
+
+  getImported(id: string): ImportedGameRow | undefined {
+    return this.#db.prepare(`${IMPORTED_SELECT} WHERE id = ?`).get(id) as
+      ImportedGameRow | undefined;
+  }
+
+  deleteImported(id: string, userId: string): boolean {
+    const result = this.#db
+      .prepare(`DELETE FROM imported_games WHERE id = ? AND user_id = ?`)
+      .run(id, userId);
+    if (result.changes > 0) this.#db.prepare(`DELETE FROM reviews WHERE game_id = ?`).run(id);
+    return result.changes > 0;
   }
 
   /** Parties à reprendre au démarrage : toutes celles qui ne sont pas terminées. */

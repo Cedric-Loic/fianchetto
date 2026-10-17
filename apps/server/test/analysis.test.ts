@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { AnalysisResponse } from '@sq/shared';
 import { testServer } from './client.js';
 
 describe('analyse et export de la notation', () => {
   it('analyse refusée avant la fin ; notation publique pendant, réelle après', async () => {
-    const { app, http, ws } = await testServer();
+    const { app, http, ws, review } = await testServer();
     const { gameId } = (
       await http('POST', '/api/games', {
         mode: 'hotseat',
@@ -29,7 +28,8 @@ describe('analyse et export de la notation', () => {
     c.send({ type: 'move', clientMoveId: '1', move: { from: 'e2', to: 'h5' } });
     await c.until((s) => s.board?.moves.length === 1);
 
-    expect((await http('GET', `/api/games/${gameId}/analysis`)).status).toBe(409);
+    expect((await http('GET', `/api/reviews/${gameId}`)).status).toBe(409);
+    expect((await http('POST', `/api/reviews/${gameId}`)).status).toBe(409);
     const port = (app.server.address() as { port: number }).port;
     const res = await fetch(`http://127.0.0.1:${port}/api/games/${gameId}/pgn`);
     const publicPgn = await res.text();
@@ -43,9 +43,12 @@ describe('analyse et export de la notation', () => {
     expect(realPgn).toContain('1. Qh5');
     expect(realPgn).toContain('[FEN "');
 
-    const analysis = (await http('GET', `/api/games/${gameId}/analysis`)).json as AnalysisResponse;
-    expect(analysis.plies).toHaveLength(2);
-    expect(analysis.plies[0]?.bestMoveSan).toBeTruthy();
+    // Revue sur les positions réelles : la dame secrète e2 joue « Qh5 ».
+    const r = await review(gameId);
+    expect(r.positions).toHaveLength(2);
+    expect(r.moves.map((m) => m.san)).toEqual(['Qh5']);
+    expect(r.moves[0]?.uci).toBe('e2h5');
+    expect(r.evals[0]?.bestMoveSan).toBeTruthy();
     c.socket.close();
     await app.close();
   }, 60_000);

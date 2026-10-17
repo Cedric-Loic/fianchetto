@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AnalysisResponse, Color, GameResult, Square, ViewerGameState } from '@sq/shared';
-import { EvalBar, EvalChart } from '../game/Analysis';
-import { evalLabel, evalValue } from '../lib/eval';
-import { api } from '../lib/api';
-import { piecesFromFen } from '../lib/fen';
+import type { Color, GameResult, Square, ViewerGameState } from '@sq/shared';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { Board } from '../game/Board';
 import { MoveList } from '../game/MoveList';
@@ -49,9 +45,6 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   } | null>(null);
   const autoFlip = useSettings((s) => s.autoFlip);
   const showLegalMoves = useSettings((s) => s.showLegalMoves);
-  // Analyse après la fin : positions réelles, évaluation, meilleur coup.
-  const [analysis, setAnalysis] = useState<AnalysisResponse | 'loading' | 'error' | null>(null);
-  const analysing = analysis !== null && analysis !== 'loading' && analysis !== 'error';
 
   useEffect(() => {
     if (!toast) return;
@@ -110,16 +103,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const ended = state.phase === 'ended';
   const live = cursor === null || cursor === plyCount;
   const shownPly = cursor ?? plyCount;
-  const reveal = board.reveal;
-  const realFens = reveal
-    ? [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)]
-    : [];
-  const showReal = analysing && realFens.length > shownPly;
-  const pieces = showReal
-    ? piecesFromFen(realFens[shownPly] ?? '')
-    : live
-      ? applyLocalMoves(board.pieces, [...(pending ? [pending] : []), ...premoves])
-      : publicPositionAt(board.moves, shownPly);
+  const pieces = live
+    ? applyLocalMoves(board.pieces, [...(pending ? [pending] : []), ...premoves])
+    : publicPositionAt(board.moves, shownPly);
   // Ma dame secrète suit l'affichage local (coup en attente, premoves).
   const ownSecretId = board.ownSecret?.pieceId;
   const ownSecretSquare = ownSecretId
@@ -130,14 +116,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const checkSquare = live && board.inCheck && king ? king.square : null;
 
   const crowns: Square[] = [];
-  if (showReal && reveal) {
-    // Analyse : on marque où se trouvent les deux dames secrètes à cette position.
-    const atPly = publicPositionAt(board.moves, shownPly);
-    for (const c of ['w', 'b'] as const) {
-      const piece = atPly.find((p) => p.id === reveal.secrets[c].pieceId);
-      if (piece) crowns.push(piece.square);
-    }
-  } else if (ended && board.reveal && live) {
+  if (ended && board.reveal && live) {
     for (const c of ['w', 'b'] as const) {
       const sq = board.reveal.secrets[c].finalSquare;
       if (sq) crowns.push(sq);
@@ -176,16 +155,6 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     />
   );
 
-  const current = analysing ? analysis.plies[shownPly] : undefined;
-  const best = current?.bestMoveUci;
-  const bestArrow = best
-    ? { from: best.slice(0, 2) as Square, to: best.slice(2, 4) as Square }
-    : null;
-  const startAnalysis = () => {
-    setAnalysis('loading');
-    void api.analysis(state.gameId).then((a) => setAnalysis(a ?? 'error'));
-  };
-
   const holdStart = () => {
     setPeekHeld(true);
     send({ type: 'peek-secret' });
@@ -194,7 +163,6 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
 
   const boardElement = (
     <Board
-      extraArrows={bestArrow ? [bestArrow] : []}
       pieces={pieces}
       orientation={view}
       premoveColor={isBot && !ended && live && (board.turn !== me || pending) ? me : null}
@@ -243,7 +211,6 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
 
   return (
     <div className="game">
-      {analysing && <EvalBar value={evalValue(current)} />}
       <div className="board-column">
         {bar(top)}
         <div className="board-wrap">
@@ -261,26 +228,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           <span className="variant-badge">{VARIANT_LABEL[state.variant]}</span>
           {state.rated && <span className="rated-badge">Classée</span>}
         </div>
-        {analysing && (
-          <div className="analysis-panel" data-testid="analysis">
-            <EvalChart analysis={analysis} cursor={shownPly} onSelect={setCursor} />
-            <p>
-              Évaluation : <strong>{evalLabel(current)}</strong>
-              {current?.bestMoveSan && (
-                <>
-                  {' '}
-                  · meilleur coup : <span className="best-move">{current.bestMoveSan}</span>
-                </>
-              )}
-            </p>
-          </div>
-        )}
-        <MoveList
-          moves={board.moves}
-          labels={analysing ? reveal?.plies.map((p) => p.realSan) : undefined}
-          cursor={shownPly}
-          onSelect={setCursor}
-        />
+        <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />
         <div className="nav">
           <button title="Début" onClick={() => setCursor(0)}>
             ⏮
@@ -356,18 +304,14 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         )}
         {ended && (
           <div className="actions">
-            {!analysing && (
-              <button onClick={startAnalysis} disabled={analysis === 'loading'}>
-                {analysis === 'loading' ? 'Analyse en cours…' : '🔍 Analyser la partie'}
-              </button>
-            )}
-            {analysing && <button onClick={() => setAnalysis(null)}>Vue publique</button>}
+            <a className="button" href={`#/review/${state.gameId}`} data-testid="review-link">
+              📊 Revue de la partie
+            </a>
             <a className="button" href={`/api/games/${state.gameId}/pgn`} download="partie.pgn">
               ⬇ PGN
             </a>
           </div>
         )}
-        {analysis === 'error' && <p className="error">Analyse impossible.</p>}
       </aside>
 
       {ended && board.result && (classic || board.reveal) && showEnd && (
@@ -398,6 +342,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
               <button className="primary" onClick={() => send({ type: 'offer-rematch' })}>
                 Revanche
               </button>
+              <a className="button" href={`#/review/${state.gameId}`}>
+                📊 Revue de la partie
+              </a>
               <button onClick={() => setShowEnd(false)}>Voir le plateau</button>
               <button onClick={onLeave}>Nouvelle partie</button>
             </div>

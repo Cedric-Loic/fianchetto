@@ -80,6 +80,18 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Bot classique (un seul monde : la position réelle)                            | ✅     | `packages/bot/test/belief.test.ts`, `player.test.ts`                                   |
 | Force réelle des niveaux du bot en classique                                  | 👁      | à calibrer en jouant                                                                   |
 
+## Étape 7 : analyse et import de parties
+
+| Exigence                                                                           | État   | Preuve                                                                  |
+| ---------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| Classe de chaque coup, précision, bilan par camp                                   | ✅     | `packages/coach/test/review.test.ts`                                    |
+| Explications : mat manqué/permis, pièce en prise, fourchettes, matériel, générique | ✅     | `packages/coach/test/explain.test.ts` (positions réelles)               |
+| Revue d'une partie locale (classique et Secret Queen), refusée avant la fin        | ✅     | `apps/server/test/analysis.test.ts`, `classic.test.ts`, e2e hot-seat    |
+| Import PGN (plusieurs parties, doublons, illisibles, camp de l'utilisateur)        | ✅     | `apps/server/test/review.test.ts`, `tests/e2e/coach.spec.ts`            |
+| Import chess.com (archives, variantes ignorées, erreurs 404/502)                   | ✅ / 👁 | `review.test.ts` (faux serveur) ; à essayer avec ton vrai pseudo        |
+| Parties importées privées                                                          | ✅     | `review.test.ts` (autre compte : 404)                                   |
+| Analyse par lot, progression, point de départ                                      | ✅ / 👁 | `review.test.ts`, `coach.spec.ts` ; pertinence des explications à juger |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).

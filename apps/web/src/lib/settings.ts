@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 
 /*
- * Préférences d'affichage. Seule donnée gardée dans le navigateur (localStorage) : aucune
- * information de partie n'y est jamais écrite (docs/SECURITY.md §8).
+ * Préférences (affichage, pseudo chess.com pour l'import). Seule donnée gardée dans le
+ * navigateur (localStorage) : aucune information de partie n'y est jamais écrite
+ * (docs/SECURITY.md §8).
  */
 
 export const BOARD_THEMES = {
@@ -24,6 +25,8 @@ interface Settings {
   autoFlip: boolean;
   /** Classique : points sur les cases accessibles à la pièce sélectionnée (jamais en Secret Queen). */
   showLegalMoves: boolean;
+  /** Pseudo chess.com (import des parties), mémorisé pour ne pas le retaper. */
+  chessComUsername: string;
 }
 
 const KEY = 'sq-settings';
@@ -33,6 +36,7 @@ const DEFAULTS: Settings = {
   sound: true,
   autoFlip: false,
   showLegalMoves: true,
+  chessComUsername: '',
 };
 const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
 
@@ -46,6 +50,10 @@ function load(): Settings {
       sound: bool(parsed.sound, DEFAULTS.sound),
       autoFlip: bool(parsed.autoFlip, DEFAULTS.autoFlip),
       showLegalMoves: bool(parsed.showLegalMoves, DEFAULTS.showLegalMoves),
+      chessComUsername:
+        typeof parsed.chessComUsername === 'string'
+          ? parsed.chessComUsername.slice(0, 40)
+          : DEFAULTS.chessComUsername,
     };
   } catch {
     return DEFAULTS;
@@ -57,11 +65,11 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
     ...load(),
     update(patch) {
       set(patch);
-      const { board, pieces, sound, autoFlip, showLegalMoves } = get();
+      const { board, pieces, sound, autoFlip, showLegalMoves, chessComUsername } = get();
       try {
         localStorage.setItem(
           KEY,
-          JSON.stringify({ board, pieces, sound, autoFlip, showLegalMoves }),
+          JSON.stringify({ board, pieces, sound, autoFlip, showLegalMoves, chessComUsername }),
         );
       } catch {
         // stockage indisponible : préférences non conservées

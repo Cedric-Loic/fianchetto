@@ -3,11 +3,13 @@ import { api } from './lib/api';
 import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
+import { Analyse } from './screens/Analyse';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
 import { Login } from './screens/Login';
 import { Profile } from './screens/Profile';
+import { Review } from './screens/Review';
 import { Selection } from './screens/Selection';
 import { SettingsMenu } from './game/SettingsMenu';
 
@@ -16,6 +18,8 @@ type Route =
   | { page: 'login' }
   | { page: 'leaderboard' }
   | { page: 'profile'; username: string }
+  | { page: 'analyse' }
+  | { page: 'review'; id: string }
   | { page: 'game'; gameId: string };
 
 /** Routage par l'URL (`#/game/<id>`, `#/profile/<pseudo>`…) : survit au rafraîchissement. */
@@ -25,6 +29,9 @@ function parseHash(): Route {
   if (m?.[1]) return { page: 'game', gameId: m[1] };
   m = /^#\/profile\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'profile', username: m[1] };
+  m = /^#\/review\/([\w-]+)$/.exec(h);
+  if (m?.[1]) return { page: 'review', id: m[1] };
+  if (h === '#/analyse') return { page: 'analyse' };
   if (h === '#/login') return { page: 'login' };
   if (h === '#/leaderboard') return { page: 'leaderboard' };
   return { page: 'home' };
@@ -38,6 +45,7 @@ function Nav() {
         ♞ Fianchetto
       </a>
       <a href="#/">Jouer</a>
+      <a href="#/analyse">Analyse</a>
       <a href="#/leaderboard">Classement</a>
       <span className="spacer" />
       <SettingsMenu />
@@ -93,6 +101,8 @@ export function App() {
   if (route.page === 'login') content = <Login onDone={() => (location.hash = '#/')} />;
   else if (route.page === 'leaderboard') content = <Leaderboard />;
   else if (route.page === 'profile') content = <Profile username={route.username} />;
+  else if (route.page === 'analyse') content = <Analyse />;
+  else if (route.page === 'review') content = <Review key={route.id} id={route.id} />;
   else if (route.page === 'home') {
     content = <Home onStart={(id) => (location.hash = `#/game/${id}`)} />;
   } else if (!state) content = <div className="loading">Connexion…</div>;

@@ -21,7 +21,8 @@ Plateforme d'échecs web personnelle, servie en local (127.0.0.1), au look chess
    `docs/DECISIONS.md`.
 4. Secret Queen : pas de surbrillance des coups légaux (`legalMoves` toujours `null`). Refus de
    coup sans motif. La variante classique peut, elle, marquer les coups possibles.
-5. Aucune dépendance réseau au runtime. Aucun asset, logo, police ou son de chess.com.
+5. Aucune dépendance réseau au runtime, sauf l'import chess.com (API publique, côté serveur, sur
+   clic explicite). Aucun asset, logo, police ou son de chess.com.
 
 ## Organisation (orchestrateur + sous-agents)
 
@@ -31,6 +32,7 @@ Plateforme d'échecs web personnelle, servie en local (127.0.0.1), au look chess
 | engine                             | `packages/engine`                                               | `.claude/agents/engine.md`      |
 | server                             | `apps/server`                                                   | `.claude/agents/server.md`      |
 | bot                                | `packages/bot`                                                  | `.claude/agents/bot.md`         |
+| coach (orchestrateur à ce jour)    | `packages/coach`                                                | —                               |
 | web                                | `apps/web`, `tests/e2e`                                         | `.claude/agents/web.md`         |
 | qa-security                        | `tests/security` uniquement (lecture seule ailleurs)            | `.claude/agents/qa-security.md` |
 
@@ -49,8 +51,8 @@ Plateforme d'échecs web personnelle, servie en local (127.0.0.1), au look chess
 | `pnpm test:stress` | tests longs (10 000 parties aléatoires)                |
 | `pnpm format`      | formate le code                                        |
 
-Tests d'un seul paquet : `pnpm vitest run --project engine` (noms : shared, engine, bot, server,
-web, security, lint-rules).
+Tests d'un seul paquet : `pnpm vitest run --project engine` (noms : shared, engine, bot, coach,
+server, web, security, lint-rules).
 
 ## Conventions
 

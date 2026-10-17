@@ -1,11 +1,16 @@
 import type { AddressInfo } from 'node:net';
 import WebSocket from 'ws';
-import type { ServerMessage, ViewerGameState } from '@sq/shared';
+import type { GameReview, ReviewResponse, ServerMessage, ViewerGameState } from '@sq/shared';
 import { startServer, type ServerOptions } from '../src/app.js';
 
 /** Serveur de test + client HTTP/WebSocket avec cookie de session. */
 export async function testServer(options: ServerOptions = {}) {
-  const app = await startServer(0, { logLevel: 'silent', dbPath: ':memory:', ...options });
+  const app = await startServer(0, {
+    logLevel: 'silent',
+    dbPath: ':memory:',
+    reviewMovetimeMs: 20,
+    ...options,
+  });
   const base = `127.0.0.1:${(app.server.address() as AddressInfo).port}`;
   let cookie = '';
   const http = async (method: string, path: string, body?: unknown) => {
@@ -45,5 +50,16 @@ export async function testServer(options: ServerOptions = {}) {
     const send = (msg: object) => socket.send(JSON.stringify(msg));
     return { socket, inbox, until, send, state: () => latest };
   };
-  return { app, http, ws };
+  /** Lance la revue d'une partie et attend qu'elle soit prête. */
+  const review = async (id: string, timeoutMs = 60_000): Promise<GameReview> => {
+    let res = (await http('POST', `/api/reviews/${id}`)).json as ReviewResponse;
+    const end = Date.now() + timeoutMs;
+    while (res.state.status !== 'done') {
+      if (res.state.status === 'error' || Date.now() > end) throw new Error('revue impossible');
+      await new Promise((r) => setTimeout(r, 50));
+      res = (await http('GET', `/api/reviews/${id}`)).json as ReviewResponse;
+    }
+    return res.state.review;
+  };
+  return { app, http, ws, review };
 }

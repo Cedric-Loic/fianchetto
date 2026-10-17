@@ -28,6 +28,12 @@ ne sort jamais du serveur vers le client d'un joueur, ni vers un log.
 - **Inférences inhérentes aux règles** (coups refusés, coups notés en coordonnées, échecs sans
   cause visible…) : voir `docs/RULES.md` §9.
 
+- **Revue et import (étape 7)** : la revue d'une partie locale n'est servie qu'une fois la partie
+  terminée (409 avant), avec les droits de l'export PGN ; elle ne porte que sur les positions
+  réelles déjà révélées. Les parties importées ne sont visibles que par leur propriétaire.
+  L'import chess.com est le seul accès réseau : côté serveur, sur clic explicite, et seules les
+  URL `https://api.chess.com/pub/player/…` sont suivies (pas d'URL arbitraire venue de la réponse).
+
 ## Mécanismes
 
 1. **Serveur autoritatif.** Le client envoie des intentions (`ClientMessage`) et n'affiche que des

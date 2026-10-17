@@ -1,48 +1,47 @@
 import { Chess } from 'chess.js';
-import type { AnalysisResponse } from '@sq/shared';
 import type { UciEngine } from './uci.js';
 
 const MATED = 10_000;
 
+/** Évaluation d'une position réelle, du point de vue des Blancs, avec la ligne principale. */
+export interface PositionAnalysis {
+  /** Centipions ; `null` si mat forcé. Position finale : ±10 000 (mat) ou 0 (nulle). */
+  evalCp: number | null;
+  /** Mat en N (positif : les Blancs matent), sinon `null`. */
+  mate: number | null;
+  bestMoveUci: string | null;
+  /** Ligne principale en UCI (vide en position finale). */
+  pv: string[];
+}
+
 /**
- * Analyse d'une partie TERMINÉE : évaluation de chaque position réelle (FEN de la révélation)
- * par Stockfish à pleine force, du point de vue des Blancs, avec le meilleur coup.
+ * Évalue chaque position (FEN réelles d'une partie terminée ou importée) par Stockfish à pleine
+ * force. `onProgress` reçoit la part déjà faite (0 à 1).
  */
-export async function analyzeGame(
+export async function evaluatePositions(
   engine: UciEngine,
   fens: readonly string[],
-  movetimeMs = 120,
-): Promise<AnalysisResponse> {
-  const plies: AnalysisResponse['plies'] = [];
-  for (const [ply, fen] of fens.entries()) {
+  options: { movetimeMs?: number; onProgress?: (done: number) => void } = {},
+): Promise<PositionAnalysis[]> {
+  const movetimeMs = options.movetimeMs ?? 150;
+  const out: PositionAnalysis[] = [];
+  for (const [i, fen] of fens.entries()) {
     const chess = new Chess(fen);
     const sign = chess.turn() === 'w' ? 1 : -1;
     if (chess.isGameOver()) {
       // Position finale : mat (le camp au trait est maté) ou nulle.
       const evalCp = chess.isCheckmate() ? -sign * MATED : 0;
-      plies.push({ ply, evalCp, mate: null, bestMoveUci: null, bestMoveSan: null });
-      continue;
+      out.push({ evalCp, mate: null, bestMoveUci: null, pv: [] });
+    } else {
+      const [best] = await engine.analyze(fen, { movetimeMs, multipv: 1, skill: 20 });
+      out.push({
+        evalCp: best && best.mate === null ? sign * best.score : null,
+        mate: best?.mate != null ? sign * best.mate : null,
+        bestMoveUci: best?.move ?? null,
+        pv: best?.pv ?? [],
+      });
     }
-    const [best] = await engine.analyze(fen, { movetimeMs, multipv: 1, skill: 20 });
-    let bestMoveSan: string | null = null;
-    if (best) {
-      try {
-        bestMoveSan = chess.move({
-          from: best.move.slice(0, 2),
-          to: best.move.slice(2, 4),
-          promotion: best.move[4],
-        }).san;
-      } catch {
-        bestMoveSan = null;
-      }
-    }
-    plies.push({
-      ply,
-      evalCp: best && best.mate === null ? sign * best.score : null,
-      mate: best?.mate != null ? sign * best.mate : null,
-      bestMoveUci: best?.move ?? null,
-      bestMoveSan,
-    });
+    options.onProgress?.((i + 1) / fens.length);
   }
-  return { plies };
+  return out;
 }

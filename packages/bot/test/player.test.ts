@@ -55,16 +55,23 @@ describe('bot (Stockfish)', () => {
 
 describe('analyse de fin de partie', () => {
   it('évalue chaque position réelle, du point de vue des Blancs', async () => {
-    const { analyzeGame } = await import('../src/analysis.js');
+    const { evaluatePositions } = await import('../src/analysis.js');
     const fens = [
       // Blancs avec une dame de plus (dame secrète en e2).
       'rnbqkbnr/pppppppp/8/8/8/8/PPPPQPPP/RNBQKBNR w KQkq - 0 1',
       // Mat du berger : les Noirs sont matés.
       'r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4',
     ];
-    const result = await analyzeGame(engine, fens, 80);
-    expect(result.plies[0]?.evalCp).toBeGreaterThan(500);
-    expect(result.plies[0]?.bestMoveSan).toBeTruthy();
-    expect(result.plies[1]?.evalCp).toBe(10_000);
+    const progress: number[] = [];
+    const result = await evaluatePositions(engine, fens, {
+      movetimeMs: 80,
+      onProgress: (p) => progress.push(p),
+    });
+    expect(result[0]?.evalCp).toBeGreaterThan(500);
+    expect(result[0]?.bestMoveUci).toMatch(/^[a-h][1-8][a-h][1-8]/);
+    expect(result[0]?.pv[0]).toBe(result[0]?.bestMoveUci);
+    expect(result[0]?.pv.length).toBeGreaterThan(1);
+    expect(result[1]).toEqual({ evalCp: 10_000, mate: null, bestMoveUci: null, pv: [] });
+    expect(progress).toEqual([0.5, 1]);
   }, 60_000);
 });

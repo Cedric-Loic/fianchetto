@@ -7,6 +7,8 @@ export interface UciLine {
   /** Centipions ; un mat est converti en ±(100 000 − 100 × distance). */
   score: number;
   mate: number | null;
+  /** Ligne principale complète (UCI), qui commence par `move`. */
+  pv: string[];
 }
 
 export interface SearchOptions {
@@ -70,19 +72,20 @@ export class UciEngine {
       const best = await this.#waitFor(
         (l) => l.startsWith('bestmove'),
         (l) => {
-          const m = /multipv (\d+) score (cp|mate) (-?\d+).* pv (\S+)/.exec(l);
+          const m = /multipv (\d+) score (cp|mate) (-?\d+).* pv (.+)$/.exec(l);
           if (!m) return;
           const value = Number(m[3]);
           const mate = m[2] === 'mate' ? value : null;
           const score =
             mate === null ? value : Math.sign(mate || -1) * (MATE_SCORE - 100 * Math.abs(mate));
-          lines.set(Number(m[1]), { move: m[4] ?? '', score, mate });
+          const pv = (m[4] ?? '').trim().split(/\s+/);
+          lines.set(Number(m[1]), { move: pv[0] ?? '', score, mate, pv });
         },
       );
       const result = [...lines.entries()].sort((a, b) => a[0] - b[0]).map(([, l]) => l);
       const bestMove = best.split(' ')[1];
       if (result.length === 0 && bestMove && bestMove !== '(none)') {
-        result.push({ move: bestMove, score: 0, mate: null });
+        result.push({ move: bestMove, score: 0, mate: null, pv: [bestMove] });
       }
       return result;
     };

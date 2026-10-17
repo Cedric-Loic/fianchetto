@@ -112,25 +112,6 @@ export type BotLevelInfo = z.infer<typeof BotLevelInfoSchema>;
 export const ActiveGameResponseSchema = z.object({ gameId: z.string().nullable() });
 export type ActiveGameResponse = z.infer<typeof ActiveGameResponseSchema>;
 
-/**
- * Analyse d'une partie TERMINÉE (positions réelles). Refusée (409) avant la fin.
- * `plies[0]` = position initiale réelle, `plies[i]` = position après le demi-coup i.
- */
-export const AnalysisResponseSchema = z.object({
-  plies: z.array(
-    z.object({
-      ply: z.number().int().nonnegative(),
-      /** Évaluation du point de vue des Blancs, en centipions ; `null` si mat forcé. */
-      evalCp: z.number().int().nullable(),
-      /** Mat en N (positif : les Blancs matent), sinon `null`. */
-      mate: z.number().int().nullable(),
-      bestMoveUci: z.string().nullable(),
-      bestMoveSan: z.string().nullable(),
-    }),
-  ),
-});
-export type AnalysisResponse = z.infer<typeof AnalysisResponseSchema>;
-
 /** Rejeu d'une partie terminée : dernier état, révélation comprise. */
 export const ReplayResponseSchema = z.object({ state: ViewerGameStateSchema });
 export type ReplayResponse = z.infer<typeof ReplayResponseSchema>;

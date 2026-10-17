@@ -2,13 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type {
-  AnalysisResponse,
-  BotObservation,
-  LeaderboardResponse,
-  ProfileResponse,
-  UserPublic,
-} from '@sq/shared';
+import type { BotObservation, LeaderboardResponse, ProfileResponse, UserPublic } from '@sq/shared';
 import type { BotDriver } from '../src/bot/driver.js';
 import { testServer } from './client.js';
 
@@ -27,7 +21,7 @@ const hotseat = (timeControl = 'untimed') => ({
 
 describe('variante classique', () => {
   it('à deux : pas de choix secret, coups légaux, mat, analyse et PGN standard', async () => {
-    const { app, http, ws } = await testServer();
+    const { app, http, ws, review } = await testServer();
     const { gameId } = (await http('POST', '/api/games', hotseat())).json as { gameId: string };
     const c = await ws();
     c.send({ type: 'join', gameId });
@@ -59,9 +53,13 @@ describe('variante classique', () => {
     expect(pgn).toContain('1. f3 e5 2. g4 Qh4# 0-1');
     expect(pgn).not.toContain('FEN');
 
-    const analysis = (await http('GET', `/api/games/${gameId}/analysis`)).json as AnalysisResponse;
-    expect(analysis.plies).toHaveLength(5);
-    expect(analysis.plies[4]?.evalCp).toBe(-10_000);
+    const r = await review(gameId);
+    expect(r.evals).toHaveLength(5);
+    expect(r.evals[4]?.evalCp).toBe(-10_000);
+    // 2. g4 ?? permet le mat : gaffe expliquée.
+    expect(r.moves[2]?.classification).toBe('blunder');
+    expect(r.moves[2]?.explanation?.kind).toBe('allowed-mate');
+    expect(r.counts.b.best).toBeGreaterThanOrEqual(1);
     await app.close();
   }, 60_000);
 

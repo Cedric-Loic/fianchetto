@@ -51,10 +51,14 @@ test('classique à deux : coups possibles (réglage), mat, fin sans révélation
   const modal = page.getByTestId('end-modal');
   await expect(modal).toContainText('Bob (Noirs) gagne par échec et mat');
   await expect(modal).not.toContainText('dames secrètes');
-  await page.getByRole('button', { name: 'Voir le plateau' }).click();
-  await page.getByRole('button', { name: /Analyser la partie/ }).click();
-  await expect(page.getByTestId('analysis')).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: 'test-results/classique-analyse.png' });
+  // Revue : 2. g4 ?? permet le mat, explication locale.
+  await modal.getByRole('link', { name: /Revue de la partie/ }).click();
+  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('move-list').locator('button.move', { hasText: 'g4' }).click();
+  await expect(page.getByTestId('move-card')).toContainText('g4');
+  await expect(page.getByTestId('move-card')).toContainText('Gaffe');
+  await expect(page.getByTestId('explanation')).toContainText('mat en 1');
+  await page.screenshot({ path: 'test-results/classique-revue.png' });
 });
 
 test('classique contre le bot : partie classée, Elo classique séparé', async ({ page }) => {

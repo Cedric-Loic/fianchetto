@@ -36,6 +36,7 @@ export function Profile({ username }: { username: string }) {
               <th>Cadence</th>
               <th>Elo</th>
               <th>Date</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -73,12 +74,17 @@ export function Profile({ username }: { username: string }) {
                   <td className="muted">
                     {g.endedAt ? new Date(g.endedAt).toLocaleDateString('fr-FR') : ''}
                   </td>
+                  <td>
+                    <a href={`#/review/${g.gameId}`} title="Revue de la partie">
+                      📊 Revue
+                    </a>
+                  </td>
                 </tr>
               );
             })}
             {history.length === 0 && (
               <tr>
-                <td colSpan={6} className="muted">
+                <td colSpan={7} className="muted">
                   Aucune partie pour l'instant.
                 </td>
               </tr>

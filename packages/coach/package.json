@@ -1,0 +1,17 @@
+{
+  "name": "@sq/coach",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Coach : classification des coups, précision, explications locales des erreurs, lecture des PGN. Logique pure, aucun I/O.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sq/shared": "workspace:*",
+    "chess.js": "^1.4.0"
+  }
+}

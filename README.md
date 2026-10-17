@@ -8,10 +8,12 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Variantes : **Classique** (échecs standard, coups possibles affichés en option) et
   **Secret Queen**, chacune avec son propre Elo.
 - Modes : contre un bot (5 niveaux, partie classée Elo) ou à deux sur le même écran (hot-seat).
+- **Analyse** (coach) : revue de chaque partie (classe de chaque coup, explication des erreurs,
+  précision), import de parties PGN ou chess.com, mesure de ton point de départ.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étapes 0 à 6 terminées** (Secret Queen, puis plateforme et variante classique).
+> **État : étapes 0 à 7 terminées** (Secret Queen, puis plateforme et variante classique).
 > Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Suite prévue (coach personnel) :
 > [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md).
 
@@ -52,6 +54,7 @@ apps/
 packages/
   shared/        contrats partagés (types + schémas Zod), Secret<T>
   engine/        règles : position réelle, légalité, fins de partie, projection par joueur
+  coach/         coach : classes des coups, précision, explications des erreurs, lecture PGN
   bot/           bot à information imparfaite + analyse de fin de partie
 tests/
   e2e/           parcours utilisateur (Playwright)
@@ -81,8 +84,13 @@ docs/
    pendant la partie, maintiens « Voir ma dame secrète » pour la retrouver.
 5. Pendant la partie : glisser-déposer ou clic-clic, clic droit pour les flèches, premoves contre
    le bot (clic droit pour les annuler), ⛶ pour le mode concentration (✕ ou Échap pour sortir).
-6. À la fin (Secret Queen) : révélation des deux dames, puis **Analyser la partie** (Stockfish sur les positions
-   réelles) et export **PGN**.
+6. À la fin (Secret Queen) : révélation des deux dames.
+7. **Revue de la partie** (bouton de fin de partie, ou 📊 dans le profil) : Stockfish analyse
+   chaque coup ; meilleur coup en flèche, explication des imprécisions (?!), erreurs (?) et
+   gaffes (??), précision des deux camps, ◀ !? ▶ pour sauter d'erreur en erreur.
+8. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
+   fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
+   est le seul accès à Internet de l'application, uniquement quand tu cliques.
 
 ## Comment le secret est protégé (résumé)
 
@@ -102,7 +110,8 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | ✅   |
 | 5     | Audit de sécurité du secret, recette                           | ✅   |
 | 6     | Plateforme : variante classique, Elo par variante              | ✅   |
-| 7–11  | Coach personnel (voir `docs/PLAN-COACH.md`)                    | ⏳   |
+| 7     | Coach : revue de partie, import PGN et chess.com               | ✅   |
+| 8–11  | Coach : puzzles, bot coach, leçons, tableau de bord            | ⏳   |
 
 ## Licences et crédits
 

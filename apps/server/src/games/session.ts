@@ -599,15 +599,28 @@ export class GameSession {
   }
 
   /**
-   * FEN réelles de la partie (position initiale puis une par demi-coup), pour l'analyse :
-   * uniquement une fois la partie terminée (en Secret Queen, elles viennent de la révélation).
+   * Partie réelle à analyser (revue du coach) : FEN réelles (position initiale puis une par
+   * demi-coup) et coups joués en UCI et en SAN réelle. Uniquement une fois la partie terminée ;
+   * en Secret Queen, tout vient de la révélation.
    */
-  realPositions(): string[] | null {
+  reviewInput(): { positions: string[]; moves: { uci: string; san: string }[] } | null {
     const game = this.#game;
     if (this.#phase !== 'ended' || game === null) return null;
-    if (game instanceof ClassicGame) return game.positions();
-    const reveal = projectForViewer(game, 'public').reveal;
-    return reveal ? [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)] : null;
+    const board = this.#project('public');
+    if (!board) return null;
+    const uci = (m: (typeof board.moves)[number]) => `${m.from}${m.to}${m.promotion ?? ''}`;
+    if (game instanceof ClassicGame) {
+      return {
+        positions: game.positions(),
+        moves: board.moves.map((m) => ({ uci: uci(m), san: m.san })),
+      };
+    }
+    const reveal = board.reveal;
+    if (!reveal) return null;
+    return {
+      positions: [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)],
+      moves: board.moves.map((m, i) => ({ uci: uci(m), san: reveal.plies[i]?.realSan ?? m.san })),
+    };
   }
 
   /** Vue complète pour un spectateur : seule la projection du moteur décrit l'échiquier. */

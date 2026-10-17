@@ -1,7 +1,7 @@
 # Plan : plateforme Fianchetto et coach personnel
 
-Statut : **étape 6 terminée** (plateforme et variante classique). Étapes 7 à 11 : en attente du
-GO.
+Statut : **étapes 6 et 7 terminées** (plateforme, variante classique, revue et import de
+parties). Étapes 8 à 11 : en attente du GO.
 
 ## 1. Point de départ et objectif
 

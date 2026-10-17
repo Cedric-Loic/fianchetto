@@ -1,4 +1,5 @@
-import type { AnalysisResponse } from '@sq/shared';
+import type { MoveClass, PositionEval } from '@sq/shared';
+import { CLASS_COLOR } from '../lib/classes';
 import { evalValue } from '../lib/eval';
 
 /** Barre d'évaluation verticale (blanc en bas). */
@@ -11,16 +12,20 @@ export function EvalBar({ value }: { value: number }) {
   );
 }
 
-/** Courbe d'évaluation de la partie ; clic = aller à la position. */
+/**
+ * Courbe d'évaluation de la partie ; clic = aller à la position. `marks` : erreurs à signaler
+ * par un point (demi-coup → classe).
+ */
 export function EvalChart(props: {
-  analysis: AnalysisResponse;
+  evals: readonly PositionEval[];
   cursor: number;
   onSelect: (ply: number) => void;
+  marks?: readonly { ply: number; cls: MoveClass }[];
 }) {
-  const n = Math.max(1, props.analysis.plies.length - 1);
-  const points = props.analysis.plies.map((p, i) => {
-    const y = 50 - 45 * Math.tanh(evalValue(p) / 400);
-    return `${(i / n) * 100},${y}`;
+  const n = Math.max(1, props.evals.length - 1);
+  const yOf = (p: PositionEval | undefined) => 50 - 45 * Math.tanh(evalValue(p) / 400);
+  const points = props.evals.map((p, i) => {
+    return `${(i / n) * 100},${yOf(p)}`;
   });
   return (
     <svg
@@ -43,6 +48,16 @@ export function EvalChart(props: {
         stroke="#4a9eea"
         strokeWidth={1}
       />
+      {props.marks?.map((m) => (
+        <ellipse
+          key={m.ply}
+          cx={(m.ply / n) * 100}
+          cy={yOf(props.evals[m.ply])}
+          rx={1.2}
+          ry={3}
+          fill={CLASS_COLOR[m.cls]}
+        />
+      ))}
     </svg>
   );
 }

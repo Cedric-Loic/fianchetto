@@ -78,6 +78,25 @@ export default defineConfig(
     },
   },
 
+  // Coach : logique pure (classification, explications, PGN), aucun I/O, aucun secret.
+  {
+    files: ['packages/coach/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: NODE_IO_PATTERNS, message: 'Le coach ne fait aucun I/O.' },
+            {
+              group: ['@sq/shared/secret', '@sq/engine', '@sq/server', '@sq/bot', '@sq/web'],
+              message: 'Dépendance interdite.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Bot : ne manipule jamais de Secret (il ne connaît que son observation).
   {
     files: ['packages/bot/src/**/*.ts'],
@@ -107,7 +126,14 @@ export default defineConfig(
         {
           patterns: [
             {
-              group: ['@sq/shared/secret', '@sq/engine', '@sq/bot', '@sq/server', 'chess.js'],
+              group: [
+                '@sq/shared/secret',
+                '@sq/engine',
+                '@sq/bot',
+                '@sq/coach',
+                '@sq/server',
+                'chess.js',
+              ],
               message: "Le client n'a ni secret ni moteur : il affiche la vue reçue du serveur.",
             },
           ],

@@ -12,13 +12,15 @@ import {
   type ProfileResponse,
   type ServerMessage,
 } from '@sq/shared';
-import { analyzeGame, UciEngine } from '@sq/bot';
 import { currentUser, registerAuthRoutes } from './auth.js';
 import type { BotDriver } from './bot/driver.js';
 import { loadConfig } from './config.js';
 import { GameManager } from './games/manager.js';
 import type { GameSession, Participant } from './games/session.js';
 import { GameStore } from './persistence/db.js';
+import type { JsonFetcher } from './review/chesscom.js';
+import { registerReviewRoutes } from './review/routes.js';
+import { ReviewService } from './review/service.js';
 import { serializeOutgoing } from './send.js';
 
 const DEFAULT_DB = fileURLToPath(new URL('../../../data/secret-queen.db', import.meta.url));
@@ -33,6 +35,10 @@ export interface ServerOptions {
   config?: GameConfig;
   /** Fabrique de bots (tests). Par défaut : bot Stockfish dans un worker. */
   createBot?: ConstructorParameters<typeof GameManager>[0]['createBot'];
+  /** Temps Stockfish par position pour les revues (tests : plus court). Défaut : 150 ms. */
+  reviewMovetimeMs?: number;
+  /** Accès à l'API chess.com (tests : faux serveur). Défaut : `fetch`. */
+  chessComFetcher?: JsonFetcher;
 }
 export type { BotDriver };
 export { WorkerBot } from './bot/driver.js';
@@ -53,7 +59,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     initialRating: config.elo.initial,
   });
   const games = new GameManager({ store, config, createBot: options.createBot });
+  const reviews = new ReviewService(store, { movetimeMs: options.reviewMovetimeMs });
   app.addHook('onClose', () => {
+    reviews.dispose();
     games.disposeAll();
     store.close();
   });
@@ -110,20 +118,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     return { session, viewer: session.botColor === 'w' ? ('b' as const) : ('w' as const) };
   };
 
-  // Analyse : uniquement après la fin (positions réelles révélées), mise en cache dans SQLite.
-  let analysisEngine: UciEngine | null = null;
-  app.addHook('onClose', () => analysisEngine?.quit());
-  app.get<{ Params: { id: string } }>('/api/games/:id/analysis', async (request, reply) => {
-    const found = viewable(request.params.id, request);
-    if (!found) return reply.code(404).send({ error: 'NOT_FOUND' });
-    const fens = found.session.realPositions();
-    if (!fens) return reply.code(409).send({ error: 'GAME_NOT_OVER' });
-    const cached = store.getAnalysis(found.session.id);
-    if (cached) return cached;
-    analysisEngine ??= new UciEngine();
-    const analysis = await analyzeGame(analysisEngine, fens);
-    store.saveAnalysis(found.session.id, analysis);
-    return analysis;
+  registerReviewRoutes(app, {
+    store,
+    reviews,
+    findLocal: (id, request) => viewable(id, request),
+    fetcher: options.chessComFetcher,
   });
 
   // Export de la notation. Classique : SAN standard. Secret Queen : notation publique pendant la

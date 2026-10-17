@@ -62,6 +62,9 @@ importers:
       '@sq/bot':
         specifier: workspace:*
         version: link:../../packages/bot
+      '@sq/coach':
+        specifier: workspace:*
+        version: link:../../packages/coach
       '@sq/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -149,6 +152,15 @@ importers:
       '@sq/engine':
         specifier: workspace:*
         version: link:../engine
+
+  packages/coach:
+    dependencies:
+      '@sq/shared':
+        specifier: workspace:*
+        version: link:../shared
+      chess.js:
+        specifier: ^1.4.0
+        version: 1.4.0
 
   packages/engine:
     dependencies:
