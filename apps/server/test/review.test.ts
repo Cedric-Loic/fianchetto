@@ -148,3 +148,31 @@ describe('import et revue de parties', () => {
     await app.close();
   });
 });
+
+describe('requête réelle vers chess.com (fetch de production)', () => {
+  it('en-tête User-Agent valide, réponses 200, 404 et 429', async () => {
+    const { createServer } = await import('node:http');
+    const { defaultFetcher, fetchRecentGames, USER_AGENT } =
+      await import('../src/review/chesscom.js');
+    const seen: string[] = [];
+    let status = 200;
+    const server = createServer((req, res) => {
+      seen.push(req.headers['user-agent'] ?? '');
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ archives: [] }));
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const port = (server.address() as { port: number }).port;
+    // Même fetch qu'en production, redirigé vers le serveur local.
+    const local: JsonFetcher = (url) =>
+      defaultFetcher(url.replace('https://api.chess.com', `http://127.0.0.1:${port}`));
+    expect(await fetchRecentGames('moi', 5, local)).toEqual([]);
+    expect(seen).toEqual([USER_AGENT]);
+    expect(/^[\x20-\x7e]+$/.test(USER_AGENT)).toBe(true);
+    status = 404;
+    await expect(fetchRecentGames('moi', 5, local)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    status = 429;
+    await expect(fetchRecentGames('moi', 5, local)).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    server.close();
+  });
+});

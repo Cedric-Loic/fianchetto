@@ -165,6 +165,14 @@ export function registerReviewRoutes(app: FastifyInstance, deps: ReviewDeps): vo
       if (error instanceof ChessComError && error.code === 'NOT_FOUND') {
         return reply.code(404).send({ error: 'CHESSCOM_USER_NOT_FOUND' });
       }
+      // Cause technique dans le journal (aucune donnée de partie), message simple au client.
+      request.log.warn(
+        { cause: error instanceof ChessComError ? error.detail : String(error) },
+        'Import chess.com impossible',
+      );
+      if (error instanceof ChessComError && error.code === 'RATE_LIMITED') {
+        return reply.code(429).send({ error: 'CHESSCOM_RATE_LIMITED' });
+      }
       return reply.code(502).send({ error: 'CHESSCOM_UNAVAILABLE' });
     }
   });

@@ -10,7 +10,11 @@ export type JsonFetcher = (
 ) => Promise<{ status: number; json: () => Promise<unknown> }>;
 
 export class ChessComError extends Error {
-  constructor(readonly code: 'NOT_FOUND' | 'UNAVAILABLE') {
+  /** `detail` : cause technique, pour le journal du serveur (jamais renvoyée au client). */
+  constructor(
+    readonly code: 'NOT_FOUND' | 'RATE_LIMITED' | 'UNAVAILABLE',
+    readonly detail = '',
+  ) {
     super(code);
   }
 }
@@ -22,9 +26,15 @@ export interface ChessComGame {
 
 const API = 'https://api.chess.com/pub/player';
 
+/**
+ * En-tête User-Agent demandé par chess.com. ASCII uniquement : un caractère hors Latin-1 (comme
+ * l'apostrophe typographique) fait échouer `fetch` avant tout envoi.
+ */
+export const USER_AGENT = 'Fianchetto/1.0 (personal chess training app, local use)';
+
 export const defaultFetcher: JsonFetcher = async (url) => {
   const res = await fetch(url, {
-    headers: { 'user-agent': 'Fianchetto (application d’échecs personnelle, usage local)' },
+    headers: { 'user-agent': USER_AGENT, accept: 'application/json' },
     signal: AbortSignal.timeout(20_000),
   });
   return { status: res.status, json: () => res.json() };
@@ -34,15 +44,17 @@ async function getJson(fetcher: JsonFetcher, url: string): Promise<unknown> {
   let res;
   try {
     res = await fetcher(url);
-  } catch {
-    throw new ChessComError('UNAVAILABLE');
+  } catch (error) {
+    const cause = (error as { cause?: { message?: string } }).cause?.message;
+    throw new ChessComError('UNAVAILABLE', cause ?? String(error));
   }
   if (res.status === 404) throw new ChessComError('NOT_FOUND');
-  if (res.status !== 200) throw new ChessComError('UNAVAILABLE');
+  if (res.status === 429) throw new ChessComError('RATE_LIMITED', 'HTTP 429');
+  if (res.status !== 200) throw new ChessComError('UNAVAILABLE', `HTTP ${res.status}`);
   try {
     return await res.json();
   } catch {
-    throw new ChessComError('UNAVAILABLE');
+    throw new ChessComError('UNAVAILABLE', 'réponse illisible');
   }
 }
 

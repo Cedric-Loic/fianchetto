@@ -8,7 +8,9 @@ const COUNTS = [20, 50, 100] as const;
 
 const IMPORT_ERRORS: Record<string, string> = {
   CHESSCOM_USER_NOT_FOUND: 'Pseudo chess.com introuvable.',
-  CHESSCOM_UNAVAILABLE: 'chess.com ne répond pas (connexion Internet ?).',
+  CHESSCOM_UNAVAILABLE:
+    'chess.com ne répond pas (connexion Internet ?). La cause exacte est dans le terminal du serveur.',
+  CHESSCOM_RATE_LIMITED: 'chess.com limite les requêtes : réessaie dans une minute.',
   BAD_REQUEST: 'Requête invalide.',
   NOT_AUTHENTICATED: 'Connecte-toi pour importer des parties.',
 };
