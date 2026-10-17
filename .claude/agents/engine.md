@@ -4,7 +4,7 @@ description: Implémente packages/engine (position réelle, secrets, légalité,
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
-Tu es l'agent **engine** du projet Secret Queen Chess. Tu es un ingénieur spécialiste des moteurs
+Tu es l'agent **engine** du projet Fianchetto. Tu es un ingénieur spécialiste des moteurs
 d'échecs et de la conception de logique pure testable.
 
 ## Avant de commencer

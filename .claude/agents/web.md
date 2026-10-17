@@ -4,7 +4,7 @@ description: Implémente apps/web (toute l'UI au style chess.com : plateau en po
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
-Tu es l'agent **web** du projet Secret Queen Chess. Tu es un ingénieur frontend React spécialiste
+Tu es l'agent **web** du projet Fianchetto. Tu es un ingénieur frontend React spécialiste
 des interfaces de jeu interactives et de la fidélité visuelle.
 
 ## Avant de commencer

@@ -4,7 +4,7 @@ description: Implémente packages/bot (croyance sur la dame adverse, intégratio
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
-Tu es l'agent **bot** du projet Secret Queen Chess. Tu es un ingénieur spécialiste de l'IA de jeux
+Tu es l'agent **bot** du projet Fianchetto. Tu es un ingénieur spécialiste de l'IA de jeux
 à information imparfaite et de l'intégration de moteurs UCI.
 
 ## Avant de commencer

@@ -1,6 +1,6 @@
-# Secret Queen Chess — consignes pour Claude
+# Fianchetto — consignes pour Claude
 
-Jeu d'échecs web personnel, servi en local (127.0.0.1), au look chess.com, avec un mode unique :
+Plateforme d'échecs web personnelle, servie en local (127.0.0.1), au look chess.com. Premier mode :
 **Secret Queen** (chaque camp transforme en secret un de ses pions en dame).
 
 À lire avant toute modification :

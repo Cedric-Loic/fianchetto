@@ -48,8 +48,8 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
 
   return (
     <div className="home wide">
-      <h1>Secret Queen Chess</h1>
-      <p className="tagline">Un de vos pions est une dame. Personne ne sait lequel.</p>
+      <h1>Fianchetto</h1>
+      <p className="tagline">Secret Queen : un de vos pions est une dame. Personne ne sait lequel.</p>
       {active && (
         <div className="panel resume">
           Une partie est en cours.{' '}

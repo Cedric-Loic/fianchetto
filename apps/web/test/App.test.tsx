@@ -8,7 +8,7 @@ vi.stubGlobal('fetch', () => Promise.resolve(new Response('{}', { status: 401 })
 describe('App', () => {
   it('affiche le titre', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Secret Queen Chess' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Fianchetto' })).toBeTruthy();
     expect(screen.getByText('Se connecter')).toBeTruthy();
   });
 });

@@ -35,7 +35,7 @@ function Nav() {
   return (
     <nav className="nav-bar">
       <a href="#/" className="logo">
-        ♛ Secret Queen
+        ♞ Fianchetto
       </a>
       <a href="#/">Jouer</a>
       <a href="#/leaderboard">Classement</a>

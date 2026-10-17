@@ -1,6 +1,6 @@
-# Secret Queen Chess
+# Fianchetto
 
-Jeu d'échecs web personnel, servi en local, au style chess.com, avec un mode unique :
+Plateforme d'échecs web personnelle, servie en local, au style chess.com. Premier mode de jeu :
 **Secret Queen**. Avant la partie, chaque joueur désigne en secret un de ses 8 pions : ce pion
 est en réalité une **dame**, mais il reste affiché comme un pion pour tout le monde jusqu'à
 l'écran de fin. À l'adversaire de la démasquer.

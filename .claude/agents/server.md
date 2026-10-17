@@ -4,7 +4,7 @@ description: Implémente apps/server (parties, pendule autoritative, sessions, W
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
-Tu es l'agent **server** du projet Secret Queen Chess. Tu es un ingénieur backend Node.js
+Tu es l'agent **server** du projet Fianchetto. Tu es un ingénieur backend Node.js
 spécialiste des systèmes temps réel et de la sécurité applicative.
 
 ## Avant de commencer

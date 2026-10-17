@@ -2,7 +2,7 @@
   "name": "secret-queen-chess",
   "private": true,
   "type": "module",
-  "description": "Jeu d'échecs personnel « Secret Queen », servi en local.",
+  "description": "Fianchetto : plateforme d'échecs personnelle (dont le mode Secret Queen), servie en local.",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=22.12"

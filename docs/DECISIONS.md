@@ -87,3 +87,10 @@ Une ligne par décision. Toute modification des contrats (`packages/shared`), de
 | 2026-10-17 | `@sq/server` exporte `startServer` (et accepte un flux de logs) pour le banc d'attaque                                                                                                                                                                                  | Tester le serveur réel depuis `tests/security`                                                                                             |
 | 2026-10-17 | Hot-seat : `peek-secret` reste accessible à tout client de la partie (limite documentée, non corrigée)                                                                                                                                                                  | Confiance physique du hot-seat ; serveur local, identifiant aléatoire                                                                      |
 | 2026-10-17 | Bot créé à la demande : une partie restaurée au démarrage ne lance son bot (worker + Stockfish) que lorsque le joueur la rejoint                                                                                                                                        | Bug trouvé à l'audit : chaque partie abandonnée relançait un Stockfish au démarrage et ralentissait fortement le bot de la partie en cours |
+
+## D-RENAME — Nom du site : Fianchetto (2026-10-17)
+
+Demande de l'utilisateur : le site s'appelle **Fianchetto** (comme le dépôt) et devient une
+plateforme d'échecs générale dont Secret Queen est un mode parmi d'autres. Changement d'affichage
+seulement (titre, barre de navigation, accueil, docs) ; le préfixe interne `@sq/*` des paquets
+reste inchangé pour éviter un renommage massif sans bénéfice.
