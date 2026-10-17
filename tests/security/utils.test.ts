@@ -16,7 +16,12 @@ import {
   secretCanaryTokens,
 } from './canary.js';
 import { bareRefusalViolations, projectionViolations, publicMoveViolations } from './invariants.js';
-import { compareObservations, firstDifference, normalizeVolatile, omitKeysDeep } from './normalize.js';
+import {
+  compareObservations,
+  firstDifference,
+  normalizeVolatile,
+  omitKeysDeep,
+} from './normalize.js';
 import {
   candidateIntents,
   initialDisplayedPieces,
@@ -25,7 +30,7 @@ import {
   uci,
 } from './public-board.js';
 import { findForbidden, findRealStateByReflection } from './scan.js';
-import { allWorldPairs, arbWorldPair, arbWorldPairScenario } from './world-pairs.js';
+import { allWorldPairs, arbSeeds, arbWorldPair, arbWorldPairScenario } from './world-pairs.js';
 
 /*
  * Auto-tests du banc : ils ne dépendent pas du moteur et prouvent que les détecteurs
@@ -131,9 +136,7 @@ describe('scan des champs interdits', () => {
     expect(findForbidden({ id: 'wqe2' }, { tokens: ['wqe2'] }).map((f) => f.rule)).toEqual([
       'canari',
     ]);
-    expect(findForbidden({ wqe2: 1 }, { tokens: ['wqe2'] }).map((f) => f.rule)).toEqual([
-      'canari',
-    ]);
+    expect(findForbidden({ wqe2: 1 }, { tokens: ['wqe2'] }).map((f) => f.rule)).toEqual(['canari']);
   });
 
   it('réflexion : détecte un moteur ou une FEN hors champ privé, ignore les champs #', () => {
@@ -206,9 +209,7 @@ describe('normalisation et comparaison', () => {
 
 describe('invariants de projection', () => {
   it('une projection initiale conforme ne viole rien', () => {
-    expect(projectionViolations(initialState('w', 'e2'), { viewer: 'w', over: false })).toEqual(
-      [],
-    );
+    expect(projectionViolations(initialState('w', 'e2'), { viewer: 'w', over: false })).toEqual([]);
     expect(projectionViolations(initialState('public'), { viewer: 'public', over: false })).toEqual(
       [],
     );
@@ -222,7 +223,10 @@ describe('invariants de projection', () => {
       'type réel visible',
       (s) => ({ ...s, pieces: s.pieces.map((p) => (p.id === 'bpe7' ? { ...p, type: 'q' } : p)) }),
     ],
-    ['reveal avant la fin', (s) => ({ ...s, reveal: { secrets: {}, realInitialFen: '', plies: [] } })],
+    [
+      'reveal avant la fin',
+      (s) => ({ ...s, reveal: { secrets: {}, realInitialFen: '', plies: [] } }),
+    ],
     ['result avant la fin', (s) => ({ ...s, result: { winner: 'w', reason: 'resignation' } })],
     ['pièces non triées', (s) => ({ ...s, pieces: [...s.pieces].reverse() })],
     ['captures incohérentes', (s) => ({ ...s, captured: { w: ['p'], b: [] } })],
@@ -236,7 +240,13 @@ describe('invariants de projection', () => {
     expect(publicMoveViolations(E4)).toEqual([]);
     expect(publicMoveViolations({ ...E4, to: 'd5', san: 'e2-d5' })).toEqual([]);
     expect(publicMoveViolations({ ...E4, san: 'Qe4' })).not.toEqual([]);
-    expect(publicMoveViolations({ ...E4, san: 'e2-e4', capture: { pieceId: 'bpe7', displayedType: 'p', square: 'e4' } })).not.toEqual([]);
+    expect(
+      publicMoveViolations({
+        ...E4,
+        san: 'e2-e4',
+        capture: { pieceId: 'bpe7', displayedType: 'p', square: 'e4' },
+      }),
+    ).not.toEqual([]);
     expect(
       publicMoveViolations({
         ...E4,
@@ -257,7 +267,9 @@ describe('invariants de projection', () => {
     const hidden = { ok: false };
     Object.defineProperty(hidden, 'why', { value: 'check', enumerable: false });
     expect(bareRefusalViolations(hidden)).not.toEqual([]);
-    expect(bareRefusalViolations(Object.assign(Object.create({ why: 1 }) as object, { ok: false }))).not.toEqual([]);
+    expect(
+      bareRefusalViolations(Object.assign(Object.create({ why: 1 }) as object, { ok: false })),
+    ).not.toEqual([]);
   });
 });
 
@@ -302,6 +314,13 @@ describe('paires de mondes', () => {
     const pairs = allWorldPairs({ w: 'a2', b: 'h7' });
     expect(pairs).toHaveLength(112);
     expect(new Set(pairs.map((p) => JSON.stringify(p))).size).toBe(112);
+  });
+
+  it('les graines forment des suites longues (pas le plafond par défaut de fast-check)', () => {
+    const lengths = fc.sample(arbSeeds(200), { numRuns: 100, seed: 3 }).map((s) => s.length);
+    const mean = lengths.reduce((sum, n) => sum + n, 0) / lengths.length;
+    expect(mean).toBeGreaterThan(50);
+    expect(Math.max(...lengths)).toBeGreaterThan(150);
   });
 
   it('les scénarios sont rejouables (même graine fast-check → même scénario)', () => {

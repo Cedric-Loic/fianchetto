@@ -28,13 +28,23 @@ export interface WorldPair {
 }
 
 /** Fin appliquée de l'extérieur après la suite de coups, pour comparer aussi l'après-fin. */
-export type ExternalEnding = 'none' | 'resign-hidden' | 'resign-observer' | 'draw' | 'flag-hidden' | 'flag-observer';
+export type ExternalEnding =
+  'none' | 'resign-hidden' | 'resign-observer' | 'draw' | 'flag-hidden' | 'flag-observer';
 
 export interface WorldPairScenario {
   pair: WorldPair;
   /** Graines de choix d'intention (une par tentative). */
   seeds: number[];
   ending: ExternalEnding;
+}
+
+/**
+ * Graines de choix d'intention. `size: 'max'` est indispensable : par défaut, fast-check
+ * plafonne la longueur des tableaux à une dizaine d'éléments quel que soit `maxLength`, ce
+ * qui réduirait chaque partie à quelques coups.
+ */
+export function arbSeeds(maxLength: number): fc.Arbitrary<number[]> {
+  return fc.array(fc.nat(), { maxLength, size: 'max' });
 }
 
 export const arbColor: fc.Arbitrary<Color> = fc.constantFrom<Color>('w', 'b');
@@ -50,13 +60,10 @@ export const arbSecrets: fc.Arbitrary<WorldSecrets> = fc.record({
 
 export const arbWorldPair: fc.Arbitrary<WorldPair> = arbColor.chain((hidden) =>
   fc
-    .tuple(
-      arbSecrets,
-      fc.uniqueArray(arbPawnStart(hidden), { minLength: 2, maxLength: 2 }),
-    )
+    .tuple(arbSecrets, fc.uniqueArray(arbPawnStart(hidden), { minLength: 2, maxLength: 2 }))
     .map(([base, [first, second]]): WorldPair => {
-      const a = { ...base, [hidden]: first } as WorldSecrets;
-      const b = { ...base, [hidden]: second } as WorldSecrets;
+      const a = { ...base, [hidden]: first };
+      const b = { ...base, [hidden]: second };
       return { hidden, observer: opposite(hidden), a, b };
     }),
 );
@@ -73,7 +80,7 @@ export const arbEnding: fc.Arbitrary<ExternalEnding> = fc.constantFrom<ExternalE
 export function arbWorldPairScenario(maxAttempts: number): fc.Arbitrary<WorldPairScenario> {
   return fc.record({
     pair: arbWorldPair,
-    seeds: fc.array(fc.nat(), { minLength: 0, maxLength: maxAttempts }),
+    seeds: arbSeeds(maxAttempts),
     ending: arbEnding,
   });
 }

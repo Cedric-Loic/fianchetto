@@ -7,7 +7,7 @@ import { playLine, snapshotAll } from './harness.js';
 import { bareRefusalViolations } from './invariants.js';
 import { pickIntent, uci } from './public-board.js';
 import { findForbidden, formatFindings } from './scan.js';
-import { arbSecrets } from './world-pairs.js';
+import { arbSecrets, arbSeeds } from './world-pairs.js';
 
 /*
  * Refus sans motif (§3.5, `RULES.md` §4) : quel que soit le motif, `play` renvoie exactement
@@ -24,14 +24,25 @@ interface RefusalCase {
 }
 
 const CASES: RefusalCase[] = [
-  { label: "pas le tour de ce camp", secrets: { w: 'e2', b: 'd7' }, setup: [], color: 'b', intent: 'e7e5' },
+  {
+    label: 'pas le tour de ce camp',
+    secrets: { w: 'e2', b: 'd7' },
+    setup: [],
+    color: 'b',
+    intent: 'e7e5',
+  },
   { label: 'case de départ vide', secrets: { w: 'e2', b: 'd7' }, setup: [], intent: 'e3e4' },
   { label: 'pièce adverse', secrets: { w: 'e2', b: 'd7' }, setup: [], intent: 'e7e5' },
   { label: 'géométrie impossible', secrets: { w: 'e2', b: 'd7' }, setup: [], intent: 'b1b3' },
   { label: 'trajet bloqué', secrets: { w: 'e2', b: 'd7' }, setup: [], intent: 'a1a3' },
   { label: 'départ = arrivée', secrets: { w: 'e2', b: 'd7' }, setup: [], intent: 'g1g1' },
   { label: 'prise de sa propre pièce', secrets: { w: 'e2', b: 'd7' }, setup: [], intent: 'd1d2' },
-  { label: 'vrai pion joué comme une dame', secrets: { w: 'a2', b: 'd7' }, setup: [], intent: 'e2e5' },
+  {
+    label: 'vrai pion joué comme une dame',
+    secrets: { w: 'a2', b: 'd7' },
+    setup: [],
+    intent: 'e2e5',
+  },
   { label: 'dame secrète bloquée', secrets: { w: 'e2', b: 'd7' }, setup: [], intent: 'e2e8' },
   {
     label: 'pièce clouée par une vraie pièce',
@@ -144,7 +155,7 @@ describe('refus sans motif', () => {
 
   it('parties aléatoires : chaque refus est nu et ne modifie aucune projection', () => {
     fc.assert(
-      fc.property(arbSecrets, fc.array(fc.nat(), { maxLength: 150 }), (secrets, seeds) => {
+      fc.property(arbSecrets, arbSeeds(150), (secrets, seeds) => {
         const game = SecretQueenGame.create(secrets);
         for (const seed of seeds) {
           if (game.isOver || game.plyCount >= 80) break;
@@ -167,7 +178,7 @@ describe('refus sans motif', () => {
 
   it('un camp qui n’est pas au trait est toujours refusé', () => {
     fc.assert(
-      fc.property(arbSecrets, fc.array(fc.nat(), { maxLength: 40 }), (secrets, seeds) => {
+      fc.property(arbSecrets, arbSeeds(40), (secrets, seeds) => {
         const game = SecretQueenGame.create(secrets);
         for (const seed of seeds) {
           if (game.isOver) break;

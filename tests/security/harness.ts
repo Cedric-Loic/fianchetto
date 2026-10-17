@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import fc from 'fast-check';
 import type {
   Color,
   GameResult,
@@ -18,7 +19,11 @@ import {
 import { bareRefusalViolations, projectionViolations } from './invariants.js';
 import { compareObservations, describeDifference } from './normalize.js';
 import { intentKey, pickIntent, uci } from './public-board.js';
-import type { ExternalEnding, WorldPairScenario } from './world-pairs.js';
+import {
+  arbWorldPairScenario,
+  type ExternalEnding,
+  type WorldPairScenario,
+} from './world-pairs.js';
 
 /**
  * Banc d'attaque contre l'API du moteur (`@sq/engine`). Seul module utilitaire qui importe le
@@ -130,7 +135,10 @@ export interface Attempt {
 export function playRandomGame(
   secrets: SecretChoice,
   seeds: readonly number[],
-  options: { maxPlies?: number; onAttempt?: (game: SecretQueenGame, attempt: Attempt) => void } = {},
+  options: {
+    maxPlies?: number;
+    onAttempt?: (game: SecretQueenGame, attempt: Attempt) => void;
+  } = {},
 ): { game: SecretQueenGame; accepted: MoveIntent[] } {
   const maxPlies = options.maxPlies ?? 120;
   const game = SecretQueenGame.create(secrets);
@@ -244,10 +252,12 @@ export function runWorldPair(
     const viewsB = snapshotAll(gameB, project);
     compare(`projection ${pair.observer}`, viewsA[pair.observer], viewsB[pair.observer], reveal);
     compare('projection public', viewsA.public, viewsB.public, reveal);
-    compare(`projection ${pair.hidden} (hors ownSecret)`, viewsA[pair.hidden], viewsB[pair.hidden], [
-      'ownSecret',
-      ...reveal,
-    ]);
+    compare(
+      `projection ${pair.hidden} (hors ownSecret)`,
+      viewsA[pair.hidden],
+      viewsB[pair.hidden],
+      ['ownSecret', ...reveal],
+    );
     compare('getters', viewsA.getters, viewsB.getters);
     if (!checkInvariants) return;
     for (const [world, views, secrets] of [
@@ -260,7 +270,8 @@ export function runWorldPair(
           over: views.getters.isOver,
           ...(viewer === 'public' ? {} : { ownSecretStart: secrets[viewer] }),
         });
-        if (violations.length > 0) leak(`invariants (monde ${world}, ${viewer})`, violations.join(' ; '));
+        if (violations.length > 0)
+          leak(`invariants (monde ${world}, ${viewer})`, violations.join(' ; '));
       }
     }
   };
@@ -340,3 +351,16 @@ export function formatReport(scenario: WorldPairScenario, report: WorldPairRepor
   ].join('\n');
 }
 
+/**
+ * Propriété d'indistinguabilité sur `numRuns` paires de mondes aléatoires (versions courte et
+ * longue). En cas de fuite, fast-check réduit le scénario et le message décrit la suite commune.
+ */
+export function assertIndistinguishable(numRuns: number, maxPlies: number, maxAttempts: number) {
+  fc.assert(
+    fc.property(arbWorldPairScenario(maxAttempts), (scenario) => {
+      const report = runWorldPair(scenario, { maxPlies, checkInvariants: true });
+      if (report.leaks.length > 0) throw new Error(`fuite :\n${formatReport(scenario, report)}`);
+    }),
+    { numRuns },
+  );
+}

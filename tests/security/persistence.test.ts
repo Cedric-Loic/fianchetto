@@ -1,7 +1,6 @@
 import { inspect } from 'node:util';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Square } from '@sq/shared';
 import { Secret } from '@sq/shared/secret';
 import {
   SecretQueenGame,
@@ -21,7 +20,7 @@ import {
 import { compareObservations, describeDifference } from './normalize.js';
 import { intentKey, pickIntent } from './public-board.js';
 import { findForbidden, formatFindings } from './scan.js';
-import { arbEnding, arbSecrets } from './world-pairs.js';
+import { arbEnding, arbSecrets, arbSeeds } from './world-pairs.js';
 
 /*
  * Forme persistée (reprise après redémarrage) : enveloppée dans `Secret<T>`, illisible par
@@ -42,7 +41,7 @@ function expectMasked(persisted: Secret<PersistedGame>, secrets: SecretChoice) {
 describe('toPersisted() masqué', () => {
   it('JSON, String, inspect, spread, structuredClone : aucune valeur, à toute étape', () => {
     fc.assert(
-      fc.property(arbSecrets, fc.array(fc.nat(), { maxLength: 100 }), arbEnding, (secrets, seeds, ending) => {
+      fc.property(arbSecrets, arbSeeds(100), arbEnding, (secrets, seeds, ending) => {
         const { game } = playRandomGame(secrets, seeds, { maxPlies: 50 });
         expectMasked(game.toPersisted(), secrets);
         if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
@@ -72,8 +71,8 @@ describe('toPersisted() masqué', () => {
     fc.assert(
       fc.property(
         arbSecrets,
-        fc.array(fc.nat(), { maxLength: 150 }),
-        fc.array(fc.nat(), { maxLength: 40 }),
+        arbSeeds(150),
+        arbSeeds(40),
         arbEnding,
         (secrets, seeds, continuation, ending) => {
           const { game } = playRandomGame(secrets, seeds, { maxPlies: 70 });
@@ -134,7 +133,7 @@ describe('entrées invalides', () => {
     const persisted = persistedOf(game);
     const corrupted: PersistedGame = {
       ...persisted,
-      moves: [...persisted.moves, { from: 'd2' as Square, to: 'd5' as Square }],
+      moves: [...persisted.moves, { from: 'd2', to: 'd5' }],
     };
     expectSilentFailure(() => SecretQueenGame.restore(wrapPersisted(corrupted)), VALID);
   });
@@ -142,14 +141,12 @@ describe('entrées invalides', () => {
   it('restore refuse une version inconnue et des secrets invalides', () => {
     const base = persistedOf(SecretQueenGame.create(VALID));
     expectSilentFailure(
-      () => SecretQueenGame.restore(wrapPersisted({ ...base, version: 2 } as unknown as PersistedGame)),
+      () =>
+        SecretQueenGame.restore(wrapPersisted({ ...base, version: 2 } as unknown as PersistedGame)),
       VALID,
     );
     expectSilentFailure(
-      () =>
-        SecretQueenGame.restore(
-          wrapPersisted({ ...base, secrets: { w: 'e4' as Square, b: 'a7' } }),
-        ),
+      () => SecretQueenGame.restore(wrapPersisted({ ...base, secrets: { w: 'e4', b: 'a7' } })),
       VALID,
     );
   });

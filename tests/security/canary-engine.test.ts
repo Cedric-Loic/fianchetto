@@ -11,7 +11,7 @@ import {
 } from './canary.js';
 import { applyEnding, playRandomGame } from './harness.js';
 import { findForbidden, findRealStateByReflection, formatFindings } from './scan.js';
-import { arbEnding, arbSecrets } from './world-pairs.js';
+import { arbEnding, arbSecrets, arbSeeds } from './world-pairs.js';
 
 /*
  * Canari (§10) : les jetons propres au secret d'un camp (rangée FEN réelle « PPPPQPPP »,
@@ -62,28 +62,23 @@ function expectGameMasked(game: SecretQueenGame, secrets: SecretChoice, label: s
 describe('canari : sérialisations de la partie', () => {
   it('[REDACTED] partout, partie neuve, en cours et terminée', () => {
     fc.assert(
-      fc.property(
-        arbSecrets,
-        fc.array(fc.nat(), { maxLength: 80 }),
-        arbEnding,
-        (secrets, seeds, ending) => {
-          let checked = 0;
-          const { game } = playRandomGame(secrets, seeds, {
-            maxPlies: 40,
-            onAttempt: (g, attempt) => {
-              // Toutes les tentatives au début, puis une sur cinq (coût).
-              if (attempt.ply < 6 || checked++ % 5 === 0) {
-                expectGameMasked(g, secrets, `demi-coup ${attempt.ply}`);
-              }
-            },
-          });
-          expectGameMasked(game, secrets, 'fin de la suite');
-          if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
-          // Même après la fin, l'objet partie ne se sérialise pas (la révélation passe par
-          // la projection, jamais par un log).
-          expectGameMasked(game, secrets, 'après la fin');
-        },
-      ),
+      fc.property(arbSecrets, arbSeeds(80), arbEnding, (secrets, seeds, ending) => {
+        let checked = 0;
+        const { game } = playRandomGame(secrets, seeds, {
+          maxPlies: 40,
+          onAttempt: (g, attempt) => {
+            // Toutes les tentatives au début, puis une sur cinq (coût).
+            if (attempt.ply < 6 || checked++ % 5 === 0) {
+              expectGameMasked(g, secrets, `demi-coup ${attempt.ply}`);
+            }
+          },
+        });
+        expectGameMasked(game, secrets, 'fin de la suite');
+        if (ending !== 'none' && !game.isOver) applyEnding(game, ending, 'w', 'b');
+        // Même après la fin, l'objet partie ne se sérialise pas (la révélation passe par
+        // la projection, jamais par un log).
+        expectGameMasked(game, secrets, 'après la fin');
+      }),
       { numRuns: 30 },
     );
   });
@@ -92,7 +87,7 @@ describe('canari : sérialisations de la partie', () => {
 describe("canari : sorties destinées à l'adversaire et au public", () => {
   it('aucune projection, aucun coup public, aucun refus ne contient un jeton du secret adverse', () => {
     fc.assert(
-      fc.property(arbSecrets, fc.array(fc.nat(), { maxLength: 200 }), (secrets, seeds) => {
+      fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
         playRandomGame(secrets, seeds, {
           maxPlies: 100,
           onAttempt: (game, attempt) => {
@@ -120,7 +115,7 @@ describe("canari : sorties destinées à l'adversaire et au public", () => {
 
   it('contrôle positif : après la fin, la révélation contient bien les jetons des deux secrets', () => {
     fc.assert(
-      fc.property(arbSecrets, fc.array(fc.nat(), { maxLength: 60 }), (secrets, seeds) => {
+      fc.property(arbSecrets, arbSeeds(60), (secrets, seeds) => {
         const { game } = playRandomGame(secrets, seeds, { maxPlies: 30 });
         if (!game.isOver) game.agreeDraw();
         const view = projectForViewer(game, 'public');

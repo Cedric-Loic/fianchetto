@@ -2,7 +2,13 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { opposite, type Viewer } from '@sq/shared';
 import { projectForViewer } from '@sq/engine';
-import { formatReport, persistedOf, runWorldPair, type Projector } from './harness.js';
+import {
+  assertIndistinguishable,
+  formatReport,
+  persistedOf,
+  runWorldPair,
+  type Projector,
+} from './harness.js';
 import {
   allWorldPairs,
   arbWorldPairScenario,
@@ -17,20 +23,9 @@ import {
  * `indistinguishability.stress.ts` (10 000 paires).
  */
 
-export const RUNS = 200;
-export const MAX_ATTEMPTS = 220;
-export const MAX_PLIES = 60;
-
-/** Propriété commune aux versions courte et longue. */
-export function assertIndistinguishable(numRuns: number, maxPlies: number, maxAttempts: number) {
-  fc.assert(
-    fc.property(arbWorldPairScenario(maxAttempts), (scenario) => {
-      const report = runWorldPair(scenario, { maxPlies, checkInvariants: true });
-      if (report.leaks.length > 0) throw new Error(`fuite :\n${formatReport(scenario, report)}`);
-    }),
-    { numRuns },
-  );
-}
+const RUNS = 200;
+const MAX_ATTEMPTS = 220;
+const MAX_PLIES = 60;
 
 const ENDINGS: ExternalEnding[] = [
   'resign-hidden',
@@ -88,7 +83,7 @@ describe('indistinguabilité : contrôles positifs (fuites injectées)', () => {
     ending: 'none',
   });
 
-  it("détecte un ordre des pièces qui place le pion secret adverse en dernier", () => {
+  it('détecte un ordre des pièces qui place le pion secret adverse en dernier', () => {
     const leaky: Projector = (game, viewer) => {
       const state = projectForViewer(game, viewer);
       const id = opponentSecretId(viewer, game);
@@ -102,7 +97,7 @@ describe('indistinguabilité : contrôles positifs (fuites injectées)', () => {
     expect(report.leaks.map((l) => l.step)).toContain('projection w');
   });
 
-  it("détecte un ordre des clés dépendant du secret (octets différents)", () => {
+  it('détecte un ordre des clés dépendant du secret (octets différents)', () => {
     const leaky: Projector = (game, viewer) => {
       const state = projectForViewer(game, viewer);
       if (!opponentSecretId(viewer, game).endsWith('a2')) return state;
@@ -123,16 +118,16 @@ describe('indistinguabilité : contrôles positifs (fuites injectées)', () => {
   });
 
   it('détecte une fuite qui n’apparaît qu’après quelques coups', () => {
-    // Fuite : le numéro de coup est décalé dès que le pion secret adverse a quitté sa case.
+    // Fuite : l'annonce d'échec est inversée dès que le pion secret adverse a bougé.
     const leaky: Projector = (game, viewer) => {
       const state = projectForViewer(game, viewer);
       const id = opponentSecretId(viewer, game);
       const moved = state.moves.some((m) => m.pieceId === id);
       return moved ? { ...state, inCheck: !state.inCheck } : state;
     };
-    const found = fc.sample(arbWorldPairScenario(MAX_ATTEMPTS), { numRuns: 60, seed: 11 }).some(
-      (s) => runWorldPair(s, { projector: leaky, maxPlies: MAX_PLIES }).leaks.length > 0,
-    );
+    const found = fc
+      .sample(arbWorldPairScenario(MAX_ATTEMPTS), { numRuns: 60, seed: 11 })
+      .some((s) => runWorldPair(s, { projector: leaky, maxPlies: MAX_PLIES }).leaks.length > 0);
     expect(found).toBe(true);
   });
 });

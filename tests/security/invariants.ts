@@ -125,7 +125,9 @@ export function projectionViolations(state: ViewerBoardState, ctx: ProjectionCon
   } else if (state.ownSecret !== null) {
     const { pieceId, square } = state.ownSecret;
     if (!pieceId.startsWith(`${ctx.viewer}p`)) {
-      out.push(`projection ${ctx.viewer} : ownSecret d'un autre camp ou d'une non-pion (${pieceId})`);
+      out.push(
+        `projection ${ctx.viewer} : ownSecret d'un autre camp ou d'une non-pion (${pieceId})`,
+      );
     }
     if (ctx.ownSecretStart && pieceId !== `${ctx.viewer}p${ctx.ownSecretStart}`) {
       out.push(`projection ${ctx.viewer} : ownSecret ${pieceId} ≠ secret choisi`);

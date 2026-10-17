@@ -1,4 +1,3 @@
-import { expect } from 'vitest';
 import fc from 'fast-check';
 import {
   SQUARES,
@@ -18,7 +17,10 @@ import { Mirror, type MirrorMove } from './mirror.js';
 /*
  * Parties aléatoires pour les tests de propriétés (fast-check) et de stress.
  * Chaque partie est déterminée par un scénario (secrets, graine, fin externe éventuelle) ; le
- * miroir chess.js (positions réelles) sert d'oracle indépendant du moteur.
+ * miroir chess.js (position réelle) sert d'oracle indépendant du moteur.
+ *
+ * Les vérifications utilisent `check` (assertion simple) plutôt que `expect` : elles sont
+ * exécutées des centaines de milliers de fois et `expect(...).toEqual` y serait trop lent.
  */
 
 export type ExternalEnd = 'none' | 'resign' | 'draw' | 'flag';
@@ -45,6 +47,13 @@ export function scenarioArbitrary(maxPlies: number): fc.Arbitrary<Scenario> {
     captureBias: fc.constantFrom(0, 0.5, 0.9),
   });
 }
+
+/** Assertion rapide. */
+export function check(condition: boolean, message: string): asserts condition {
+  if (!condition) throw new Error(`Invariant violé : ${message}`);
+}
+
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /** Générateur pseudo-aléatoire déterministe (mulberry32). */
 export function prng(seed: number): () => number {
@@ -74,7 +83,7 @@ export function chooseMove(
 
 const VIEWERS: readonly Viewer[] = ['w', 'b', 'public'];
 
-/** SAN réelle d'un coup du miroir, calculée AVANT de le jouer. */
+/** SAN réelle (chess.js) d'un coup du miroir, calculée AVANT de le jouer. */
 function realSan(mirror: Mirror, move: MirrorMove, all: readonly MirrorMove[]): string {
   const chess = mirror.chess as unknown as {
     _moveToSan(raw: MirrorMove['raw'], moves: MirrorMove['raw'][]): string;
@@ -86,7 +95,7 @@ function realSan(mirror: Mirror, move: MirrorMove, all: readonly MirrorMove[]): 
 }
 
 const PIECE_SAN = /^([NBRQK])[a-h]?[1-8]?(x?[a-h][1-8][+#]?)$/;
-const PAWN_SAN = /^(?:[a-h]x)?[a-h][1-8](?:=[NBRQ])?[+#]?$/;
+const PAWN_SAN = /^(?:[a-h]x)?[a-h][2-7][+#]?$/;
 const COORDINATE_SAN = /^[a-h][1-8][-x][a-h][1-8][+#]?$/;
 
 function suffix(san: string): string {
@@ -94,43 +103,33 @@ function suffix(san: string): string {
 }
 
 /**
- * Vérifie la notation publique d'un coup face à la SAN réelle :
- * - vrai pion : identique ;
+ * Notation publique d'un coup face à la SAN réelle :
+ * - mêmes annonces (+, #) ;
+ * - vrai pion et roque : identiques ;
  * - pièce affichée N, B, R, Q, K : identique à la désambiguïsation près ;
- * - dame secrète : notation de pion ou coordonnées, jamais de lettre de pièce.
+ * - dame secrète : notation de pion sans promotion ou coordonnées, jamais de lettre de pièce.
  */
 export function checkNotation(move: PublicMove, real: string, isSecret: boolean): void {
-  expect(suffix(move.san)).toBe(suffix(real));
-  expect(move.check).toBe(suffix(real) !== '');
-  expect(move.checkmate).toBe(suffix(real) === '#');
+  check(suffix(move.san) === suffix(real), `annonce ${move.san} / ${real}`);
+  check(move.check === (suffix(real) !== ''), 'check');
+  check(move.checkmate === (suffix(real) === '#'), 'checkmate');
   if (isSecret) {
-    expect(move.displayedType).toBe('p');
-    expect(move.promotion).toBeNull();
-    expect(PAWN_SAN.test(move.san) || COORDINATE_SAN.test(move.san)).toBe(true);
-    expect(move.san).not.toContain('=');
+    check(move.displayedType === 'p' && move.promotion === null, 'dame secrète : type affiché');
+    check(PAWN_SAN.test(move.san) || COORDINATE_SAN.test(move.san), `dame secrète : ${move.san}`);
     return;
   }
   if (move.displayedType === 'p' || move.castle !== null) {
-    expect(move.san).toBe(real);
+    check(move.san === real, `pion ou roque : ${move.san} / ${real}`);
     return;
   }
   const pub = PIECE_SAN.exec(move.san);
   const rl = PIECE_SAN.exec(real);
-  expect(pub).not.toBeNull();
-  expect(rl).not.toBeNull();
-  expect([pub?.[1], pub?.[2]]).toEqual([rl?.[1], rl?.[2]]);
+  check(pub !== null && rl !== null && pub[1] === rl[1] && pub[2] === rl[2], `${move.san} / ${real}`);
 }
-
-/** Assertion rapide (les `expect` de Vitest sont trop lents pour des centaines de milliers d'appels). */
-export function check(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`Invariant violé : ${message}`);
-}
-
-const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * Invariants de la projection, pour les trois spectateurs, face au miroir réel.
- * `full` : compare aussi l'historique complet et valide le schéma Zod (coûteux).
+ * `full` : compare aussi l'historique complet et valide le schéma Zod (plus coûteux).
  */
 export function checkProjections(
   game: SecretQueenGame,
@@ -143,7 +142,8 @@ export function checkProjections(
   const pub = views.public;
 
   // Ce qu'un camp voit en plus de la vue publique : uniquement `ownSecret`.
-  const { moves: pubMoves, viewer: _pv, ownSecret: _po, ...pubRest } = pub;
+  const { moves: pubMoves, viewer: pubViewer, ownSecret: pubOwn, ...pubRest } = pub;
+  check(pubViewer === 'public' && pubOwn === null, 'vue publique sans secret');
   for (const color of ['w', 'b'] as const) {
     const { moves, viewer, ownSecret, ...rest } = views[color];
     check(viewer === color, 'viewer');
@@ -151,13 +151,10 @@ export function checkProjections(
     check(moves.length === pubMoves.length, 'longueur de l’historique');
     check(same(moves.at(-1), pubMoves.at(-1)), 'dernier coup');
     if (full) check(same(moves, pubMoves), 'historique');
-    check(
-      same(ownSecret, { pieceId: `${color}p${secrets[color]}`, square: mirror.secretSquares[color] }),
-      `ownSecret ${color}`,
-    );
+    const expected = { pieceId: `${color}p${secrets[color]}`, square: mirror.secretSquares[color] };
+    check(same(ownSecret, expected), `ownSecret ${color}`);
   }
-  check(pub.ownSecret === null, 'ownSecret public');
-  if (full) check(same(ViewerBoardStateSchema.parse(pub), pub), 'schéma (clés non déclarées ?)');
+  if (full) check(same(ViewerBoardStateSchema.parse(pub), pub), 'schéma (clé non déclarée ?)');
 
   check(pub.turn === game.turn && pub.turn === mirror.chess.turn(), 'trait');
   check(pub.fullmoveNumber === Math.floor(game.plyCount / 2) + 1, 'numéro de coup');
@@ -204,10 +201,12 @@ function randomIllegalIntent(legal: readonly MirrorMove[], random: () => number)
   }
 }
 
+const uciNull: MoveIntent = { from: 'a1', to: 'a1' };
+
 export interface RunOptions {
   maxPlies: number;
-  /** Vérifie le schéma Zod tous les `schemaEvery` demi-coups (coûteux). */
-  schemaEvery: number;
+  /** Comparaison complète et schéma Zod tous les `fullEvery` demi-coups. */
+  fullEvery: number;
   /** Vérifie la restauration depuis la forme persistée en fin de partie. */
   checkRestore: boolean;
 }
@@ -227,22 +226,21 @@ export function runRandomGame(scenario: Scenario, options: RunOptions): SecretQu
 
     // Refus sans motif et sans effet : coup illégal ou mauvais camp.
     if (random() < 0.1) {
-      const before = projectForViewer(game, 'public');
-      expect(game.play(color, randomIllegalIntent(legal, random))).toEqual({ ok: false });
-      expect(game.play(opposite(color), pick(legal, random).intent)).toEqual({ ok: false });
-      expect(projectForViewer(game, 'public')).toEqual(before);
+      const before = JSON.stringify(projectForViewer(game, 'public'));
+      check(same(game.play(color, randomIllegalIntent(legal, random)), { ok: false }), 'refus');
+      check(same(game.play(opposite(color), pick(legal, random).intent), { ok: false }), 'camp');
+      check(JSON.stringify(projectForViewer(game, 'public')) === before, 'refus sans effet');
     }
 
     const chosen = chooseMove(legal, random, scenario.captureBias);
     const isSecret = mirror.secretSquares[color] === chosen.intent.from;
     const real = realSan(mirror, chosen, legal);
     const outcome = game.play(color, chosen.intent);
-    expect(outcome.ok).toBe(true);
-    if (!outcome.ok) break;
+    check(outcome.ok, `coup légal refusé ${chosen.intent.from}${chosen.intent.to}`);
     mirror.apply(chosen);
     checkNotation(outcome.move, real, isSecret);
-    expect(outcome.result).toEqual(game.result);
-    checkProjections(game, mirror, secrets, game.plyCount % options.schemaEvery === 0);
+    check(same(outcome.result, game.result), 'résultat du coup');
+    checkProjections(game, mirror, secrets, game.plyCount % options.fullEvery === 0);
   }
 
   if (!game.isOver && scenario.external !== 'none') {
@@ -250,23 +248,31 @@ export function runRandomGame(scenario: Scenario, options: RunOptions): SecretQu
     if (scenario.external === 'resign') game.resign(loser);
     else if (scenario.external === 'draw') game.agreeDraw();
     else game.flagFall(loser);
-    expect(game.isOver).toBe(true);
-    expect(() => game.agreeDraw()).toThrow();
-    checkProjections(game, mirror, secrets, true);
+    check(game.isOver, 'fin externe');
+    let threw = false;
+    try {
+      game.agreeDraw();
+    } catch {
+      threw = true;
+    }
+    check(threw, 'fin externe sur une partie terminée');
   }
 
+  checkProjections(game, mirror, secrets, true);
   if (game.isOver) {
     const reveal = projectForViewer(game, 'public').reveal;
-    expect(reveal?.plies).toHaveLength(game.plyCount);
-    expect(reveal?.secrets.w.finalSquare).toBe(mirror.secretSquares.w);
-    expect(reveal?.secrets.b.finalSquare).toBe(mirror.secretSquares.b);
-    expect(game.play(game.turn, pick(mirror.legalMoves(), random).intent)).toEqual({ ok: false });
+    check(reveal?.plies.length === game.plyCount, 'révélation : demi-coups');
+    check(reveal.secrets.w.finalSquare === mirror.secretSquares.w, 'révélation : dame blanche');
+    check(reveal.secrets.b.finalSquare === mirror.secretSquares.b, 'révélation : dame noire');
+    const late = game.play(game.turn, pick(mirror.legalMoves(), random)?.intent ?? uciNull);
+    check(same(late, { ok: false }), 'coup après la fin');
   }
 
   if (options.checkRestore) {
     const restored = SecretQueenGame.restore(game.toPersisted());
     for (const viewer of VIEWERS) {
-      expect(projectForViewer(restored, viewer)).toEqual(projectForViewer(game, viewer));
+      const a = JSON.stringify(projectForViewer(restored, viewer));
+      check(a === JSON.stringify(projectForViewer(game, viewer)), 'restauration');
     }
   }
   return game;
@@ -286,55 +292,70 @@ export function runTwinWorlds(
   maxPlies: number,
 ): number {
   const secretsB: SecretChoice = { ...base, [hidden]: otherSecret };
-  const worlds = [base, secretsB].map((secrets) => ({
-    game: SecretQueenGame.create(secrets),
-    mirror: new Mirror(secrets),
-  }));
-  const [a, b] = worlds as [(typeof worlds)[number], (typeof worlds)[number]];
+  const a = { game: SecretQueenGame.create(base), mirror: new Mirror(base) };
+  const b = { game: SecretQueenGame.create(secretsB), mirror: new Mirror(secretsB) };
   const viewers: Viewer[] = [opposite(hidden), 'public'];
   const random = prng(seed);
+  const sameIntent = (m: MirrorMove, n: MirrorMove) =>
+    m.intent.from === n.intent.from &&
+    m.intent.to === n.intent.to &&
+    m.intent.promotion === n.intent.promotion;
   let compared = 0;
 
   for (;;) {
     for (const viewer of viewers) {
       const va = projectForViewer(a.game, viewer);
       const vb = projectForViewer(b.game, viewer);
-      if (a.game.isOver) {
-        // Après la fin, seule la révélation diffère.
-        expect({ ...va, reveal: null }).toEqual({ ...vb, reveal: null });
-      } else {
-        expect(va).toEqual(vb);
-      }
+      // Après la fin, seule la révélation peut différer.
+      check(same({ ...va, reveal: null }, { ...vb, reveal: null }), `mondes distinguables`);
+      check(a.game.isOver || same(va, vb), 'mondes distinguables (révélation)');
     }
     if (a.game.isOver || a.game.plyCount >= maxPlies) return compared;
 
     const legalB = b.mirror.legalMoves();
-    const common = a.mirror
-      .legalMoves()
-      .filter((m) =>
-        legalB.some(
-          (n) =>
-            n.intent.from === m.intent.from &&
-            n.intent.to === m.intent.to &&
-            n.intent.promotion === m.intent.promotion,
-        ),
-      );
+    const common = a.mirror.legalMoves().filter((m) => legalB.some((n) => sameIntent(m, n)));
     if (common.length === 0) return compared;
     const chosen = chooseMove(common, random, 0.3);
-    const twin = legalB.find(
-      (n) =>
-        n.intent.from === chosen.intent.from &&
-        n.intent.to === chosen.intent.to &&
-        n.intent.promotion === chosen.intent.promotion,
-    ) as MirrorMove;
+    const twin = legalB.find((n) => sameIntent(chosen, n)) as MirrorMove;
     const color = a.game.turn;
     const ra = a.game.play(color, chosen.intent);
     const rb = b.game.play(color, chosen.intent);
-    expect(ra.ok && rb.ok).toBe(true);
+    check(ra.ok && rb.ok, 'coup légal refusé dans un des mondes');
     a.mirror.apply(chosen);
     b.mirror.apply(twin);
     // Divergence publique (notation, annonce, fin) : les mondes ne sont plus comparables.
-    if (JSON.stringify(ra) !== JSON.stringify(rb)) return compared;
+    if (!same(ra, rb)) return compared;
     compared++;
   }
+}
+
+/** Lance `games` parties aléatoires (fast-check, graine fixe pour la reproductibilité). */
+export function assertRandomGames(games: number, maxPlies: number, seed: number): void {
+  let index = 0;
+  fc.assert(
+    fc.property(scenarioArbitrary(maxPlies), (scenario) => {
+      runRandomGame(scenario, { maxPlies, fullEvery: 20, checkRestore: index++ % 10 === 0 });
+    }),
+    { numRuns: games, seed },
+  );
+}
+
+/** Lance `runs` paires de mondes jumeaux (indistinguabilité). */
+export function assertTwinWorlds(runs: number, maxPlies: number, seed: number): void {
+  fc.assert(
+    fc.property(
+      fc.record({
+        w: fc.constantFrom(...pawnStartSquares('w')),
+        b: fc.constantFrom(...pawnStartSquares('b')),
+      }),
+      fc.constantFrom<Color>('w', 'b'),
+      fc.integer({ min: 0, max: 6 }),
+      fc.integer(),
+      (base, hidden, shift, gameSeed) => {
+        const others = pawnStartSquares(hidden).filter((sq) => sq !== base[hidden]);
+        runTwinWorlds(base, hidden, others[shift % others.length] as Square, gameSeed, maxPlies);
+      },
+    ),
+    { numRuns: runs, seed },
+  );
 }

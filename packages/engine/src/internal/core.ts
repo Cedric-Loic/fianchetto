@@ -84,6 +84,15 @@ function repetitionKey(fen: string): string {
 
 const refused = (): PlayResult => ({ ok: false });
 
+/** Copie profonde d'un coup public (l'appelant ne doit jamais tenir une référence interne). */
+function copyMove(move: PublicMove): PublicMove {
+  return {
+    ...move,
+    capture: move.capture === null ? null : { ...move.capture },
+    castle: move.castle === null ? null : { ...move.castle },
+  };
+}
+
 export class GameCore {
   readonly #secrets: SecretChoice;
   readonly #secretIds: Readonly<Record<Color, PieceId>>;
@@ -133,7 +142,7 @@ export class GameCore {
 
   /** Copie des coups publics joués. */
   publicMoves(): PublicMove[] {
-    return structuredClone(this.#moves);
+    return this.#moves.map(copyMove);
   }
 
   /** Copie des types AFFICHÉS des pièces capturées, par couleur, dans l'ordre des prises. */
@@ -324,7 +333,7 @@ export class GameCore {
     this.#realPlies.push({ realSan: move.san, realFenAfter: move.after });
     const repeated = this.#countRepetition(move.after) >= 3;
     this.#result = this.#automaticEnd(color, mate, stalemate, repeated);
-    return { move: structuredClone(publicMove), result: this.result };
+    return { move: copyMove(publicMove), result: this.result };
   }
 
   /** Fins automatiques, toutes jugées sur la position réelle (§5). Le mat prime. */

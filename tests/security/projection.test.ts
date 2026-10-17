@@ -14,14 +14,18 @@ import { realPawnRankToken } from './canary.js';
 import { VIEWERS, playLine, playRandomGame } from './harness.js';
 import { projectionViolations } from './invariants.js';
 import { initialDisplayedPieces } from './public-board.js';
-import { arbSecrets } from './world-pairs.js';
+import { arbSecrets, arbSeeds } from './world-pairs.js';
 
 /*
  * Projection (`docs/RULES.md` §2) : champs interdits, `ownSecret` jamais pour l'adversaire ni
  * pour `public`, `result` / `reveal` nuls avant la fin et présents après.
  */
 
-function contextFor(game: SecretQueenGame, secrets: SecretChoice, viewer: ViewerBoardState['viewer']) {
+function contextFor(
+  game: SecretQueenGame,
+  secrets: SecretChoice,
+  viewer: ViewerBoardState['viewer'],
+) {
   return {
     viewer,
     over: game.isOver,
@@ -31,7 +35,10 @@ function contextFor(game: SecretQueenGame, secrets: SecretChoice, viewer: Viewer
 
 function expectAllViewsConform(game: SecretQueenGame, secrets: SecretChoice, label: string) {
   for (const viewer of VIEWERS) {
-    const violations = projectionViolations(projectForViewer(game, viewer), contextFor(game, secrets, viewer));
+    const violations = projectionViolations(
+      projectForViewer(game, viewer),
+      contextFor(game, secrets, viewer),
+    );
     expect(violations, `${label} — projection ${viewer}`).toEqual([]);
   }
 }
@@ -91,7 +98,9 @@ describe('projection : position initiale', () => {
             moves: [],
             captured: { w: [], b: [] },
             ownSecret:
-              viewer === 'public' ? null : { pieceId: `${viewer}p${secrets[viewer]}`, square: secrets[viewer] },
+              viewer === 'public'
+                ? null
+                : { pieceId: `${viewer}p${secrets[viewer]}`, square: secrets[viewer] },
             result: null,
             reveal: null,
           });
@@ -103,12 +112,15 @@ describe('projection : position initiale', () => {
 });
 
 describe('projection : parties aléatoires', () => {
-  it('invariants à chaque tentative ; result et reveal nuls tant que la partie continue', () => {
+  it('invariants après chaque coup ; result et reveal nuls tant que la partie continue', () => {
     fc.assert(
-      fc.property(arbSecrets, fc.array(fc.nat(), { maxLength: 200 }), (secrets, seeds) => {
+      fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
         playRandomGame(secrets, seeds, {
           maxPlies: 100,
           onAttempt: (game, attempt) => {
+            // Un refus ne change rien (vérifié dans refusal.test.ts) : on ne contrôle qu'après
+            // un coup accepté.
+            if (!attempt.result.ok) return;
             expectAllViewsConform(game, secrets, `demi-coup ${attempt.ply}`);
             if (!game.isOver) {
               for (const viewer of VIEWERS) {
@@ -126,7 +138,7 @@ describe('projection : parties aléatoires', () => {
 
   it("ownSecret : le sien seulement, qui suit sa pièce ; jamais celui de l'adversaire", () => {
     fc.assert(
-      fc.property(arbSecrets, fc.array(fc.nat(), { maxLength: 200 }), (secrets, seeds) => {
+      fc.property(arbSecrets, arbSeeds(200), (secrets, seeds) => {
         playRandomGame(secrets, seeds, {
           onAttempt: (game) => {
             expect(projectForViewer(game, 'public').ownSecret).toBeNull();
@@ -144,7 +156,9 @@ describe('projection : parties aléatoires', () => {
   });
 
   it('après une fin externe : result et reveal présents et exacts pour tous', () => {
-    const endings: Array<[string, (g: SecretQueenGame, c: Color) => GameResult, (c: Color) => Partial<GameResult>]> = [
+    const endings: Array<
+      [string, (g: SecretQueenGame, c: Color) => GameResult, (c: Color) => Partial<GameResult>]
+    > = [
       ['abandon', (g, c) => g.resign(c), (c) => ({ winner: opposite(c), reason: 'resignation' })],
       ['nulle par accord', (g) => g.agreeDraw(), () => ({ winner: null, reason: 'agreement' })],
       ['chute du drapeau', (g, c) => g.flagFall(c), () => ({})],
@@ -152,7 +166,7 @@ describe('projection : parties aléatoires', () => {
     fc.assert(
       fc.property(
         arbSecrets,
-        fc.array(fc.nat(), { maxLength: 120 }),
+        arbSeeds(120),
         fc.constantFrom(...endings),
         fc.constantFrom<Color>('w', 'b'),
         (secrets, seeds, [, end, expected], color) => {
@@ -161,7 +175,8 @@ describe('projection : parties aléatoires', () => {
           const result = end(game, color);
           expectExactResult(result, expected(color));
           if (result.reason === 'timeout') expect(result.winner).toBe(opposite(color));
-          if (result.reason === 'timeout-vs-insufficient-material') expect(result.winner).toBeNull();
+          if (result.reason === 'timeout-vs-insufficient-material')
+            expect(result.winner).toBeNull();
           expect(game.result).toEqual(result);
           expectRevealed(game, secrets);
           expectAllViewsConform(game, secrets, 'après la fin');
