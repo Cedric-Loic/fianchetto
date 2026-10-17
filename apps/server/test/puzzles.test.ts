@@ -247,3 +247,34 @@ describe('routes', () => {
     await app.close();
   });
 });
+
+describe('décompression zstd trame par trame (format pzstd de Lichess)', () => {
+  const zstd = (zlib as unknown as { zstdCompressSync?: (b: Buffer) => Buffer }).zstdCompressSync;
+
+  it.skipIf(!zstd)('trames « skippable » + plusieurs trames : tout le CSV est lu', async () => {
+    if (!zstd) return;
+    const csv = readFileSync(FIXTURE, 'utf8').split('\n');
+    // Deux trames compressées, chacune précédée de sa trame skippable (taille de la trame).
+    const parts = [csv.slice(0, 4).join('\n') + '\n', csv.slice(4).join('\n')].map((t) =>
+      zstd(Buffer.from(t)),
+    );
+    const skippable = (n: number) => {
+      const b = Buffer.alloc(12);
+      b.writeUInt32LE(0x184d2a50, 0);
+      b.writeUInt32LE(4, 4);
+      b.writeUInt32LE(n, 8);
+      return b;
+    };
+    const file = join(tempDir(), 'pzstd.csv.zst');
+    writeFileSync(file, Buffer.concat(parts.flatMap((p) => [skippable(p.length), p])));
+    expect(await importPuzzles({ file, dbPath: join(tempDir(), 'z.db') })).toBe(4);
+  });
+
+  it('fichier vide : erreur explicite', async () => {
+    const file = join(tempDir(), 'vide.csv');
+    writeFileSync(file, '');
+    await expect(importPuzzles({ file, dbPath: join(tempDir(), 'v.db') })).rejects.toThrow(
+      'Aucune ligne lue',
+    );
+  });
+});

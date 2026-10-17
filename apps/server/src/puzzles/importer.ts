@@ -3,9 +3,9 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
-import * as zlib from 'node:zlib';
 import Database from 'better-sqlite3';
 import { bankSchema } from '../persistence/puzzles.js';
+import { zstdStream } from './zstd.js';
 
 /*
  * Import (une seule fois) d'un sous-ensemble de la base de puzzles Lichess (licence CC0,
@@ -35,18 +35,6 @@ const MIN_POPULARITY = 80;
 const MIN_PLAYS = 100;
 const MAX_DEVIATION = 90;
 
-function zstdDecompress(): NodeJS.ReadWriteStream {
-  const create = (zlib as unknown as { createZstdDecompress?: () => NodeJS.ReadWriteStream })
-    .createZstdDecompress;
-  if (!create) {
-    throw new Error(
-      'Décompression zstd indisponible : Node ≥ 22.15 requis (ou décompresse le fichier et ' +
-        'passe le .csv avec --file).',
-    );
-  }
-  return create();
-}
-
 async function openSource(options: ImportOptions, abort: AbortController): Promise<Readable> {
   const compressed = options.file ? options.file.endsWith('.zst') : true;
   let raw: Readable;
@@ -57,10 +45,7 @@ async function openSource(options: ImportOptions, abort: AbortController): Promi
     if (!res.ok || !res.body) throw new Error(`Téléchargement impossible (HTTP ${res.status}).`);
     raw = Readable.fromWeb(res.body as never);
   }
-  if (!compressed) return raw;
-  const out = zstdDecompress();
-  raw.on('error', (e) => out.emit('error', e));
-  return raw.pipe(out) as unknown as Readable;
+  return compressed ? zstdStream(raw) : raw;
 }
 
 /** Importe les puzzles ; renvoie le nombre de puzzles enregistrés. */
@@ -130,11 +115,14 @@ export async function importPuzzles(options: ImportOptions): Promise<number> {
     }
   } finally {
     flush(batch.splice(0));
+    // Arrêt volontaire du téléchargement : les erreurs d'interruption qui suivent sont ignorées.
+    source.on('error', () => undefined);
     lines.close();
-    abort.abort();
     source.destroy();
+    abort.abort();
     db.close();
   }
   options.onProgress?.(kept, read);
+  if (read === 0) throw new Error('Aucune ligne lue : fichier vide ou illisible.');
   return kept;
 }
