@@ -15,6 +15,8 @@ export interface BoardProps {
   /** Case mise en avant (pion choisi pendant la sélection). */
   highlighted?: Square | null;
   onMove?: (from: Square, to: Square, promotion?: PromotionPiece) => void;
+  /** Mode bot : ma dame secrète (pas de fenêtre de promotion pour elle). */
+  ownSecretSquare?: Square | null;
   /** Mode sélection : clic sur une pièce au lieu d'un déplacement. */
   onPieceClick?: (piece: DisplayedPiece) => void;
 }
@@ -66,7 +68,9 @@ export function Board(props: BoardProps) {
     const lastRank = piece?.color === 'w' ? '8' : '1';
     // Un « pion » qui atteint la dernière rangée : choix de promotion (ignoré par le serveur
     // s'il s'agit de la dame secrète, qui ne se promeut pas).
-    if (piece?.type === 'p' && to[1] === lastRank) return setPromotion({ from, to });
+    if (piece?.type === 'p' && to[1] === lastRank && from !== props.ownSecretSquare) {
+      return setPromotion({ from, to });
+    }
     props.onMove?.(from, to);
   };
 

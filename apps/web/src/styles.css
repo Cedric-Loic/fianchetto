@@ -445,3 +445,112 @@ button.big {
 .modal .actions {
   margin-top: 18px;
 }
+
+/* --- Navigation, pages, étape 3 --- */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 20px;
+  background: var(--panel-2);
+}
+.nav-bar a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+.nav-bar .logo {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.nav-bar .spacer {
+  flex: 1;
+}
+button.link {
+  background: none;
+  color: var(--text-muted);
+  text-decoration: underline;
+  padding: 4px;
+}
+a.button {
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 12px;
+}
+a.button.primary {
+  background: var(--accent);
+  box-shadow: 0 4px 0 var(--accent-dark);
+  font-weight: 700;
+}
+.home.wide {
+  max-width: 960px;
+}
+.home-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+.levels {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.levels button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+  padding: 8px 4px;
+}
+.colors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.resume {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+.page-panel {
+  padding: 24px;
+}
+.big-rating {
+  font-size: 1.3rem;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid #3c3a37;
+}
+.table a {
+  color: var(--text);
+}
+.win {
+  color: var(--accent);
+}
+.loss {
+  color: var(--danger);
+}
+.rated-badge {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  background: #3c3a37;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.elo-change {
+  font-size: 1.1rem;
+}

@@ -14,7 +14,9 @@ export function Selection({ state }: { state: ViewerGameState }) {
   const receivedAt = useGame((s) => s.receivedAt);
   const [choice, setChoice] = useState<Square | null>(null);
   const [now, setNow] = useState(() => performance.now());
-  const chooser = selection?.chooser ?? 'w';
+  // Hot-seat : camp désigné par le serveur ; mode bot : mon camp.
+  const mine = state.viewer === 'public' ? null : state.viewer;
+  const chooser = selection?.chooser ?? mine ?? 'w';
 
   useEffect(() => {
     const id = setInterval(() => setNow(performance.now()), 200);
@@ -41,6 +43,8 @@ export function Selection({ state }: { state: ViewerGameState }) {
   }
 
   const remaining = Math.max(0, (selection.remainingMs ?? 0) - (now - receivedAt));
+  const opponent = chooser === 'w' ? 'b' : 'w';
+  const botReady = state.mode === 'bot' && selection.ready[opponent];
   return (
     <div className="selection">
       <div className="selection-header">
@@ -59,6 +63,11 @@ export function Selection({ state }: { state: ViewerGameState }) {
         crowns={choice ? [choice] : []}
         onPieceClick={(p) => p.color === chooser && p.type === 'p' && setChoice(p.square)}
       />
+      {botReady && (
+        <p className="muted" data-testid="opponent-ready">
+          {state.players[opponent].name} : prêt ✓
+        </p>
+      )}
       <div className="selection-actions">
         <p className="muted">Sans confirmation à temps, un pion est tiré au hasard.</p>
         <button

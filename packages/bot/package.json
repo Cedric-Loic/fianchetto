@@ -5,12 +5,19 @@
   "type": "module",
   "description": "Bot Secret Queen : croyance sur la dame adverse, moteur, 5 niveaux, analyse de fin de partie.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@sq/shared": "workspace:*"
+    "@sq/shared": "workspace:*",
+    "chess.js": "^1.4.0",
+    "stockfish": "^19.0.1",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@sq/engine": "workspace:*"
   }
 }

@@ -9,8 +9,9 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étape 2 terminée** : une partie à deux sur le même écran (hot-seat) est jouable de
-> bout en bout. Le bot, les comptes et l'Elo arrivent à l'étape 3.
+> **État : étape 3 terminée** : parties contre le bot (5 niveaux, classées Elo) avec comptes
+> locaux, profil et classement, et parties à deux sur le même écran. Thèmes, sons, flèches,
+> premoves et analyse arrivent à l'étape 4.
 
 ## Prérequis
 
@@ -77,7 +78,7 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 0     | Monorepo, contrats, CI locale, journal des décisions           | ✅      |
 | 1     | Moteur (règles, projection, notation) + banc de tests de fuite | ✅      |
 | 2     | Serveur + interface : partie hot-seat complète                 | ✅      |
-| 3     | Bot, comptes, Elo, pendules                                    | à venir |
+| 3     | Bot, comptes, Elo, pendules                                    | ✅      |
 | 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | à venir |
 | 5     | Audit de sécurité du secret, recette                           | à venir |
 

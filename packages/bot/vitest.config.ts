@@ -5,5 +5,7 @@ export default defineProject({
     name: 'bot',
     include: ['test/**/*.test.ts'],
     environment: 'node',
+    // Les tests du bot lancent Stockfish : marge pour les machines lentes.
+    testTimeout: 60_000,
   },
 });

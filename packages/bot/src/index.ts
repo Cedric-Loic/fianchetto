@@ -1,6 +1,12 @@
 /*
- * @sq/bot — implémenté à l'étape 3 par l'agent `bot`.
- * Implémentera l'interface BotPlayer de @sq/shared (observation seule) et l'analyse
- * des parties terminées.
+ * @sq/bot — bot Secret Queen (§5). Le serveur ne l'utilise qu'à travers un worker
+ * (`@sq/bot/worker`) qui reçoit uniquement des observations sérialisées.
  */
-export const BOT_STAGE = 0;
+export { computeBelief, type Hypothesis } from './belief.js';
+export { LEVELS, type LevelSettings } from './levels.js';
+export { SecretQueenBot } from './player.js';
+export { UciEngine, type UciLine } from './uci.js';
+export type { BotRequest, BotResponse } from './worker.js';
+
+/** Fichier du worker, pour `new Worker(BOT_WORKER_URL, …)`. */
+export const BOT_WORKER_URL = new URL('./worker-entry.mjs', import.meta.url);

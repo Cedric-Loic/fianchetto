@@ -47,7 +47,7 @@ export default defineConfig(
 
   // Fichiers JS (configs, plugin local) : pas d'analyse typée.
   {
-    files: ['**/*.js'],
+    files: ['**/*.js', '**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 

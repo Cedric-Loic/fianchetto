@@ -16,10 +16,11 @@ test('partie hot-seat complète : choix secrets, passage, mat par la dame secrè
   page,
 }) => {
   await page.goto('/');
-  await page.getByLabel('Blancs').fill('Alice');
-  await page.getByLabel('Noirs').fill('Bob');
-  await page.getByRole('button', { name: 'Sans pendule' }).click();
-  await page.getByRole('button', { name: 'Jouer' }).click();
+  const seat = page.locator('.home-panel', { hasText: 'À deux sur cet écran' });
+  await seat.getByLabel('Blancs').fill('Alice');
+  await seat.getByLabel('Noirs').fill('Bob');
+  await seat.getByRole('button', { name: 'Sans pendule' }).click();
+  await seat.getByRole('button', { name: 'Jouer', exact: true }).click();
 
   // Écran de passage Blancs : le plateau n'est pas visible.
   await expect(page.getByTestId('handoff')).toContainText('Alice (Blancs)');

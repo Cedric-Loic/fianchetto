@@ -6,20 +6,8 @@ import { PlayerBar } from '../game/PlayerBar';
 import { send } from '../lib/net';
 import { publicPositionAt } from '../lib/position';
 import { useGame } from '../lib/store';
-
-const SIDE: Record<Color, string> = { w: 'Blancs', b: 'Noirs' };
-
-const REASONS: Record<GameResult['reason'], string> = {
-  checkmate: 'par échec et mat',
-  resignation: 'par abandon',
-  timeout: 'au temps',
-  stalemate: 'par pat',
-  'insufficient-material': 'par manque de matériel',
-  'timeout-vs-insufficient-material': 'temps écoulé, matériel insuffisant',
-  'fifty-move-rule': 'par la règle des 50 coups',
-  'threefold-repetition': 'par triple répétition',
-  agreement: 'par accord mutuel',
-};
+import { useSession } from '../lib/session';
+import { REASONS, SIDE } from './labels';
 
 function resultText(result: GameResult, state: ViewerGameState): string {
   if (result.winner === null) return `Partie nulle ${REASONS[result.reason]}`;
@@ -30,7 +18,10 @@ function resultText(result: GameResult, state: ViewerGameState): string {
 export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave: () => void }) {
   const board = state.board;
   const { receivedAt, toast, peek, clearToast, setPeekHeld } = useGame();
-  const [orientation, setOrientation] = useState<Color>('w');
+  const me = state.viewer === 'public' ? null : state.viewer;
+  const isBot = state.mode === 'bot';
+  const user = useSession((s) => s.user);
+  const [orientation, setOrientation] = useState<Color>(me ?? 'w');
   // Position consultée dans l'historique ; oubliée dès qu'un nouveau coup arrive.
   const [nav, setNav] = useState<{ ply: number; base: number } | null>(null);
   const [showEnd, setShowEnd] = useState(true);
@@ -62,7 +53,13 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     }
   } else if (!ended && live && peek?.square) {
     crowns.push(peek.square);
+  } else if (!ended && live && isBot && board.ownSecret?.square) {
+    // Mode bot : marqueur discret et permanent sur MA dame secrète (moi seul le vois).
+    crowns.push(board.ownSecret.square);
   }
+  // Mon camp peut jouer (mode bot : seulement à mon tour ; hot-seat : le camp au trait).
+  const movable = ended || !live ? null : isBot ? (board.turn === me ? me : null) : board.turn;
+  const actor = isBot ? (me ?? 'w') : board.turn;
 
   const bottom = orientation;
   const top: Color = orientation === 'w' ? 'b' : 'w';
@@ -99,7 +96,8 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           <Board
             pieces={pieces}
             orientation={orientation}
-            movable={!ended && live ? board.turn : null}
+            movable={movable}
+            ownSecretSquare={isBot ? (board.ownSecret?.square ?? null) : null}
             lastMove={lastMove ? { from: lastMove.from, to: lastMove.to } : null}
             checkSquare={checkSquare}
             crowns={crowns}
@@ -121,6 +119,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           {ended
             ? 'Partie terminée'
             : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`}
+          {state.rated && <span className="rated-badge">Classée</span>}
         </div>
         <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />
         <div className="nav">
@@ -143,17 +142,21 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
 
         {!ended && (
           <>
-            <button
-              className="peek"
-              data-testid="peek"
-              onPointerDown={holdStart}
-              onPointerUp={holdEnd}
-              onPointerLeave={holdEnd}
-              onPointerCancel={holdEnd}
-            >
-              Voir ma dame secrète ({SIDE[board.turn]}) — maintenir
-            </button>
-            {state.drawOffer !== null ? (
+            {!isBot && (
+              <button
+                className="peek"
+                data-testid="peek"
+                onPointerDown={holdStart}
+                onPointerUp={holdEnd}
+                onPointerLeave={holdEnd}
+                onPointerCancel={holdEnd}
+              >
+                Voir ma dame secrète ({SIDE[board.turn]}) — maintenir
+              </button>
+            )}
+            {state.drawOffer !== null && isBot ? (
+              <div className="draw-offer">Nulle proposée, en attente de la réponse…</div>
+            ) : state.drawOffer !== null ? (
               <div className="draw-offer">
                 <p>
                   {state.players[state.drawOffer].name} propose la nulle.{' '}
@@ -168,13 +171,11 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
               </div>
             ) : (
               <div className="actions">
-                <button onClick={() => send({ type: 'offer-draw', color: board.turn })}>
-                  ½ Nulle
-                </button>
+                <button onClick={() => send({ type: 'offer-draw', color: actor })}>½ Nulle</button>
                 <button
                   onClick={() =>
-                    window.confirm(`${state.players[board.turn].name} abandonne ?`) &&
-                    send({ type: 'resign', color: board.turn })
+                    window.confirm(`${state.players[actor].name} abandonne ?`) &&
+                    send({ type: 'resign', color: actor })
                   }
                 >
                   ⚑ Abandonner
@@ -197,6 +198,11 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         <div className="modal-backdrop" onClick={() => setShowEnd(false)}>
           <div className="modal" data-testid="end-modal" onClick={(e) => e.stopPropagation()}>
             <h2>{resultText(board.result, state)}</h2>
+            {state.rated && me && user && state.players[me].rating !== null && (
+              <p className="elo-change" data-testid="elo-change">
+                Elo : {state.players[me].rating} → <strong>{user.rating}</strong>
+              </p>
+            )}
             <h3>Les dames secrètes</h3>
             {(['w', 'b'] as const).map((c) => {
               const s = board.reveal?.secrets[c];

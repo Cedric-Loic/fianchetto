@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
-import type { Color, Square } from '@sq/shared';
+import type { Color, GameSummary, Square } from '@sq/shared';
 import { Secret } from '@sq/shared/secret';
 import type { PersistedGame } from '@sq/engine';
 import type { SessionRecord, SessionSecrets } from '../games/session.js';
@@ -13,6 +13,17 @@ import type { SessionRecord, SessionSecrets } from '../games/session.js';
  * `secret_state`, uniquement ici (seul dossier serveur autorisé à appeler `expose()`), et n'est
  * jamais loggé. Limite assumée : l'administrateur local peut lire la base (docs/SECURITY.md).
  */
+export interface UserRow {
+  id: string;
+  username: string;
+  passwordHash: string;
+  rating: number;
+  gamesPlayed: number;
+}
+
+const USER_SELECT = `SELECT id, username, password_hash AS passwordHash, rating,
+  games_played AS gamesPlayed FROM users`;
+
 export class GameStore {
   readonly #db: Database.Database;
 
@@ -27,7 +38,117 @@ export class GameStore {
         secret_state TEXT NOT NULL,
         phase        TEXT NOT NULL,
         updated_at   INTEGER NOT NULL
-      )`);
+      );
+      CREATE TABLE IF NOT EXISTS users (
+        id            TEXT PRIMARY KEY,
+        username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash TEXT NOT NULL,
+        rating        INTEGER NOT NULL,
+        games_played  INTEGER NOT NULL DEFAULT 0,
+        created_at    INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS sessions (
+        token      TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        expires_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS results (
+        game_id       TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL REFERENCES users(id),
+        summary       TEXT NOT NULL,
+        ended_at      INTEGER NOT NULL
+      );`);
+  }
+
+  // --- Comptes ---------------------------------------------------------------------------
+
+  createUser(user: {
+    id: string;
+    username: string;
+    passwordHash: string;
+    rating: number;
+  }): boolean {
+    try {
+      this.#db
+        .prepare(
+          `INSERT INTO users (id, username, password_hash, rating, created_at)
+           VALUES (@id, @username, @passwordHash, @rating, @now)`,
+        )
+        .run({ ...user, now: Date.now() });
+      return true;
+    } catch {
+      return false; // pseudo déjà pris
+    }
+  }
+
+  findUserByName(username: string): UserRow | undefined {
+    return this.#db.prepare(`${USER_SELECT} WHERE username = ?`).get(username) as
+      UserRow | undefined;
+  }
+
+  findUser(id: string): UserRow | undefined {
+    return this.#db.prepare(`${USER_SELECT} WHERE id = ?`).get(id) as UserRow | undefined;
+  }
+
+  setRating(userId: string, rating: number): void {
+    this.#db
+      .prepare(`UPDATE users SET rating = ?, games_played = games_played + 1 WHERE id = ?`)
+      .run(rating, userId);
+  }
+
+  leaderboard(): UserRow[] {
+    return this.#db
+      .prepare(`${USER_SELECT} ORDER BY rating DESC, username LIMIT 100`)
+      .all() as UserRow[];
+  }
+
+  createSession(token: string, userId: string, expiresAt: number): void {
+    this.#db
+      .prepare(`INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)`)
+      .run(token, userId, expiresAt);
+  }
+
+  sessionUser(token: string): UserRow | undefined {
+    return this.#db
+      .prepare(
+        `SELECT u.id, u.username, u.password_hash AS passwordHash, u.rating, u.games_played AS gamesPlayed
+         FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.token = ? AND s.expires_at > ?`,
+      )
+      .get(token, Date.now()) as UserRow | undefined;
+  }
+
+  deleteSession(token: string): void {
+    this.#db.prepare(`DELETE FROM sessions WHERE token = ?`).run(token);
+  }
+
+  // --- Historique ------------------------------------------------------------------------
+
+  saveResult(gameId: string, userId: string, summary: GameSummary): void {
+    this.#db
+      .prepare(
+        `INSERT OR REPLACE INTO results (game_id, user_id, summary, ended_at) VALUES (?, ?, ?, ?)`,
+      )
+      .run(gameId, userId, JSON.stringify(summary), Date.now());
+  }
+
+  history(userId: string): GameSummary[] {
+    const rows = this.#db
+      .prepare(`SELECT summary FROM results WHERE user_id = ? ORDER BY ended_at DESC LIMIT 100`)
+      .all(userId) as { summary: string }[];
+    return rows.map((r) => JSON.parse(r.summary) as GameSummary);
+  }
+
+  /** Partie non terminée la plus récente d'un utilisateur (reprise après rafraîchissement). */
+  activeGameOf(userId: string): string | null {
+    const rows = this.#db
+      .prepare(`SELECT id, record FROM games WHERE phase != 'ended' ORDER BY updated_at DESC`)
+      .all() as { id: string; record: string }[];
+    for (const row of rows) {
+      const record = JSON.parse(row.record) as { ownerId?: string | null; mode?: string };
+      if (record.ownerId === userId && record.mode === 'bot') return row.id;
+    }
+    return null;
   }
 
   save(record: SessionRecord, secrets: Secret<SessionSecrets>): void {

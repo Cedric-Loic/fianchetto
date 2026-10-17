@@ -4,12 +4,14 @@ import {
   TIME_CONTROLS,
   opposite,
   pawnStartSquares,
+  type BotRejection,
   type ClientMessage,
   type Color,
   type GameEvent,
   type GameMode,
   type GamePhase,
   type GameResult,
+  type MoveIntent,
   type PlayerInfo,
   type ServerMessage,
   type Square,
@@ -19,20 +21,24 @@ import {
 } from '@sq/shared';
 import { SecretQueenGame, projectForViewer, type PersistedGame } from '@sq/engine';
 import { Secret } from '@sq/shared/secret';
+import type { BotDriver } from '../bot/driver.js';
 
 /** Partie publique d'un enregistrement de partie (aucun secret) : colonnes ordinaires. */
 export interface SessionRecord {
   id: string;
   mode: GameMode;
   timeControl: TimeControlId;
-  whiteName: string;
-  blackName: string;
+  players: Record<Color, PlayerInfo>;
+  /** Mode bot : camp du bot et compte du joueur humain. */
+  botColor: Color | null;
+  ownerId: string | null;
   phase: GamePhase;
   chooser: Color;
   clockMs: Record<Color, number> | null;
   drawOffer: Color | null;
   rematchOffer: Color | null;
   nextGameId: string | null;
+  startedAt: string;
 }
 
 /** Partie secrète : choix déjà verrouillés et partie persistée. Colonne dédiée, jamais loggée. */
@@ -43,13 +49,19 @@ export interface SessionSecrets {
 
 export interface SessionOptions {
   id: string;
+  mode: GameMode;
   timeControl: TimeControlId;
-  whiteName: string;
-  blackName: string;
+  players: Record<Color, PlayerInfo>;
+  botColor?: Color | null;
+  ownerId?: string | null;
+  /** Mode bot : le bot (dans son worker). */
+  bot?: BotDriver | null;
   now?: () => number;
   onRematch: (session: GameSession) => string;
   /** Appelé après chaque changement d'état (sauvegarde). */
   onChange?: (session: GameSession) => void;
+  /** Appelé une fois, à la fin de la partie (Elo, historique). */
+  onEnd?: (session: GameSession, result: GameResult) => void;
 }
 
 /** Un client connecté à la partie : son camp de vue et sa fonction d'envoi. */
@@ -65,23 +77,31 @@ interface ClockData {
   startedAt: number | null;
 }
 
+/** Nombre maximal de coups refusés d'affilée avant d'abandonner pour le bot (sécurité). */
+const MAX_BOT_ATTEMPTS = 80;
+
 /**
- * Une partie côté serveur (étape 2 : hot-seat). Gère la phase de choix du secret, la pendule
- * autoritative, la nulle, l'abandon, la revanche, et diffuse à chaque client SA projection.
+ * Une partie côté serveur, hot-seat ou contre le bot. Gère la phase de choix du secret, la
+ * pendule autoritative, la nulle, l'abandon, la revanche, et diffuse à chaque client SA
+ * projection.
  *
  * Les choix secrets vivent dans `#secrets` (champ privé) puis dans le moteur ; ils ne sont
- * jamais loggés ni envoyés : seule `projectForViewer` produit ce qu'un client reçoit.
+ * jamais loggés ni envoyés : seule `projectForViewer` produit ce qu'un client reçoit. Le bot ne
+ * reçoit que sa propre projection et ses propres refus.
  */
 export class GameSession {
   readonly id: string;
-  readonly mode: GameMode = 'hotseat';
+  readonly mode: GameMode;
   readonly timeControl: TimeControlId;
   readonly players: Record<Color, PlayerInfo>;
+  readonly botColor: Color | null;
+  readonly ownerId: string | null;
+  readonly startedAt: string;
 
   #phase: GamePhase = 'secret-selection';
   #secrets: Partial<Record<Color, Square>> = {};
   #chooser: Color = 'w';
-  #handoffPending = true;
+  #handoffPending: boolean;
   #selectionDeadline: number | null = null;
   #selectionTimer: NodeJS.Timeout | null = null;
   #game: SecretQueenGame | null = null;
@@ -92,21 +112,27 @@ export class GameSession {
   #rematchOffer: Color | null = null;
   #nextGameId: string | null = null;
   #participants = new Set<Participant>();
+  #bot: BotDriver | null;
+  #botThinking = false;
+  /** Refus des coups du bot : renvoyés au bot seulement. */
+  #botRejections: BotRejection[] = [];
+  #ended = false;
   readonly #now: () => number;
-  readonly #onRematch: (session: GameSession) => string;
-
-  readonly #onChange: ((session: GameSession) => void) | undefined;
+  readonly #options: SessionOptions;
 
   constructor(options: SessionOptions) {
     this.id = options.id;
+    this.mode = options.mode;
     this.timeControl = options.timeControl;
-    this.players = {
-      w: { name: options.whiteName, rating: null, isBot: false, botLevel: null },
-      b: { name: options.blackName, rating: null, isBot: false, botLevel: null },
-    };
+    this.players = options.players;
+    this.botColor = options.botColor ?? null;
+    this.ownerId = options.ownerId ?? null;
+    this.startedAt = new Date().toISOString();
+    this.#bot = options.bot ?? null;
+    this.#options = options;
     this.#now = options.now ?? (() => Date.now());
-    this.#onRematch = options.onRematch;
-    this.#onChange = options.onChange;
+    // Hot-seat : écran de passage avant chaque choix. Mode bot : choix immédiat.
+    this.#handoffPending = options.mode === 'hotseat';
     const tc = TIME_CONTROLS[options.timeControl];
     this.#clock =
       tc.initialMs === null
@@ -116,6 +142,16 @@ export class GameSession {
             incrementMs: tc.incrementMs,
             startedAt: null,
           };
+  }
+
+  /** Mode bot : le bot verrouille son pion et le chrono de 30 s de l'humain démarre. */
+  startBotSelection(): void {
+    if (this.mode !== 'bot' || this.#phase !== 'secret-selection' || !this.#bot) return;
+    const botColor = this.botColor ?? 'b';
+    if (this.#secrets[botColor] === undefined) {
+      this.#secrets[botColor] = this.#bot.chooseSecret(pawnStartSquares(botColor));
+    }
+    this.#armSelectionTimer(opposite(botColor));
   }
 
   get phase(): GamePhase {
@@ -134,48 +170,70 @@ export class GameSession {
   dispose(): void {
     this.#clearTimers();
     this.#participants.clear();
+    this.#bot?.dispose();
+    this.#bot = null;
   }
 
-  /** Traite un message d'un client. En hot-seat, le camp agissant est déduit du contexte. */
+  /**
+   * Traite un message d'un client. En hot-seat, le camp agissant est le camp au trait (ou le
+   * camp qui choisit) ; en mode bot, c'est le camp du participant.
+   */
   handle(participant: Participant, message: ClientMessage): void {
+    const actor = this.#actor(participant, message);
     switch (message.type) {
       case 'join':
         return;
       case 'start-selection':
         return this.#startSelection();
       case 'lock-secret':
-        return this.#lockSecret(message.square);
+        if (actor) this.#lockSecret(actor, message.square);
+        return;
       case 'move':
-        return this.#move(participant, message.clientMoveId, message.move);
+        return this.#humanMove(participant, actor, message.clientMoveId, message.move);
       case 'resign':
-        return this.#resign(message.color ?? this.#game?.turn ?? 'w');
+        if (actor) this.#resign(actor);
+        return;
       case 'offer-draw':
-        return this.#offerDraw(message.color ?? this.#game?.turn ?? 'w');
+        if (actor) this.#offerDraw(actor);
+        return;
       case 'answer-draw':
-        return this.#answerDraw(message.accept);
+        return this.#answerDraw(actor, message.accept);
       case 'offer-rematch':
-        return this.#offerRematch(message.color ?? 'w');
+        if (actor) this.#offerRematch(actor);
+        return;
       case 'peek-secret':
         return this.#peek(participant);
     }
   }
 
+  #actor(participant: Participant, message: ClientMessage): Color | null {
+    if (this.mode === 'bot') return participant.viewer === 'public' ? null : participant.viewer;
+    if (message.type === 'lock-secret') return this.#chooser;
+    if ('color' in message && message.color) return message.color;
+    return this.#game?.turn ?? 'w';
+  }
+
   // --- Phase de choix -------------------------------------------------------------------
 
   #startSelection(): void {
-    if (this.#phase !== 'secret-selection' || !this.#handoffPending) return;
+    if (this.mode !== 'hotseat' || this.#phase !== 'secret-selection') return;
+    if (!this.#handoffPending) return;
     this.#handoffPending = false;
-    this.#selectionDeadline = this.#now() + SECRET_SELECTION_MS;
-    const chooser = this.#chooser;
-    this.#selectionTimer = setTimeout(() => this.#lockSecret(null, chooser), SECRET_SELECTION_MS);
+    this.#armSelectionTimer(this.#chooser);
     this.#broadcast(null);
   }
 
-  /** Verrouille le choix du camp `chooser` ; `square === null` = tirage CSPRNG (temps écoulé). */
-  #lockSecret(square: Square | null, expectedChooser?: Color): void {
-    if (this.#phase !== 'secret-selection' || this.#handoffPending) return;
-    const color = this.#chooser;
-    if (expectedChooser !== undefined && expectedChooser !== color) return;
+  #armSelectionTimer(color: Color): void {
+    this.#selectionDeadline = this.#now() + SECRET_SELECTION_MS;
+    if (this.#selectionTimer) clearTimeout(this.#selectionTimer);
+    this.#selectionTimer = setTimeout(() => this.#lockSecret(color, null), SECRET_SELECTION_MS);
+  }
+
+  /** Verrouille le choix de `color` ; `square === null` = tirage CSPRNG (temps écoulé). */
+  #lockSecret(color: Color, square: Square | null): void {
+    if (this.#phase !== 'secret-selection' || this.#secrets[color] !== undefined) return;
+    if (this.mode === 'hotseat' && (this.#handoffPending || color !== this.#chooser)) return;
+    if (this.mode === 'bot' && color === this.botColor) return;
     const candidates = pawnStartSquares(color);
     if (square !== null && !candidates.includes(square)) return;
     const chosen = square ?? candidates[randomInt(candidates.length)];
@@ -184,16 +242,15 @@ export class GameSession {
     this.#selectionTimer = null;
     this.#selectionDeadline = null;
     this.#secrets[color] = chosen;
-    const lockedEvent: GameEvent = { kind: 'secret-locked', color };
 
-    if (color === 'w') {
-      this.#chooser = 'b';
+    const { w, b } = this.#secrets;
+    if (w === undefined || b === undefined) {
+      // Hot-seat : au tour des Noirs, après un nouvel écran de passage.
+      this.#chooser = opposite(color);
       this.#handoffPending = true;
-      this.#broadcast(lockedEvent);
+      this.#broadcast({ kind: 'secret-locked', color });
       return;
     }
-    const { w, b } = this.#secrets;
-    if (w === undefined || b === undefined) return;
     this.#game = SecretQueenGame.create({ w, b });
     this.#phase = 'playing';
     this.#startClock();
@@ -202,28 +259,39 @@ export class GameSession {
 
   // --- Partie ---------------------------------------------------------------------------
 
-  #move(
+  #humanMove(
     participant: Participant,
+    actor: Color | null,
     clientMoveId: string,
-    intent: Parameters<SecretQueenGame['play']>[1],
+    intent: MoveIntent,
   ): void {
     const game = this.#game;
-    const reject = () => participant.send({ type: 'move-rejected', clientMoveId });
-    if (this.#phase !== 'playing' || game === null) return reject();
-    const color = game.turn;
-    if (this.#checkFlag()) return reject();
+    const allowed =
+      game !== null &&
+      actor !== null &&
+      actor !== this.botColor &&
+      (this.mode === 'hotseat' || actor === game.turn);
+    if (!allowed || !this.#applyMove(game.turn, intent)) {
+      participant.send({ type: 'move-rejected', clientMoveId });
+    }
+  }
 
+  /** Joue un coup pour `color`. Renvoie `false` (sans motif) s'il est refusé. */
+  #applyMove(color: Color, intent: MoveIntent): boolean {
+    const game = this.#game;
+    if (this.#phase !== 'playing' || game === null || game.turn !== color) return false;
+    if (this.#checkFlag()) return false;
     const outcome = game.play(color, intent);
-    if (!outcome.ok) return reject();
+    if (!outcome.ok) return false;
 
-    // Une proposition de nulle adverse en attente est déclinée par le coup joué.
-    if (this.#drawOffer !== null && this.#drawOffer !== color) this.#drawOffer = null;
-    if (this.#drawOffer === color) this.#drawOffer = null;
+    // Un coup joué annule toute proposition de nulle en attente.
+    this.#drawOffer = null;
     this.#drawBlocked[color] = false;
     this.#switchClock(color);
     const event: GameEvent = { kind: 'move', move: outcome.move };
-    if (outcome.result !== null) return this.#finish(outcome.result, event);
-    this.#broadcast(event);
+    if (outcome.result !== null) this.#finish(outcome.result, event);
+    else this.#broadcast(event);
+    return true;
   }
 
   #resign(color: Color): void {
@@ -236,11 +304,14 @@ export class GameSession {
     this.#drawOffer = color;
     this.#drawBlocked[color] = true;
     this.#broadcast({ kind: 'draw-offered', by: color });
+    if (this.#bot && this.botColor === opposite(color)) void this.#botAnswersDraw();
   }
 
-  #answerDraw(accept: boolean): void {
+  #answerDraw(actor: Color | null, accept: boolean): void {
     const offer = this.#drawOffer;
     if (this.#phase !== 'playing' || offer === null || this.#game === null) return;
+    // Mode bot : seul l'adversaire de celui qui propose répond.
+    if (this.mode === 'bot' && actor !== opposite(offer)) return;
     this.#drawOffer = null;
     if (accept) return this.#finish(this.#game.agreeDraw());
     this.#broadcast({ kind: 'draw-declined', by: opposite(offer) });
@@ -248,9 +319,9 @@ export class GameSession {
 
   #offerRematch(color: Color): void {
     if (this.#phase !== 'ended' || this.#nextGameId !== null) return;
-    // Hot-seat : un seul écran, la revanche est créée immédiatement.
+    // Hot-seat : un seul écran. Mode bot : le bot accepte toujours (§5).
     this.#rematchOffer = color;
-    this.#nextGameId = this.#onRematch(this);
+    this.#nextGameId = this.#options.onRematch(this);
     this.#broadcast({ kind: 'rematch-offered', by: color });
   }
 
@@ -266,8 +337,65 @@ export class GameSession {
     this.#phase = 'ended';
     this.#drawOffer = null;
     this.#stopClock();
+    if (!this.#ended) {
+      this.#ended = true;
+      this.#options.onEnd?.(this, result);
+    }
     if (cause) this.#broadcast(cause);
     this.#broadcast({ kind: 'game-ended', result });
+    this.#bot?.dispose();
+    this.#bot = null;
+  }
+
+  // --- Bot ------------------------------------------------------------------------------
+
+  /** Observation du bot : sa projection (son secret seulement) et ses refus (§5). */
+  #observation() {
+    const botColor = this.botColor ?? 'b';
+    return { botColor, state: this.stateFor(botColor), rejections: [...this.#botRejections] };
+  }
+
+  #maybeBotTurn(): void {
+    const game = this.#game;
+    if (!this.#bot || this.#botThinking || this.#phase !== 'playing' || !game) return;
+    if (game.turn !== this.botColor) return;
+    this.#botThinking = true;
+    void this.#botPlay().finally(() => {
+      this.#botThinking = false;
+      this.#maybeBotTurn();
+    });
+  }
+
+  async #botPlay(): Promise<void> {
+    const color = this.botColor;
+    for (let attempt = 0; attempt < MAX_BOT_ATTEMPTS; attempt++) {
+      const bot = this.#bot;
+      const game = this.#game;
+      if (!bot || !game || color === null || this.#phase !== 'playing' || game.turn !== color) {
+        return;
+      }
+      let move: MoveIntent;
+      try {
+        move = await bot.chooseMove(this.#observation());
+      } catch {
+        return;
+      }
+      const plies = game.plyCount;
+      if (this.#applyMove(color, move)) return;
+      if (this.#phase !== 'playing') return;
+      this.#botRejections.push({ ply: plies, move });
+    }
+    // Ne devrait jamais arriver (le monde réel n'est jamais éliminé) : le bot abandonne.
+    if (color !== null) this.#resign(color);
+  }
+
+  async #botAnswersDraw(): Promise<void> {
+    const bot = this.#bot;
+    if (!bot) return;
+    const accept = await bot.shouldAcceptDraw(this.#observation()).catch(() => false);
+    if (this.#drawOffer !== null && this.botColor !== null) {
+      this.#answerDraw(this.botColor, accept);
+    }
   }
 
   // --- Pendule autoritative ----------------------------------------------------------------
@@ -331,10 +459,11 @@ export class GameSession {
   // --- Projection et diffusion -------------------------------------------------------------
 
   #broadcast(cause: GameEvent | null): void {
-    this.#onChange?.(this);
+    this.#options.onChange?.(this);
     for (const p of this.#participants) {
       p.send({ type: 'snapshot', state: this.stateFor(p.viewer), cause });
     }
+    this.#maybeBotTurn();
   }
 
   // --- Persistance (reprise après redémarrage) ---------------------------------------------
@@ -346,8 +475,9 @@ export class GameSession {
         id: this.id,
         mode: this.mode,
         timeControl: this.timeControl,
-        whiteName: this.players.w.name,
-        blackName: this.players.b.name,
+        players: this.players,
+        botColor: this.botColor,
+        ownerId: this.ownerId,
         phase: this.#phase,
         chooser: this.#chooser,
         clockMs: this.#clock
@@ -356,6 +486,7 @@ export class GameSession {
         drawOffer: this.#drawOffer,
         rematchOffer: this.#rematchOffer,
         nextGameId: this.#nextGameId,
+        startedAt: this.startedAt,
       },
       secrets: new Secret({
         selection: { ...this.#secrets },
@@ -366,20 +497,25 @@ export class GameSession {
 
   /**
    * Recrée une partie sauvegardée. Pendant le choix, on revient à l'écran de passage du camp
-   * qui choisissait ; en cours de partie, la pendule repart avec le temps sauvegardé (le temps
-   * pendant lequel le serveur était arrêté n'est pas décompté).
+   * qui choisissait (hot-seat) ou on relance le chrono de choix (bot) ; en cours de partie, la
+   * pendule repart avec le temps sauvegardé (arrêt du serveur non décompté).
    */
   static restore(
     record: SessionRecord,
     secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedGame> | null },
-    options: Omit<SessionOptions, 'id' | 'timeControl' | 'whiteName' | 'blackName'>,
+    options: Omit<
+      SessionOptions,
+      'id' | 'mode' | 'timeControl' | 'players' | 'botColor' | 'ownerId'
+    >,
   ): GameSession {
     const session = new GameSession({
       ...options,
       id: record.id,
+      mode: record.mode,
       timeControl: record.timeControl,
-      whiteName: record.whiteName,
-      blackName: record.blackName,
+      players: record.players,
+      botColor: record.botColor,
+      ownerId: record.ownerId,
     });
     session.#phase = record.phase;
     session.#chooser = record.chooser;
@@ -389,7 +525,12 @@ export class GameSession {
     session.#nextGameId = record.nextGameId;
     if (session.#clock && record.clockMs) session.#clock.remainingMs = { ...record.clockMs };
     if (secrets.game) session.#game = SecretQueenGame.restore(secrets.game);
-    if (record.phase === 'playing') session.#startClock();
+    if (record.phase === 'playing') {
+      session.#startClock();
+      session.#maybeBotTurn();
+    } else if (record.phase === 'secret-selection' && record.mode === 'bot') {
+      session.startBotSelection();
+    }
     return session;
   }
 
@@ -403,20 +544,20 @@ export class GameSession {
       mode: this.mode,
       viewer,
       phase: this.#phase,
-      rated: false,
+      rated: this.mode === 'bot',
       timeControl: this.timeControl,
       players: this.players,
       selection:
         this.#phase === 'secret-selection'
           ? {
-              chooser: this.#chooser,
+              chooser: this.mode === 'hotseat' ? this.#chooser : null,
               handoffPending: this.#handoffPending,
               remainingMs:
                 this.#selectionDeadline === null
                   ? null
                   : Math.max(0, Math.round(this.#selectionDeadline - now)),
               ready: { w: this.#secrets.w !== undefined, b: this.#secrets.b !== undefined },
-              ownLocked: null,
+              ownLocked: viewer === 'public' ? null : (this.#secrets[viewer] ?? null),
             }
           : null,
       board: this.#game ? projectForViewer(this.#game, viewer) : null,
