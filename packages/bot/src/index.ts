@@ -7,7 +7,7 @@ export { classicWorld, computeBelief, worldsFor, type Hypothesis } from './belie
 export { LEVELS, type LevelSettings } from './levels.js';
 export { SecretQueenBot } from './player.js';
 export { targetThinkMs } from './think-time.js';
-export { UciEngine, type UciLine } from './uci.js';
+export { UciEngine, type AnalysisStream, type StreamOptions, type UciLine } from './uci.js';
 export type { BotRequest, BotResponse } from './worker.js';
 
 /** Fichier du worker, pour `new Worker(BOT_WORKER_URL, …)`. */

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ColorSchema } from './chess.js';
+import { SquareMarkSchema } from './analysis.js';
 import {
   BotLevelSchema,
   EndReasonSchema,
@@ -123,6 +124,8 @@ export const HintResponseSchema = z.object({
   text: z.string(),
   from: z.string().nullable(),
   to: z.string().nullable(),
+  /** Niveau 1 : zone à regarder (pièce menacée, case de l'idée), sans donner le coup. */
+  marks: z.array(SquareMarkSchema).optional(),
 });
 export type HintResponse = z.infer<typeof HintResponseSchema>;
 
