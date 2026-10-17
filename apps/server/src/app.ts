@@ -27,18 +27,26 @@ export interface ServerOptions {
   logLevel?: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'silent';
   /** Fichier SQLite ; `:memory:` pour les tests. Défaut : <racine du dépôt>/data/secret-queen.db. */
   dbPath?: string;
+  /** Destination des logs (tests : capture pour vérifier qu'aucun secret n'y apparaît). */
+  logStream?: { write: (line: string) => void };
   config?: GameConfig;
   /** Fabrique de bots (tests). Par défaut : bot Stockfish dans un worker. */
   createBot?: ConstructorParameters<typeof GameManager>[0]['createBot'];
 }
 export type { BotDriver };
+export { WorkerBot } from './bot/driver.js';
 
 /**
  * Construit l'application Fastify sans la démarrer (testable avec `app.inject`).
  * Les logs ne contiennent jamais de contenu de message (ni entrant ni sortant).
  */
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: { level: options.logLevel ?? 'info' } });
+  const app = Fastify({
+    logger: {
+      level: options.logLevel ?? 'info',
+      ...(options.logStream ? { stream: options.logStream } : {}),
+    },
+  });
   const config = options.config ?? loadConfig();
   const store = new GameStore(options.dbPath ?? DEFAULT_DB);
   const games = new GameManager({ store, config, createBot: options.createBot });

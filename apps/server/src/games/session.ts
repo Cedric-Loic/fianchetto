@@ -54,8 +54,11 @@ export interface SessionOptions {
   players: Record<Color, PlayerInfo>;
   botColor?: Color | null;
   ownerId?: string | null;
-  /** Mode bot : le bot (dans son worker). */
-  bot?: BotDriver | null;
+  /**
+   * Mode bot : fabrique du bot (worker + Stockfish). Le bot n'est créé qu'au besoin : une partie
+   * restaurée au démarrage ne lance son bot que lorsque le joueur revient.
+   */
+  createBot?: (() => BotDriver) | null;
   now?: () => number;
   onRematch: (session: GameSession) => string;
   /** Appelé après chaque changement d'état (sauvegarde). */
@@ -128,7 +131,7 @@ export class GameSession {
     this.botColor = options.botColor ?? null;
     this.ownerId = options.ownerId ?? null;
     this.startedAt = new Date().toISOString();
-    this.#bot = options.bot ?? null;
+    this.#bot = null;
     this.#options = options;
     this.#now = options.now ?? (() => Date.now());
     // Hot-seat : écran de passage avant chaque choix. Mode bot : choix immédiat.
@@ -146,6 +149,7 @@ export class GameSession {
 
   /** Mode bot : le bot verrouille son pion et le chrono de 30 s de l'humain démarre. */
   startBotSelection(): void {
+    this.#ensureBot();
     if (this.mode !== 'bot' || this.#phase !== 'secret-selection' || !this.#bot) return;
     const botColor = this.botColor ?? 'b';
     if (this.#secrets[botColor] === undefined) {
@@ -161,6 +165,14 @@ export class GameSession {
   join(participant: Participant): void {
     this.#participants.add(participant);
     participant.send({ type: 'snapshot', state: this.stateFor(participant.viewer), cause: null });
+    // Partie restaurée : le bot se réveille quand le joueur revient.
+    this.#ensureBot();
+    this.#maybeBotTurn();
+  }
+
+  #ensureBot(): void {
+    if (this.mode !== 'bot' || this.#bot || this.#phase === 'ended') return;
+    this.#bot = this.#options.createBot?.() ?? null;
   }
 
   leave(participant: Participant): void {
@@ -527,9 +539,12 @@ export class GameSession {
     if (secrets.game) session.#game = SecretQueenGame.restore(secrets.game);
     if (record.phase === 'playing') {
       session.#startClock();
-      session.#maybeBotTurn();
     } else if (record.phase === 'secret-selection' && record.mode === 'bot') {
-      session.startBotSelection();
+      // Le choix du bot est déjà sauvegardé : seul le chrono de l'humain repart.
+      const botColor = record.botColor ?? 'b';
+      if (session.#secrets[opposite(botColor)] === undefined) {
+        session.#armSelectionTimer(opposite(botColor));
+      }
     }
     return session;
   }

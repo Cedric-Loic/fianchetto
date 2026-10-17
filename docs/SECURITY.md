@@ -3,8 +3,7 @@
 Exigence n°1 (`docs/SPEC.md` §4) : avant la fin de partie, l'identité de la dame secrète adverse
 ne sort jamais du serveur vers le client d'un joueur, ni vers un log.
 
-> État : les mécanismes 4 et 5 existent depuis l'étape 0 ; les autres sont mis en place aux
-> étapes 1 (moteur, projection) et 2 (serveur, client), puis audités à l'étape 5.
+> État : tous les mécanismes sont en place et audités (étape 5). Preuves : `docs/RECETTE.md`.
 
 ## Ce qui est protégé
 
@@ -20,6 +19,9 @@ ne sort jamais du serveur vers le client d'un joueur, ni vers un log.
   reprendre une partie après un redémarrage du serveur. Tu es l'administrateur local : la
   protection vise le client et les logs, pas l'accès au fichier `data/*.db`.
 - **Canaux auxiliaires** : temps de réponse, taille des paquets, temps de réflexion du bot.
+- **Hot-seat, plusieurs onglets** : tout client connecté à une partie hot-seat peut demander la
+  case de la dame du camp au trait (`peek-secret`). Atténuation : serveur limité à 127.0.0.1,
+  identifiant de partie aléatoire.
 - **Hot-seat** : la confiance est physique. Le joueur qui ne joue pas doit détourner le regard
   quand l'autre maintient « Voir ma dame secrète ». Le client ne reçoit la case que pendant le
   maintien du bouton, pour le camp au trait.
@@ -52,6 +54,10 @@ ne sort jamais du serveur vers le client d'un joueur, ni vers un log.
    snapshot. Le stockage local ne sert qu'aux préférences (thème, sons).
 
 ## Tests de garantie (définition de « terminé », §10)
+
+Fichiers : `tests/security/server.test.ts` (WebSocket, logs, base), `tests/security/bundle.test.ts`
+(bundle JS), `tests/security/e2e/browser.spec.ts` (navigateur), et le banc du moteur
+(`indistinguishability`, `canary-engine`, `projection`, `notation`, `refusal`).
 
 - **Indistinguabilité** : deux secrets différents, même suite de coups publics légale dans les deux
   mondes, mêmes annonces → messages envoyés à l'adversaire strictement identiques (horodatages,

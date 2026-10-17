@@ -1,7 +1,8 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    "lib": ["ES2023", "DOM"]
   },
-  "include": ["*.ts", "tests/e2e/**/*.ts", "tools/**/*.ts"]
+  "include": ["*.ts", "tests/e2e/**/*.ts", "tests/security/e2e/**/*.ts", "tools/**/*.ts"]
 }

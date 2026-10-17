@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Serveur autoritatif : parties, pendules, WebSocket, REST, SQLite, Elo, orchestration du bot.",
+  "exports": {
+    ".": "./src/app.ts"
+  },
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/main.ts",
     "start": "tsx src/main.ts",

@@ -75,3 +75,52 @@ describe('persistance SQLite', () => {
     await app.close();
   });
 });
+
+describe('reprise des parties contre le bot', () => {
+  it('ne relance aucun bot au démarrage : seulement quand le joueur revient', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sq-'));
+    dirs.push(dir);
+    const dbPath = join(dir, 'test.db');
+    let created = 0;
+    const createBot = () => {
+      created++;
+      return {
+        chooseSecret: () => 'a7' as const,
+        chooseMove: () => Promise.resolve({ from: 'g8', to: 'f6' } as const),
+        shouldAcceptDraw: () => Promise.resolve(false),
+        dispose: () => undefined,
+      };
+    };
+    let app = await startServer(0, { logLevel: 'silent', dbPath, createBot });
+    let port = (app.server.address() as AddressInfo).port;
+    const reg = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'reprise', password: 'motdepasse' }),
+    });
+    const cookie = (reg.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/games`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({ mode: 'bot', level: 2, timeControl: 'untimed', color: 'w' }),
+      });
+      ids.push(((await res.json()) as { gameId: string }).gameId);
+    }
+    expect(created).toBe(3);
+    await app.close();
+
+    created = 0;
+    app = await startServer(0, { logLevel: 'silent', dbPath, createBot });
+    port = (app.server.address() as AddressInfo).port;
+    expect(created).toBe(0); // 3 parties restaurées, aucun bot lancé
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { cookie } });
+    await new Promise((r) => ws.once('open', r));
+    ws.send(JSON.stringify({ type: 'join', gameId: ids[0] }));
+    await new Promise((r) => ws.once('message', r));
+    expect(created).toBe(1);
+    ws.close();
+    await app.close();
+  });
+});

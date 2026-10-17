@@ -43,7 +43,7 @@ export class GameManager {
           : null;
         const session = GameSession.restore(saved.record, saved.secrets, {
           ...this.#hooks(),
-          bot: level ? this.#createBot(level) : null,
+          createBot: level ? () => this.#createBot(level) : null,
         });
         this.#games.set(session.id, session);
       } catch {
@@ -122,7 +122,7 @@ export class GameManager {
         players,
         botColor,
         ownerId: user.id,
-        bot: this.#createBot(level.level),
+        createBot: () => this.#createBot(level.level),
         ...this.#hooks(),
       }),
     );

@@ -9,9 +9,7 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étape 4 terminée** : parties contre le bot (5 niveaux, classées Elo) ou à deux,
-> comptes, profil, classement, thèmes, sons, flèches, premoves, rejeu et analyse Stockfish.
-> Reste l'étape 5 : audit de sécurité du secret et recette.
+> **État : terminé (étapes 0 à 5)**. Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md).
 
 ## Prérequis
 
@@ -64,6 +62,18 @@ docs/
   DECISIONS.md   journal des décisions
 ```
 
+## Comment jouer
+
+1. **Connexion → Créer un compte** (comptes locaux, mot de passe haché).
+2. **Contre le bot** : choisis le niveau, la couleur et la cadence, puis ton pion secret (30 s).
+   Ton propre pion-dame est marqué d'une petite couronne ♛, visible de toi seul.
+3. **À deux sur cet écran** : chacun choisit son pion à tour de rôle (l'autre détourne le regard) ;
+   pendant la partie, maintiens « Voir ma dame secrète » pour la retrouver.
+4. Pendant la partie : glisser-déposer ou clic-clic, clic droit pour les flèches, premoves contre
+   le bot (clic droit pour les annuler), ⛶ pour le mode concentration (✕ ou Échap pour sortir).
+5. À la fin : révélation des deux dames, puis **Analyser la partie** (Stockfish sur les positions
+   réelles) et export **PGN**.
+
 ## Comment le secret est protégé (résumé)
 
 Le serveur garde la **position réelle** (le pion choisi y est une dame) et calcule pour chaque
@@ -73,14 +83,14 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 
 ## Feuille de route
 
-| Étape | Contenu                                                        | État    |
-| ----- | -------------------------------------------------------------- | ------- |
-| 0     | Monorepo, contrats, CI locale, journal des décisions           | ✅      |
-| 1     | Moteur (règles, projection, notation) + banc de tests de fuite | ✅      |
-| 2     | Serveur + interface : partie hot-seat complète                 | ✅      |
-| 3     | Bot, comptes, Elo, pendules                                    | ✅      |
-| 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | ✅      |
-| 5     | Audit de sécurité du secret, recette                           | à venir |
+| Étape | Contenu                                                        | État |
+| ----- | -------------------------------------------------------------- | ---- |
+| 0     | Monorepo, contrats, CI locale, journal des décisions           | ✅   |
+| 1     | Moteur (règles, projection, notation) + banc de tests de fuite | ✅   |
+| 2     | Serveur + interface : partie hot-seat complète                 | ✅   |
+| 3     | Bot, comptes, Elo, pendules                                    | ✅   |
+| 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | ✅   |
+| 5     | Audit de sécurité du secret, recette                           | ✅   |
 
 ## Licences et crédits
 
