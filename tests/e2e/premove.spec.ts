@@ -28,6 +28,20 @@ test('premove pendant la réflexion du bot, joué automatiquement à mon tour', 
   await clickSquare(page, 'e2');
   await clickSquare(page, 'e4');
   await expect(page.getByTestId('move-list').locator('button.move')).toHaveCount(1);
+  // Premoves enchaînés (Cg1-f3 puis Cf3-g5) puis clic droit : tout est annulé, le cavalier
+  // revient en g1.
+  await clickSquare(page, 'g1');
+  await clickSquare(page, 'f3');
+  await clickSquare(page, 'f3');
+  await clickSquare(page, 'g5');
+  await expect(page.locator('img[data-square="g5"]')).toHaveAttribute('alt', 'wn');
+  await expect(page.locator('.sq.premove')).toHaveCount(3);
+  const box = await page.getByTestId('board').boundingBox();
+  if (!box) throw new Error('plateau');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+  await expect(page.locator('.sq.premove')).toHaveCount(0);
+  await expect(page.locator('img[data-square="g1"]')).toHaveAttribute('alt', 'wn');
+
   // Pendant que le bot réfléchit : premove Cg1-f3 (cases marquées en rouge).
   await clickSquare(page, 'g1');
   await clickSquare(page, 'f3');

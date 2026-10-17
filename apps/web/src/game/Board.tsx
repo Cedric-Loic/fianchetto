@@ -27,8 +27,10 @@ export interface BoardProps {
   onPieceClick?: (piece: DisplayedPiece) => void;
   /** Premove (mode bot) : camp autorisé à préparer un coup pendant le tour adverse. */
   premoveColor?: Color | null;
-  premove?: Arrow | null;
+  /** Premoves en file d'attente (cases surlignées en rouge). */
+  premoves?: readonly Arrow[];
   onPremove?: (move: Arrow & { promotion?: PromotionPiece }) => void;
+  /** Clic droit : annule tous les premoves. */
   onCancelPremove?: () => void;
   /** Flèches imposées (meilleur coup en analyse). */
   extraArrows?: readonly Arrow[];
@@ -96,8 +98,18 @@ export function Board(props: BoardProps) {
   const theme = BOARD_THEMES[settings.board];
   const boardRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Square | null>(null);
-  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number } | null>(null);
-  const dragStart = useRef<{ x: number; y: number; from: Square } | null>(null);
+  /** Glisser en cours : pièce, position du pointeur dans le plateau (px), case survolée. */
+  const [drag, setDrag] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    /** Taille d'une case en px (lue au mouvement, pas pendant le rendu). */
+    size: number;
+    over: Square | null;
+  } | null>(null);
+  const dragStart = useRef<{ x: number; y: number; from: Square; id: string } | null>(null);
+  /** Pièce déposée à la main : pas d'animation, elle « tombe » au centre de la case. */
+  const [dropped, setDropped] = useState<string | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [marks, setMarks] = useState<Square[]>([]);
@@ -107,6 +119,13 @@ export function Board(props: BoardProps) {
   // Camp manipulable maintenant : le mien à mon tour, ou mes pièces en premove.
   const handColor = movable ?? props.premoveColor ?? null;
   const premoving = movable === null && handColor !== null;
+
+  const pointerInBoard = (e: { clientX: number; clientY: number }) => {
+    const rect = boardRef.current?.getBoundingClientRect();
+    return rect
+      ? { x: e.clientX - rect.left, y: e.clientY - rect.top, size: rect.width / 8 }
+      : null;
+  };
 
   const squareFromEvent = (e: { clientX: number; clientY: number }): Square | null => {
     const rect = boardRef.current?.getBoundingClientRect();
@@ -136,10 +155,18 @@ export function Board(props: BoardProps) {
     const square = squareFromEvent(e);
     if (!square) return;
     if (e.button === 2) {
+      // Clic droit avec des premoves en attente : tout est annulé (comme sur les sites
+      // habituels) ; sinon, début d'une flèche ou d'un surlignage.
+      if (props.premoves?.length) {
+        props.onCancelPremove?.();
+        setSelected(null);
+        return;
+      }
       rightStart.current = square;
       return;
     }
     if (e.button !== 0) return;
+    setDropped(null);
     // Un clic gauche efface les annotations (comme sur les sites d'échecs habituels).
     setArrows([]);
     setMarks([]);
@@ -152,19 +179,21 @@ export function Board(props: BoardProps) {
     if (selected && (!piece || piece.color !== handColor)) return attempt(selected, square);
     if (piece && piece.color === handColor) {
       setSelected(square);
-      setDrag({ id: piece.id, dx: 0, dy: 0 });
       boardRef.current?.setPointerCapture(e.pointerId);
-      dragStart.current = { x: e.clientX, y: e.clientY, from: square };
+      dragStart.current = { x: e.clientX, y: e.clientY, from: square, id: piece.id };
     } else {
       setSelected(null);
-      if (premoving) props.onCancelPremove?.();
     }
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const start = dragStart.current;
-    if (!drag || !start) return;
-    setDrag({ ...drag, dx: e.clientX - start.x, dy: e.clientY - start.y });
+    if (!start) return;
+    // Petit seuil : en dessous, c'est un clic (clic-clic), pas un glisser.
+    if (!drag && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 4) return;
+    const pos = pointerInBoard(e);
+    if (!pos) return;
+    setDrag({ id: start.id, x: pos.x, y: pos.y, size: pos.size, over: squareFromEvent(e) });
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -186,12 +215,16 @@ export function Board(props: BoardProps) {
       return;
     }
     const start = dragStart.current;
+    const wasDragging = drag !== null;
     dragStart.current = null;
     setDrag(null);
     if (!start) return;
     const target = squareFromEvent(e);
     // Relâché sur sa propre case : on garde la sélection pour un clic-clic.
-    if (target && target !== start.from) attempt(start.from, target);
+    if (target && target !== start.from) {
+      if (wasDragging) setDropped(start.id);
+      attempt(start.from, target);
+    }
   };
 
   const squares = [];
@@ -204,9 +237,10 @@ export function Board(props: BoardProps) {
         classes.push('last');
       }
       if (selected === square || props.highlighted === square) classes.push('selected');
-      if (props.premove && (props.premove.from === square || props.premove.to === square)) {
+      if (props.premoves?.some((p) => p.from === square || p.to === square)) {
         classes.push('premove');
       }
+      if (drag?.over === square) classes.push('drag-over');
       if (marks.includes(square)) classes.push('marked');
       if (props.checkSquare === square) classes.push('check');
       squares.push(
@@ -242,21 +276,33 @@ export function Board(props: BoardProps) {
       {pieces.map((p) => {
         const [x, y] = squareXY(p.square, orientation);
         const dragging = drag?.id === p.id;
-        return (
+        const src = pieceUrl(settings.pieces, p.color, p.type);
+        // Pendant le glisser, le CENTRE de la pièce suit le pointeur ; un fantôme reste en place.
+        return [
+          dragging && (
+            <img
+              key={`${p.id}-ghost`}
+              className="piece ghost"
+              src={src}
+              alt=""
+              draggable={false}
+              style={{ transform: `translate(${x * 100}%, ${y * 100}%)` }}
+            />
+          ),
           <img
             key={p.id}
-            className={`piece${dragging ? ' dragging' : ''}`}
-            src={pieceUrl(settings.pieces, p.color, p.type)}
+            className={`piece${dragging ? ' dragging' : ''}${dropped === p.id ? ' no-anim' : ''}`}
+            src={src}
             alt={`${p.color}${p.type}`}
             data-square={p.square}
             draggable={false}
             style={{
-              transform: `translate(${x * 100}%, ${y * 100}%)${
-                dragging ? ` translate(${drag.dx}px, ${drag.dy}px)` : ''
-              }`,
+              transform: dragging
+                ? `translate(${drag.x - drag.size / 2}px, ${drag.y - drag.size / 2}px)`
+                : `translate(${x * 100}%, ${y * 100}%)`,
             }}
-          />
-        );
+          />,
+        ];
       })}
       {props.crowns?.map((square) => {
         const [x, y] = squareXY(square, orientation);

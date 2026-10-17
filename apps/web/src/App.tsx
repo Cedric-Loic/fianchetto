@@ -60,6 +60,7 @@ function Nav() {
 export function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const state = useGame((s) => s.state);
+  const focus = useGame((s) => s.focus);
   const refresh = useSession((s) => s.refresh);
   const gameId = route.page === 'game' ? route.gameId : null;
 
@@ -103,7 +104,8 @@ export function App() {
 
   return (
     <>
-      <Nav />
+      {/* Mode concentration : pas de barre de navigation, l'échiquier seul. */}
+      {!(focus && route.page === 'game') && <Nav />}
       {content}
     </>
   );

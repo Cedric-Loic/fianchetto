@@ -630,3 +630,53 @@ a.button.primary {
   color: #4a9eea;
   font-weight: 700;
 }
+
+/* --- Confort de jeu : glisser, fantôme, case survolée, mode concentration --- */
+.piece.dragging {
+  transform-origin: center;
+  filter: drop-shadow(0 6px 6px #0006);
+}
+.piece.ghost {
+  opacity: 0.3;
+  pointer-events: none;
+  transition: none;
+}
+.piece.no-anim {
+  transition: none;
+}
+.sq.drag-over {
+  box-shadow: inset 0 0 0 4px #ffffffcc;
+}
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.focus-board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.focus-overlay .board {
+  width: min(88vh, calc(100vw - 32px));
+}
+.focus-clock .player-bar {
+  min-height: 0;
+}
+.focus-clock > span {
+  display: none;
+}
+.focus-close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: 1.3rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #3c3a37cc;
+}

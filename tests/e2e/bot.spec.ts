@@ -28,6 +28,7 @@ test('compte, partie classée contre le bot, Elo mis à jour', async ({ page }) 
   await expect(page.getByTestId('opponent-ready')).toBeVisible();
   await clickSquare(page, 'd2');
   await page.getByRole('button', { name: 'Confirmer' }).click();
+  await expect(page.getByTestId('move-list')).toBeVisible();
 
   // Ma dame secrète est marquée en permanence (moi seul la vois).
   await expect(page.getByTestId('secret-marker')).toHaveCount(1);

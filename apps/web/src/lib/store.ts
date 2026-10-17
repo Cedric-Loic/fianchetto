@@ -19,6 +19,11 @@ interface GameStore {
   /** Instant de réception du dernier snapshot (pour faire tourner les pendules localement). */
   receivedAt: number;
   toast: string | null;
+  /** Nombre de coups refusés reçus (sert à annuler l'affichage optimiste et les premoves). */
+  rejections: number;
+  /** Mode concentration : seul l'échiquier est affiché. */
+  focus: boolean;
+  setFocus: (focus: boolean) => void;
   /** Hot-seat : case de la dame secrète du camp au trait, seulement pendant le maintien. */
   peek: { color: Color; square: Square | null } | null;
   peekHeld: boolean;
@@ -43,6 +48,11 @@ export const useGame = create<GameStore>((set, get) => ({
   lastCause: null,
   receivedAt: 0,
   toast: null,
+  rejections: 0,
+  focus: false,
+  setFocus(focus) {
+    set({ focus });
+  },
   peek: null,
   peekHeld: false,
   receive(message) {
@@ -64,7 +74,7 @@ export const useGame = create<GameStore>((set, get) => ({
       }
       case 'move-rejected':
         playSound('illegal');
-        set({ toast: GENERIC_ILLEGAL_MOVE_MESSAGE });
+        set({ toast: GENERIC_ILLEGAL_MOVE_MESSAGE, rejections: get().rejections + 1 });
         return;
       case 'secret-peek':
         if (get().peekHeld) set({ peek: { color: message.color, square: message.square } });
