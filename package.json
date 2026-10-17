@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @sq/server --filter @sq/web dev",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:stress": "vitest run --config vitest.stress.config.ts",
@@ -17,7 +18,7 @@
     "typecheck": "pnpm -r --parallel typecheck && tsc -p tsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage",
     "verify": "pnpm check && pnpm test:e2e"
   },
   "devDependencies": {
