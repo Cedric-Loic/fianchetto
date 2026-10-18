@@ -80,6 +80,9 @@ function reviewSummary(review: GameReview): ReviewSummary {
   };
 }
 
+/** Séances comptées dans les minutes d'entraînement du coach. */
+export type ActivityKind = 'lesson' | 'analysis';
+
 export interface SavedGame {
   record: SessionRecord;
   secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedAny> | null };
@@ -172,6 +175,15 @@ export class GameStore {
         rating       INTEGER NOT NULL,
         games_played INTEGER NOT NULL,
         PRIMARY KEY (user_id, variant)
+      );
+      -- Étape 13 : séances d'entraînement (leçon, revue ouverte), une par sujet et par jour.
+      CREATE TABLE IF NOT EXISTS activity_sessions (
+        user_id TEXT NOT NULL REFERENCES users(id),
+        kind    TEXT NOT NULL,
+        ref     TEXT NOT NULL,
+        day     TEXT NOT NULL,
+        at      INTEGER NOT NULL,
+        PRIMARY KEY (user_id, kind, ref, day)
       );
       -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
       INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
@@ -380,6 +392,47 @@ export class GameStore {
            updated_at = excluded.updated_at`,
       )
       .run(userId, lessonId, correct, Date.now());
+    this.recordActivity(userId, 'lesson', lessonId);
+  }
+
+  // --- Séances d'entraînement (minutes du coach, étape 13) ----------------------------------
+
+  /**
+   * Séance d'entraînement : une seule par sujet (leçon, partie revue) et par jour local, pour
+   * qu'un rechargement de page ne compte pas deux fois.
+   */
+  recordActivity(userId: string, kind: ActivityKind, ref: string, at = Date.now()): void {
+    const d = new Date(at);
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO activity_sessions (user_id, kind, ref, day, at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(userId, kind, ref, day, at);
+  }
+
+  /** Séances enregistrées d'un type, par ordre chronologique. */
+  activity(userId: string, kind: ActivityKind): { ref: string; at: number }[] {
+    return this.#db
+      .prepare(`SELECT ref, at FROM activity_sessions WHERE user_id = ? AND kind = ? ORDER BY at`)
+      .all(userId, kind) as { ref: string; at: number }[];
+  }
+
+  /**
+   * Rang (0 = la première) d'une partie d'entraînement parmi celles de son propriétaire, par
+   * date de début : sert au garde-fou dégressif (une partie sur deux en phase 2).
+   */
+  trainingGameIndex(userId: string, startedAt: string): number {
+    const row = this.#db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM games
+         WHERE json_extract(record, '$.ownerId') = ?
+           AND json_extract(record, '$.training') = 1
+           AND json_extract(record, '$.startedAt') < ?`,
+      )
+      .get(userId, startedAt) as { n: number };
+    return row.n;
   }
 
   // --- Revues et parties importées (coach) ------------------------------------------------

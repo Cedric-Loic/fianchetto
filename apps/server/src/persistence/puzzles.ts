@@ -119,6 +119,10 @@ export class PuzzleStore {
     if (!columns.some((c) => c.name === 'rating_after')) {
       db.exec(`ALTER TABLE puzzle_attempts ADD COLUMN rating_after REAL`);
     }
+    // Migration (étape 13) : temps passé sur chaque tentative (minutes d'entraînement).
+    if (!columns.some((c) => c.name === 'duration_ms')) {
+      db.exec(`ALTER TABLE puzzle_attempts ADD COLUMN duration_ms INTEGER`);
+    }
   }
 
   // --- Base Lichess ------------------------------------------------------------------------
@@ -176,11 +180,15 @@ export class PuzzleStore {
     themes: string;
     /** Classement puzzle après la tentative (tentatives classées). */
     ratingAfter?: number | null;
+    /** Temps passé sur le puzzle (ms), de l'affichage à la fin de la tentative. */
+    durationMs?: number | null;
+    /** Instant de fin (ms) ; défaut : maintenant. */
+    at?: number;
   }): void {
     this.#db
       .prepare(
         `INSERT INTO puzzle_attempts (user_id, source, puzzle_id, success, rated, themes, at,
-           rating_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           rating_after, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         a.userId,
@@ -189,8 +197,9 @@ export class PuzzleStore {
         a.success ? 1 : 0,
         a.rated ? 1 : 0,
         a.themes,
-        Date.now(),
+        a.at ?? Date.now(),
         a.ratingAfter ?? null,
+        a.durationMs == null ? null : Math.max(0, Math.round(a.durationMs)),
       );
   }
 
@@ -200,11 +209,12 @@ export class PuzzleStore {
     themes: string;
     at: number;
     ratingAfter: number | null;
+    durationMs: number | null;
   }[] {
     return this.#db
       .prepare(
-        `SELECT source, success, themes, at, rating_after AS ratingAfter FROM puzzle_attempts
-         WHERE user_id = ? ORDER BY at`,
+        `SELECT source, success, themes, at, rating_after AS ratingAfter,
+           duration_ms AS durationMs FROM puzzle_attempts WHERE user_id = ? ORDER BY at`,
       )
       .all(userId) as {
       source: string;
@@ -212,6 +222,7 @@ export class PuzzleStore {
       themes: string;
       at: number;
       ratingAfter: number | null;
+      durationMs: number | null;
     }[];
   }
 

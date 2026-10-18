@@ -78,6 +78,8 @@ export interface SessionOptions {
   training?: boolean;
   /** Classique : position de départ (FEN), sinon position standard. */
   initialFen?: string | null;
+  /** Reprise : instant de début d'origine (ISO), sinon maintenant. */
+  startedAt?: string;
   mode: GameMode;
   timeControl: TimeControlId;
   players: Record<Color, PlayerInfo>;
@@ -179,7 +181,7 @@ export class GameSession {
     this.players = options.players;
     this.botColor = options.botColor ?? null;
     this.ownerId = options.ownerId ?? null;
-    this.startedAt = new Date().toISOString();
+    this.startedAt = options.startedAt ?? new Date().toISOString();
     this.#bot = null;
     this.#options = options;
     this.#now = options.now ?? (() => Date.now());
@@ -681,6 +683,7 @@ export class GameSession {
       variant,
       training: record.training ?? false,
       initialFen: record.initialFen ?? null,
+      startedAt: record.startedAt,
       mode: record.mode,
       timeControl: record.timeControl,
       players: record.players,

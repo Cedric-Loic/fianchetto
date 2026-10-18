@@ -113,7 +113,13 @@ export function registerReviewRoutes(app: FastifyInstance, deps: ReviewDeps): vo
     const target = resolve(request.params.id, request);
     if (target === 'not-over') return reply.code(409).send({ error: 'GAME_NOT_OVER' });
     if (!target) return reply.code(404).send({ error: 'NOT_FOUND' });
-    return respond(target);
+    const response = respond(target);
+    // Revue terminée consultée : séance d'analyse (minutes du coach, une par partie et par jour).
+    const user = currentUser(store, request);
+    if (user && response.state.status === 'done') {
+      store.recordActivity(user.id, 'analysis', target.info.gameId);
+    }
+    return response;
   });
 
   app.post<{ Params: { id: string } }>('/api/reviews/:id', (request, reply) => {

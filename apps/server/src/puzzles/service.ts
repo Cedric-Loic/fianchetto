@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Chess } from 'chess.js';
-import { INITIAL_GLICKO, puzzlesFromReview, updateGlicko, winChance, type Glicko } from '@sq/coach';
+import {
+  INITIAL_GLICKO,
+  puzzlesFromReview,
+  themeOfDay,
+  updateGlicko,
+  winChance,
+  type Glicko,
+} from '@sq/coach';
 import type {
   Color,
   PuzzleAttempt,
@@ -14,25 +21,18 @@ import { EngineUnavailableError } from '../engine-unavailable.js';
 import { legalMoves, playLine as line, playStep as play } from '../chess-utils.js';
 import type { GameStore } from '../persistence/db.js';
 
-/** Thèmes du « thème du jour » (phase 1 du plan : tactique de base), en rotation. */
-const THEME_ROTATION = [
-  'hangingPiece',
-  'fork',
-  'pin',
-  'mateIn1',
-  'skewer',
-  'mateIn2',
-  'discoveredAttack',
-  'backRankMate',
-] as const;
-
 /** Tolérance (points de % de gain) pour accepter un autre coup que le meilleur, dans mes erreurs. */
 const OWN_TOLERANCE = 5;
 const MAX_LIVE_ATTEMPTS = 500;
 
-export function themeOfDay(now = Date.now()): string {
-  const day = Math.floor(now / (24 * 3600 * 1000));
-  return THEME_ROTATION[day % THEME_ROTATION.length] ?? 'fork';
+export interface PuzzleServiceOptions {
+  /**
+   * Thème du jour d'un utilisateur. En production : celui du tableau de bord du coach (phase et
+   * thèmes faibles, `coach/routes.ts`). Défaut : thème du jour de la phase 1, sans faiblesse.
+   */
+  themeOfDay?: (userId: string) => string;
+  /** Horloge (tests). */
+  now?: () => number;
 }
 
 interface Live {
@@ -53,6 +53,8 @@ interface Live {
   rated: boolean;
   hinted: boolean;
   finished: boolean;
+  /** Instant d'affichage (ms) : durée de la tentative. */
+  shownAt: number;
 }
 
 /**
@@ -63,10 +65,19 @@ export class PuzzleService {
   readonly #store: GameStore;
   readonly #evaluate: (fen: string) => Promise<PositionAnalysis | null>;
   readonly #live = new Map<string, Live>();
+  readonly #themeOfDay: (userId: string) => string;
+  readonly #now: () => number;
 
-  constructor(store: GameStore, evaluate: (fen: string) => Promise<PositionAnalysis | null>) {
+  constructor(
+    store: GameStore,
+    evaluate: (fen: string) => Promise<PositionAnalysis | null>,
+    options: PuzzleServiceOptions = {},
+  ) {
     this.#store = store;
     this.#evaluate = evaluate;
+    this.#now = options.now ?? Date.now;
+    this.#themeOfDay =
+      options.themeOfDay ?? (() => themeOfDay({ phase: 1, weakThemes: [], date: this.#now() }));
   }
 
   #glicko(userId: string): Glicko {
@@ -144,7 +155,7 @@ export class PuzzleService {
     if (p.bankSize() === 0) return 'NO_BANK';
     // Légèrement au-dessus du niveau, fenêtre élargie s'il le faut.
     const rating = this.#glicko(userId).rating;
-    const filter = mode === 'theme' ? (theme ?? themeOfDay()) : null;
+    const filter = mode === 'theme' ? (theme ?? this.#themeOfDay(userId)) : null;
     for (const [below, above] of [
       [50, 150],
       [200, 300],
@@ -201,6 +212,7 @@ export class PuzzleService {
         rated,
         hinted: false,
         finished: false,
+        shownAt: this.#now(),
       },
       puzzle.gameUrl ? { label: 'Partie Lichess d’origine', url: puzzle.gameUrl } : null,
       puzzle.fen,
@@ -227,6 +239,7 @@ export class PuzzleService {
         rated: false,
         hinted: false,
         finished: false,
+        shownAt: this.#now(),
       },
       { label: own.label, url: own.url },
       own.fen,
@@ -324,12 +337,25 @@ export class PuzzleService {
       rated,
       themes: live.themes,
       ratingAfter: after?.rating ?? null,
+      at: this.#now(),
+      durationMs: this.#now() - live.shownAt,
     });
     if (success) p.scheduleSuccess(live.userId, live.source, live.puzzleId);
     else p.scheduleFailure(live.userId, live.source, live.puzzleId);
     if (!after) return null;
     p.setGlicko(live.userId, after);
     return { before: Math.round(before.rating), after: Math.round(after.rating) };
+  }
+
+  /** Classement et puzzles disponibles, sans thème du jour (entrée du tableau de bord). */
+  summary(userId: string): { rating: number; due: number; mine: number } {
+    this.syncOwn(userId);
+    const p = this.#store.puzzles;
+    return {
+      rating: Math.round(this.#glicko(userId).rating),
+      due: p.due(userId).length,
+      mine: p.countOwn(userId),
+    };
   }
 
   stats(userId: string): PuzzleStats {
@@ -353,7 +379,7 @@ export class PuzzleService {
       attempts: attempts.length,
       solved: attempts.filter((a) => a.success === 1).length,
       available: { lichess: p.bankSize(), mine: p.countOwn(userId), due: p.due(userId).length },
-      themeOfDay: themeOfDay(),
+      themeOfDay: this.#themeOfDay(userId),
       themes: [...byTheme.entries()]
         .map(([theme, t]) => ({ theme, ...t }))
         .sort((a, b) => b.attempts - a.attempts),

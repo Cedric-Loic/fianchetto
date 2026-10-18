@@ -64,6 +64,15 @@ describe('tableau de bord du coach', () => {
     ]);
     expect(d.curves.find((c) => c.id === 'puzzle')?.points).toHaveLength(1);
     expect(d.phase.criteria.find((c) => c.label.startsWith('Leçons'))?.value).toBe('1 / 10');
+    // Étape 13 : partie lente (30 min estimées), leçon (20), revue consultée (10), puzzle chronométré.
+    await http('GET', `/api/reviews/${games[0]?.id ?? ''}`);
+    d = (await http('GET', '/api/coach/dashboard')).json as CoachDashboard;
+    expect(d.streak.todayPuzzles).toBe(1);
+    expect(d.streak.todayMinutes).toBeGreaterThanOrEqual(60);
+    expect(d.streak.todayMinutes).toBeLessThanOrEqual(62);
+    expect(d.themeOfDay).toBe(
+      ((await http('GET', '/api/puzzles/stats')).json as { themeOfDay: string }).themeOfDay,
+    );
     await app.close();
   }, 60_000);
 });
