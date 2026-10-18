@@ -3,6 +3,7 @@ import type { ImportedGameSummary, ImportResult } from '@sq/shared';
 import { AnalysisBoard } from '../analysis/AnalysisBoard';
 import { checkFen, parsePgn, START_FEN } from '../analysis/tree';
 import { useAnalysisTree } from '../analysis/useAnalysisTree';
+import { pollDelay, wait } from '../lib/poll';
 import { api, type Result } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
@@ -196,17 +197,19 @@ function Imports() {
   const pending = games?.some((g) => g.review === 'queued' || g.review === 'running') ?? false;
   useEffect(() => {
     if (!user) return;
-    let cancelled = false;
-    const load = () =>
-      void api.imports().then((r) => {
-        if (!cancelled && r) setGames(r.games);
-      });
-    load();
-    const timer = pending ? setInterval(load, 1500) : null;
-    return () => {
-      cancelled = true;
-      if (timer) clearInterval(timer);
-    };
+    const controller = new AbortController();
+    const { signal } = controller;
+    // Chargement, puis (analyses en cours) interrogations successives, sans chevauchement,
+    // de plus en plus espacées ; tout s'arrête au démontage.
+    void (async () => {
+      for (let round = 0; ; round++) {
+        const r = await api.imports(signal);
+        if (signal.aborted) return;
+        if (r) setGames(r.games);
+        if (!pending || !(await wait(pollDelay(round), signal))) return;
+      }
+    })();
+    return () => controller.abort();
   }, [user, refresh, pending]);
 
   if (!user) {

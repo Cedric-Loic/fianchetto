@@ -27,7 +27,7 @@ export default defineConfig({
     command: 'pnpm dev',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: true,
-    env: { FIANCHETTO_PUZZLES_DB: E2E_PUZZLES_DB },
+    env: { FIANCHETTO_PUZZLES_DB: E2E_PUZZLES_DB, FIANCHETTO_HUMAN_PACE: '0' },
     timeout: 60_000,
   },
 });

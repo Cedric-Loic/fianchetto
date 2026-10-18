@@ -1,5 +1,6 @@
 import type { EngineLine } from '@sq/shared';
 import { engineEvalLabel } from '../lib/eval';
+import { Button } from '../ui/Button';
 import { fullmoveOf, turnOf } from './tree';
 import type { EngineState } from './useEngine';
 
@@ -106,12 +107,24 @@ export function EnginePanel(props: {
           <span className="muted engine-depth" data-testid="engine-depth">
             {engine.status === 'loading'
               ? 'Analyse…'
-              : engine.depth > 0
-                ? `Profondeur ${engine.depth}${engine.status === 'done' ? '' : '…'}`
-                : ''}
+              : engine.status === 'paused'
+                ? `En pause${engine.depth > 0 ? ` (profondeur ${engine.depth})` : ''}`
+                : engine.depth > 0
+                  ? `Profondeur ${engine.depth}${engine.status === 'done' ? '' : '…'}`
+                  : ''}
           </span>
         )}
       </div>
+      {enabled && engine.status === 'paused' && (
+        <p className="muted engine-message" data-testid="engine-paused">
+          Analyse interrompue par un autre onglet.{' '}
+          {engine.resume && (
+            <Button variant="link" size="s" data-testid="engine-resume" onClick={engine.resume}>
+              Reprendre
+            </Button>
+          )}
+        </p>
+      )}
       {enabled && engine.message && (
         <p className="muted engine-message" data-testid="engine-message">
           {engine.message}

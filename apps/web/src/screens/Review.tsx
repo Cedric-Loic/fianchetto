@@ -15,7 +15,8 @@ import { useAnalysisTree } from '../analysis/useAnalysisTree';
 import { EvalChart } from '../game/Analysis';
 import type { BoardMark } from '../game/Board';
 import { CLASS_LABEL, CLASS_SYMBOL, classCss } from '../lib/classes';
-import { api } from '../lib/api';
+import { api, reviewFailureMessage, SERVER_UNREACHABLE } from '../lib/api';
+import { pollDelay, wait } from '../lib/poll';
 import { evalLabel } from '../lib/eval';
 import { useSettings } from '../lib/settings';
 import { ExplainText, GuidedPanel } from '../review/GuidedReview';
@@ -86,33 +87,34 @@ export function Review({ id }: { id: string }) {
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // « Réessayer » après un serveur injoignable : recharge sans relancer l'analyse.
+  const [reload, setReload] = useState(0);
 
-  // Chargement, lancement de l'analyse si besoin, puis suivi de sa progression.
+  // Chargement, lancement de l'analyse si besoin, puis suivi de sa progression (espacement
+  // progressif, arrêt au démontage).
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    const { signal } = controller;
     void (async () => {
-      let res = await api.review(id);
+      let res = await api.review(id, signal);
       const status = res.ok ? res.data.state.status : null;
-      if (status === 'none' || (attempt > 0 && status === 'error')) res = await api.startReview(id);
-      while (!cancelled) {
+      if (status === 'none' || (attempt > 0 && status === 'error')) {
+        res = await api.startReview(id, signal);
+      }
+      for (let round = 0; !signal.aborted; round++) {
         if (!res.ok) {
-          setFailure(
-            res.status === 409 ? "La partie n'est pas encore terminée." : 'Partie introuvable.',
-          );
+          setFailure(reviewFailureMessage(res.status));
           return;
         }
         setData(res.data);
         const current = res.data.state.status;
         if (current !== 'queued' && current !== 'running') return;
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        if (cancelled) return;
-        res = await api.review(id);
+        if (!(await wait(pollDelay(round), signal))) return;
+        res = await api.review(id, signal);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [id, attempt]);
+    return () => controller.abort();
+  }, [id, attempt, reload]);
 
   const review = data?.state.status === 'done' ? data.state.review : null;
 
@@ -124,9 +126,21 @@ export function Review({ id }: { id: string }) {
             icon="♞"
             title={failure}
             action={
-              <Button variant="primary" href="#/analyse">
-                Mes parties analysées
-              </Button>
+              failure === SERVER_UNREACHABLE ? (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setFailure(null);
+                    setReload((r) => r + 1);
+                  }}
+                >
+                  Réessayer
+                </Button>
+              ) : (
+                <Button variant="primary" href="#/analyse">
+                  Mes parties analysées
+                </Button>
+              )
             }
           />
         </div>

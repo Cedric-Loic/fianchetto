@@ -24,27 +24,79 @@ import type {
 /** Réponse d'un appel REST : données, ou statut et code d'erreur du serveur. */
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
-/** Appel REST détaillé (statut et code d'erreur en cas d'échec ; statut 0 = réseau). */
-async function request<T>(method: string, path: string, body?: unknown): Promise<Result<T>> {
+/** Délai maximal d'un appel REST par défaut. */
+export const REQUEST_TIMEOUT_MS = 15_000;
+
+export interface RequestOptions {
+  /** Annulation par l'appelant (démontage…) : résultat `{ status: 0, error: 'ABORTED' }`. */
+  signal?: AbortSignal;
+  /** Délai maximal (ms) : au-delà, résultat `{ status: 0, error: 'TIMEOUT' }`. */
+  timeoutMs?: number;
+}
+
+/** Statut 0 : le serveur n'a pas répondu (arrêté, réseau coupé, délai dépassé, annulation). */
+export function isNetworkError(res: Result<unknown>): boolean {
+  return !res.ok && res.status === 0;
+}
+
+/**
+ * Appel REST détaillé (statut et code d'erreur en cas d'échec). Statut 0 : pas de réponse du
+ * serveur, avec `error` = `NETWORK`, `TIMEOUT` ou `ABORTED`.
+ */
+export async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options: RequestOptions = {},
+): Promise<Result<T>> {
+  const outer = options.signal;
+  if (outer?.aborted) return { ok: false, status: 0, error: 'ABORTED' };
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+  const onAbort = () => controller.abort();
+  outer?.addEventListener('abort', onAbort);
   try {
     const res = await fetch(path, {
       method,
       headers: body ? { 'content-type': 'application/json' } : {},
       body: body ? JSON.stringify(body) : undefined,
       credentials: 'same-origin',
+      signal: controller.signal,
     });
     const json = (await res.json().catch(() => ({}))) as unknown;
     if (res.ok) return { ok: true, data: json as T };
     const error = (json as { error?: unknown }).error;
     return { ok: false, status: res.status, error: typeof error === 'string' ? error : '' };
   } catch {
-    return { ok: false, status: 0, error: 'NETWORK' };
+    const error = timedOut ? 'TIMEOUT' : outer?.aborted ? 'ABORTED' : 'NETWORK';
+    return { ok: false, status: 0, error };
+  } finally {
+    clearTimeout(timer);
+    outer?.removeEventListener('abort', onAbort);
   }
 }
 
+export const SERVER_UNREACHABLE = 'Serveur injoignable.';
+
+/** Message d'échec du chargement d'une revue (statut 0 : le serveur n'a pas répondu). */
+export function reviewFailureMessage(status: number): string {
+  if (status === 0) return SERVER_UNREACHABLE;
+  if (status === 409) return "La partie n'est pas encore terminée.";
+  return 'Partie introuvable.';
+}
+
 /** Appel REST ; `null` en cas d'erreur HTTP ou réseau (serveur arrêté…). */
-async function call<T>(method: string, path: string, body?: unknown): Promise<T | null> {
-  const res = await request<T>(method, path, body);
+async function call<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options?: RequestOptions,
+): Promise<T | null> {
+  const res = await request<T>(method, path, body, options);
   return res.ok ? res.data : null;
 }
 
@@ -68,12 +120,15 @@ export const api = {
   checkMove: (gameId: string, uci: string) =>
     call<CheckMoveResponse>('POST', `/api/games/${gameId}/check-move`, { uci }),
   // Coach : revues et imports.
-  review: (id: string) => request<ReviewResponse>('GET', `/api/reviews/${id}`),
-  startReview: (id: string) => request<ReviewResponse>('POST', `/api/reviews/${id}`),
+  review: (id: string, signal?: AbortSignal) =>
+    request<ReviewResponse>('GET', `/api/reviews/${id}`, undefined, { signal }),
+  startReview: (id: string, signal?: AbortSignal) =>
+    request<ReviewResponse>('POST', `/api/reviews/${id}`, undefined, { signal }),
   /** « Apprends de tes erreurs » : autre coup proposé au demi-coup `ply` d'une revue. */
   retryMove: (id: string, ply: number, uci: string) =>
     call<RetryMoveResponse>('POST', `/api/reviews/${id}/retry`, { ply, uci }),
-  imports: () => call<ImportedGamesResponse>('GET', '/api/imports'),
+  imports: (signal?: AbortSignal) =>
+    call<ImportedGamesResponse>('GET', '/api/imports', undefined, { signal }),
   importPgn: (pgn: string, as: string) =>
     request<ImportResult>('POST', '/api/imports/pgn', { pgn, ...(as ? { as } : {}) }),
   importChessCom: (username: string, max: number) =>

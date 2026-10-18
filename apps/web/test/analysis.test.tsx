@@ -220,6 +220,100 @@ describe('EnginePanel', () => {
   });
 });
 
+describe('useEngine : recherche interrompue par un autre onglet', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  const setVisibility = (state: DocumentVisibilityState) => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+  afterEach(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+  });
+
+  it('garde les lignes, se met en pause, relance une fois puis propose « Reprendre »', async () => {
+    const stream = fakeStream();
+    render(<Harness fen={FEN_E4} />);
+    await act(() => vi.advanceTimersByTimeAsync(160));
+    stream.push(LINES);
+    await flush();
+
+    // Interruption pendant que l'onglet est caché.
+    setVisibility('hidden');
+    stream.push({ type: 'interrupted', fen: FEN_E4 });
+    await flush();
+    expect(stream.signals[0]?.aborted).toBe(true);
+    expect(screen.getAllByTestId('engine-line')).toHaveLength(3);
+    expect(screen.getByTestId('engine-depth').textContent).toBe('En pause (profondeur 14)');
+    expect(screen.getByTestId('engine-paused')).toBeTruthy();
+    // Rien ne se relance tant que l'onglet reste caché.
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(stream.fetchMock).toHaveBeenCalledTimes(1);
+
+    // Onglet de nouveau visible : une relance automatique.
+    act(() => setVisibility('visible'));
+    await flush();
+    expect(stream.fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('engine-paused')).toBeNull();
+    expect(screen.getAllByTestId('engine-line')).toHaveLength(3);
+
+    // Deuxième interruption de la même position : plus de relance automatique.
+    stream.push({ type: 'interrupted', fen: FEN_E4 });
+    await flush();
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+      setVisibility('visible');
+    });
+    await flush();
+    expect(stream.fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('engine-depth').textContent).toContain('En pause');
+
+    // « Reprendre » relance à la main.
+    fireEvent.click(screen.getByTestId('engine-resume'));
+    await flush();
+    expect(stream.fetchMock).toHaveBeenCalledTimes(3);
+    stream.push(LINES);
+    await flush();
+    expect(screen.getByTestId('engine-depth').textContent).toContain('Profondeur 14');
+  });
+
+  it('relance au prochain focus de la fenêtre', async () => {
+    const stream = fakeStream();
+    render(<Harness fen={FEN_E4} />);
+    await act(() => vi.advanceTimersByTimeAsync(160));
+    stream.push({ type: 'interrupted', fen: FEN_E4 });
+    await flush();
+    expect(screen.getByTestId('engine-depth').textContent).toBe('En pause');
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    await flush();
+    expect(stream.fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('une nouvelle position repart de zéro', async () => {
+    const stream = fakeStream();
+    const view = render(<Harness fen={FEN_E4} />);
+    await act(() => vi.advanceTimersByTimeAsync(160));
+    stream.push({ type: 'interrupted', fen: FEN_E4 });
+    await flush();
+    view.rerender(<Harness fen={START_FEN} />);
+    await act(() => vi.advanceTimersByTimeAsync(160));
+    expect(stream.fetchMock).toHaveBeenCalledTimes(2);
+    // Les écouteurs de l'ancienne position sont retirés.
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    await flush();
+    expect(stream.fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('MoveTree', () => {
   function setup() {
     const tree = new AnalysisTree(START_FEN, ['e2e4', 'e7e5', 'g1f3', 'b8c6']);

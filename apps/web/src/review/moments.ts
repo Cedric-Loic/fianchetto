@@ -1,4 +1,11 @@
-import type { ClassCounts, Color, ExplanationKind, GameReview, ReviewMove } from '@sq/shared';
+import {
+  PUZZLE_THEME_FOR_KIND,
+  type ClassCounts,
+  type Color,
+  type ExplanationKind,
+  type GameReview,
+  type ReviewMove,
+} from '@sq/shared';
 
 /*
  * Revue guidée : choix des moments clés d'une partie et bilan final. Fonctions pures (testées
@@ -81,16 +88,6 @@ export const TIPS: Record<ExplanationKind, string> = {
     'Compare deux ou trois coups candidats avant de jouer, surtout dans les positions tendues.',
 };
 
-/** Thème de puzzles qui entraîne chaque type d'erreur (même table que le tableau de bord du coach). */
-export const THEME_FOR_KIND: Partial<Record<ExplanationKind, string>> = {
-  'hanging-piece': 'hangingPiece',
-  'missed-material': 'hangingPiece',
-  'allowed-fork': 'fork',
-  'missed-fork': 'fork',
-  'allowed-mate': 'mateIn2',
-  'missed-mate': 'mateIn2',
-};
-
 /** Conseils d'appoint quand la partie compte moins de trois types d'erreurs. */
 const FALLBACK_KINDS: readonly ExplanationKind[] = ['generic', 'material-loss', 'missed-mate'];
 
@@ -127,7 +124,7 @@ export function guidedSummary(review: GameReview, userColor: Color | null): Guid
   const tipKinds = [...sorted];
   for (const k of FALLBACK_KINDS) if (!tipKinds.includes(k)) tipKinds.push(k);
   const mainKind = sorted[0] ?? null;
-  const theme = mainKind ? THEME_FOR_KIND[mainKind] : undefined;
+  const theme = mainKind ? PUZZLE_THEME_FOR_KIND[mainKind] : undefined;
   return {
     accuracy: colors.map((color) => ({ color, value: review.accuracy[color] })),
     counts,

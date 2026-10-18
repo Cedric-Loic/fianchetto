@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { Color, GameResult, HintResponse, Square, ViewerGameState } from '@sq/shared';
+import {
+  GENERIC_ILLEGAL_MOVE_MESSAGE,
+  type Color,
+  type GameResult,
+  type HintResponse,
+  type Square,
+  type ViewerGameState,
+} from '@sq/shared';
 import { api } from '../lib/api';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { Board } from '../game/Board';
@@ -62,7 +69,8 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
 
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(clearToast, 1800);
+    // Les messages de connexion restent plus longtemps que le refus de coup.
+    const id = setTimeout(clearToast, toast === GENERIC_ILLEGAL_MOVE_MESSAGE ? 1800 : 4000);
     return () => clearTimeout(id);
   }, [toast, clearToast]);
 

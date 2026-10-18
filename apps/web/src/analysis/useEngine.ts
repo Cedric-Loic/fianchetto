@@ -11,9 +11,16 @@ import { AnalysisEventSchema, type AnalysisEvent, type EngineLine } from '@sq/sh
  * arrête la précédente), donc les deux flux ne peuvent pas tourner ensemble. On calcule d'abord
  * la menace (même position, l'autre camp au trait), brièvement et à profondeur limitée, puis on
  * ferme ce flux et on lance l'analyse principale.
+ *
+ * Interruption (`interrupted` : un autre onglet a lancé sa propre recherche) : les lignes
+ * restent affichées, état « en pause ». La recherche est relancée une seule fois par position,
+ * automatiquement, quand l'onglet redevient visible ou reprend le focus ; une nouvelle
+ * interruption de la même position laisse la main au bouton « Reprendre ». Deux onglets visibles
+ * ne se disputent donc pas le moteur en boucle.
  */
 
-export type EngineStatus = 'off' | 'loading' | 'running' | 'done' | 'error';
+/** `paused` : recherche arrêtée par une autre demande (autre onglet) ; lignes conservées. */
+export type EngineStatus = 'off' | 'loading' | 'running' | 'done' | 'paused' | 'error';
 
 export interface EngineState {
   status: EngineStatus;
@@ -23,6 +30,8 @@ export interface EngineState {
   message: string | null;
   /** Option « Menace » : meilleur coup de l'adversaire s'il jouait maintenant (sinon `null`). */
   threat: EngineLine | null;
+  /** En pause : relance la recherche de la position (bouton « Reprendre »). */
+  resume?: () => void;
 }
 
 const OFF: EngineState = { status: 'off', lines: [], depth: 0, message: null, threat: null };
@@ -168,20 +177,64 @@ export function useEngine(
       state = { ...state, ...patch };
       setResult({ ...state, key });
     };
-    const main = () =>
-      stream(position, multipv, controller.signal, (event) => {
-        if (controller.signal.aborted) return;
+    // Relance automatique déjà utilisée pour cette position ; écouteurs de reprise en attente.
+    let autoResumed = false;
+    let detach: (() => void) | null = null;
+    const stopWaiting = () => {
+      detach?.();
+      detach = null;
+    };
+    const resume = () => {
+      stopWaiting();
+      if (controller.signal.aborted || state.status !== 'paused') return;
+      update({ status: 'running', resume: undefined });
+      void main();
+    };
+    const waitForResume = () => {
+      stopWaiting();
+      if (autoResumed) return;
+      const onVisible = () => {
+        if (document.visibilityState !== 'visible') return;
+        autoResumed = true;
+        resume();
+      };
+      const onFocus = () => {
+        autoResumed = true;
+        resume();
+      };
+      document.addEventListener('visibilitychange', onVisible);
+      window.addEventListener('focus', onFocus);
+      detach = () => {
+        document.removeEventListener('visibilitychange', onVisible);
+        window.removeEventListener('focus', onFocus);
+      };
+    };
+    // Chaque lancement a son propre flux, fermé à l'interruption (ou avec l'effet).
+    const main = (): Promise<void> => {
+      const run = new AbortController();
+      const stop = () => run.abort();
+      controller.signal.addEventListener('abort', stop, { once: true });
+      const live = () => !run.signal.aborted && !controller.signal.aborted;
+      return stream(position, multipv, run.signal, (event) => {
+        if (!live()) return;
         if (event.type === 'lines') {
           const depth = Math.max(0, ...event.lines.map((l) => l.depth));
           update({ status: 'running', lines: event.lines, depth });
         } else if (event.type === 'done') {
           if (state.status !== 'error') update({ status: 'done' });
+        } else if (event.type === 'interrupted') {
+          run.abort();
+          update({ status: 'paused', resume });
+          waitForResume();
         } else {
           update({ status: 'error', message: event.error });
         }
-      }).catch(() => {
-        if (!controller.signal.aborted) update({ status: 'error', message: UNAVAILABLE });
-      });
+      })
+        .catch(() => {
+          if (live()) update({ status: 'error', message: UNAVAILABLE });
+        })
+        .finally(() => controller.signal.removeEventListener('abort', stop));
+    };
     const timer = setTimeout(() => {
       void (async () => {
         if (withThreat) {
@@ -194,6 +247,7 @@ export function useEngine(
     }, ENGINE_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
+      stopWaiting();
       controller.abort();
     };
   }, [key, multipv]);

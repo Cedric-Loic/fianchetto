@@ -29,6 +29,11 @@ interface GameStore {
   peekHeld: boolean;
   receive: (message: ServerMessage) => void;
   setPeekHeld: (held: boolean) => void;
+  /**
+   * Message abandonné faute de connexion : toast clair ; pour un coup, l'affichage optimiste
+   * et les premoves sont annulés (même mécanisme qu'un refus, sans son ni message de refus).
+   */
+  sendFailed: (wasMove: boolean) => void;
   clearToast: () => void;
   reset: () => void;
 }
@@ -86,6 +91,14 @@ export const useGame = create<GameStore>((set, get) => ({
   },
   setPeekHeld(held) {
     set(held ? { peekHeld: true } : { peekHeld: false, peek: null });
+  },
+  sendFailed(wasMove) {
+    set({
+      toast: wasMove
+        ? 'Connexion au serveur perdue : coup non envoyé.'
+        : 'Connexion au serveur perdue : action non envoyée.',
+      rejections: wasMove ? get().rejections + 1 : get().rejections,
+    });
   },
   clearToast() {
     set({ toast: null });
