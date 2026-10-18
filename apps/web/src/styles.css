@@ -1911,6 +1911,19 @@ textarea:focus-visible {
   font-weight: 700;
   white-space: nowrap;
 }
+/* Finales : le bouton « Jouer » passe sous le texte sur téléphone. */
+.endgame-card {
+  flex-wrap: wrap;
+}
+.endgame-card .lesson-body {
+  flex-basis: 220px;
+}
+.endgame-goal {
+  margin: 0;
+}
+.endgame-verdict {
+  font-weight: 600;
+}
 .back-link {
   display: inline-block;
   margin-bottom: var(--space-2);

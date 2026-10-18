@@ -169,6 +169,13 @@ export function Coach() {
               ))}
             </ol>
           )}
+          <p className="muted">
+            Aussi : <a href="#/lessons">les leçons</a> et{' '}
+            <a href="#/endgames" data-testid="coach-endgames">
+              les finales contre le bot
+            </a>
+            .
+          </p>
         </div>
       </div>
 

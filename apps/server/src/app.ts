@@ -22,6 +22,8 @@ import type { GameSession, Participant } from './games/session.js';
 import { GameStore } from './persistence/db.js';
 import type { JsonFetcher } from './review/chesscom.js';
 import { CoachService, registerCoachRoutes } from './coach/routes.js';
+import { registerEndgameRoutes } from './endgames/routes.js';
+import { EndgameService } from './endgames/service.js';
 import { registerLessonRoutes } from './lessons/routes.js';
 import { LessonService } from './lessons/service.js';
 import { registerPuzzleRoutes } from './puzzles/routes.js';
@@ -93,12 +95,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     botHumanPace: options.botHumanPace ?? humanPaceFromEnv(),
     logger: app.log,
     // Revue lancée d'office à la fin d'une partie classique contre le bot (bilan du coach).
-    afterEnd: (session) => {
+    afterEnd: (session, result) => {
       if (session.variant === 'classic' && session.mode === 'bot') {
         reviews.request(session.id, () => session.reviewInput());
       }
+      endgames.onGameEnd(session, result);
     },
   });
+  const endgames = new EndgameService(store, games);
   const training = new TrainingService((fen) => reviews.evaluate(fen));
   const lessons = new LessonService(store, (fen) => reviews.evaluate(fen, 400));
   const coach = new CoachService(store, config.botLevels);
@@ -176,6 +180,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   registerPuzzleRoutes(app, store, puzzles);
   registerLessonRoutes(app, store, lessons);
+  registerEndgameRoutes(app, store, endgames);
   registerCoachRoutes(app, store, coach);
   registerAnalysisRoutes(app, store, analysis);
   registerTrainingRoutes(

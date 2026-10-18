@@ -1,4 +1,5 @@
-import type { Color, GameResult, ViewerGameState } from '@sq/shared';
+import type { Color, EndgameSummary, GameResult, ViewerGameState } from '@sq/shared';
+import { endgameSucceeded, startEndgame } from '../lib/endgame';
 import { useCountUp } from '../lib/motion';
 import { send } from '../lib/net';
 import { SIDE, VARIANT_LABEL } from '../screens/labels';
@@ -46,6 +47,8 @@ export function EndDialog(props: {
   ratingAfter: number | null;
   /** La partie vient de se terminer sous nos yeux (pas un rechargement de page). */
   justEnded: boolean;
+  /** Finale contre le bot jouée par cette partie : réussite ou échec, et « Réessayer ». */
+  endgame?: EndgameSummary | null;
   onClose: () => void;
   onLeave: () => void;
 }) {
@@ -73,6 +76,16 @@ export function EndDialog(props: {
       >
         {state.rated && before !== null && props.ratingAfter !== null && (
           <EloChange variant={state.variant} before={before} after={props.ratingAfter} />
+        )}
+        {props.endgame && (
+          <p
+            className={`endgame-verdict ${endgameSucceeded(props.endgame, result) ? 'win' : 'loss'}`}
+            data-testid="endgame-verdict"
+          >
+            {endgameSucceeded(props.endgame, result)
+              ? `Finale réussie : ${props.endgame.goal === 'win' ? 'tu as gagné' : 'tu as tenu la nulle'} !`
+              : `Objectif non atteint : ${props.endgame.objective}`}
+          </p>
         )}
         {board?.reveal && <h3>Les dames secrètes</h3>}
         {(['w', 'b'] as const).map((c) => {
@@ -102,10 +115,20 @@ export function EndDialog(props: {
               <IconChart size={18} />
               Revue de la partie
             </Button>
-            <Button onClick={() => send({ type: 'offer-rematch' })}>
-              <IconRetry size={18} />
-              Revanche
-            </Button>
+            {props.endgame ? (
+              <Button
+                onClick={() => void startEndgame(props.endgame?.id ?? '')}
+                data-testid="endgame-retry"
+              >
+                <IconRetry size={18} />
+                Réessayer
+              </Button>
+            ) : (
+              <Button onClick={() => send({ type: 'offer-rematch' })}>
+                <IconRetry size={18} />
+                Revanche
+              </Button>
+            )}
           </div>
           <div className="actions">
             <Button variant="ghost" onClick={props.onClose}>

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  ENDGAMES,
   LESSONS,
   PASS_RATIO,
   buildDashboard,
@@ -50,6 +51,17 @@ function botResultsOf(history: GameSummary[], botLevels: BotLevels): BotResult[]
  * première séance enregistrée, on garde l'ancienne estimation (date de revue, au plus 2 par jour) pour ne pas
  * effacer l'historique ; `undefined` si rien n'est enregistré (le coach applique ce repli seul).
  */
+/** Finales (lot 4b) : réussies au moins une fois ? */
+function endgamesOf(store: GameStore, userId: string) {
+  const passed = new Set(
+    store
+      .endgameProgress(userId)
+      .filter((p) => p.successes > 0)
+      .map((p) => p.endgameId),
+  );
+  return ENDGAMES.map((e) => ({ id: e.id, title: e.title, passed: passed.has(e.id) }));
+}
+
 function analysisSessionsOf(
   recorded: number[],
   reviewedAt: (number | null)[],
@@ -156,6 +168,7 @@ export function dashboardFor(
     lessonSessions,
     ...(analysisSessions ? { analysisSessions } : {}),
     botResults: botResultsOf(history, botLevels),
+    endgames: endgamesOf(store, userId),
   });
 }
 

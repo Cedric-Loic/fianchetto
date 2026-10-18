@@ -80,6 +80,8 @@ export interface DashboardInput {
   analysisSessions?: number[];
   /** Résultats des parties classiques contre le bot (niveau suggéré). */
   botResults?: BotResult[];
+  /** Finales contre le bot (lot 4b), dans l'ordre de la bibliothèque. */
+  endgames?: { id: string; title: string; passed: boolean }[];
 }
 
 /** Minutes estimées par activité quand la durée réelle n'est pas connue. */
@@ -632,6 +634,14 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
     recommendations.push({
       text: `Leçon de la semaine : ${nextLesson.title}.`,
       href: `#/lessons/${nextLesson.id}`,
+    });
+  }
+  // Phase 2 et suivantes : première finale pas encore réussie.
+  const nextEndgame = current >= 2 ? input.endgames?.find((e) => !e.passed) : undefined;
+  if (nextEndgame) {
+    recommendations.push({
+      text: `Finale à travailler contre le bot : ${nextEndgame.title}.`,
+      href: '#/endgames',
     });
   }
   if ((tasks[1]?.done ?? 0) < 2) {

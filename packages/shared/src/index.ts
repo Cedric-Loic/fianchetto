@@ -24,3 +24,4 @@ export * from './puzzle.js';
 export * from './lesson.js';
 export * from './coach.js';
 export * from './analysis.js';
+export * from './endgame.js';

@@ -16,6 +16,7 @@ import { PlayerBar } from '../game/PlayerBar';
 import { send } from '../lib/net';
 import { publicPositionAt } from '../lib/position';
 import { piecesFromFen } from '../lib/fen';
+import { startEndgame, useEndgameOf } from '../lib/endgame';
 import { useGame } from '../lib/store';
 import { useSession } from '../lib/session';
 import { SIDE, VARIANT_LABEL } from './labels';
@@ -57,6 +58,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const isBot = state.mode === 'bot';
   const classic = state.variant === 'classic';
   const user = useSession((s) => s.user);
+  const endgame = useEndgameOf(state);
   const [orientation, setOrientation] = useState<Color>(me ?? 'w');
   // Position consultée dans l'historique ; oubliée dès qu'un nouveau coup arrive.
   const [nav, setNav] = useState<{ ply: number; base: number } | null>(null);
@@ -318,6 +320,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           result={board.result}
           ratingAfter={user ? user.ratings[state.variant].rating : null}
           justEnded={justEnded}
+          endgame={endgame}
           onClose={() => setShowEnd(false)}
           onLeave={onLeave}
         />
@@ -507,6 +510,11 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           </button>
         </div>
 
+        {endgame && (
+          <p className="endgame-goal" data-testid="endgame-goal">
+            <strong>{endgame.title}</strong> · {endgame.objective}
+          </p>
+        )}
         {!ended && state.training && (
           <div className="training" data-testid="training-panel">
             <div className="actions">
@@ -555,10 +563,17 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         )}
         {ended && (
           <div className="actions">
-            <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
-              <IconRetry size={18} />
-              Revanche
-            </Button>
+            {endgame ? (
+              <Button variant="primary" onClick={() => void startEndgame(endgame.id)}>
+                <IconRetry size={18} />
+                Réessayer
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
+                <IconRetry size={18} />
+                Revanche
+              </Button>
+            )}
             <Button onClick={onLeave}>Nouvelle partie</Button>
           </div>
         )}

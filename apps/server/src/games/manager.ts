@@ -20,8 +20,8 @@ export interface ManagerOptions {
   config: GameConfig;
   /** Fabrique de bots (remplaçable dans les tests). */
   createBot?: (level: BotLevel) => BotDriver;
-  /** Après la fin d'une partie (par exemple : lancer sa revue). */
-  afterEnd?: (session: GameSession) => void;
+  /** Après la fin d'une partie (par exemple : lancer sa revue, noter une finale). */
+  afterEnd?: (session: GameSession, result: GameResult) => void;
   /** Bot par défaut : temps de réflexion « humain » (défaut : oui). */
   botHumanPace?: boolean;
   /** Journal des parties (échecs du bot), sans donnée de jeu. */
@@ -41,7 +41,7 @@ export class GameManager {
   readonly #store: GameStore;
   readonly #config: GameConfig;
   readonly #createBot: (level: BotLevel) => BotDriver;
-  readonly #afterEnd: ((session: GameSession) => void) | undefined;
+  readonly #afterEnd: ((session: GameSession, result: GameResult) => void) | undefined;
   readonly #logger: SessionLogger | undefined;
 
   constructor(options: ManagerOptions) {
@@ -81,7 +81,7 @@ export class GameManager {
       },
       onEnd: (session: GameSession, result: GameResult) => {
         this.#recordResult(session, result);
-        this.#afterEnd?.(session);
+        this.#afterEnd?.(session, result);
       },
     };
   }

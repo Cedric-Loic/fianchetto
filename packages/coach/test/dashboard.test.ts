@@ -161,4 +161,33 @@ describe('tableau de bord', () => {
     expect(d1.phase.current).toBe(1);
     expect(d1.phase.criteria.find((c) => c.label.startsWith('Leçons'))?.met).toBe(false);
   });
+
+  it('phase 2 : recommande la première finale pas encore réussie', () => {
+    const clean = Array.from({ length: 10 }, (_, i) => game(i, { review: review(0, 85) }));
+    const solved = Array.from({ length: 150 }, (_, i) => ({
+      at: i,
+      success: true,
+      ratingAfter: null,
+      themes: '',
+    }));
+    const endgames = [
+      { id: 'dame-roi', title: 'Roi et dame contre roi', passed: true },
+      { id: 'lucena', title: 'Position de Lucena', passed: false },
+    ];
+    const phase2 = input({
+      games: clean,
+      lessons: input().lessons.map((l) => ({ ...l, passed: true })),
+      puzzleAttempts: solved,
+      endgames,
+    });
+    const d = buildDashboard(phase2);
+    expect(d.phase.current).toBeGreaterThanOrEqual(2);
+    expect(d.recommendations).toContainEqual({
+      text: 'Finale à travailler contre le bot : Position de Lucena.',
+      href: '#/endgames',
+    });
+    // Phase 1 : pas encore de finale.
+    const d1 = buildDashboard(input({ endgames }));
+    expect(d1.recommendations.some((r) => r.href === '#/endgames')).toBe(false);
+  });
 });

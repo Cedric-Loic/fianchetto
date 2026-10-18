@@ -185,6 +185,15 @@ export class GameStore {
         at      INTEGER NOT NULL,
         PRIMARY KEY (user_id, kind, ref, day)
       );
+      -- Lot 4b : finales contre le bot (parties terminées et réussites par position).
+      CREATE TABLE IF NOT EXISTS endgame_progress (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        endgame_id TEXT NOT NULL,
+        attempts   INTEGER NOT NULL,
+        successes  INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, endgame_id)
+      );
       -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
       INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
         SELECT id, 'secret-queen', rating, games_played FROM users WHERE games_played > 0;`);
@@ -393,6 +402,30 @@ export class GameStore {
       )
       .run(userId, lessonId, correct, Date.now());
     this.recordActivity(userId, 'lesson', lessonId);
+  }
+
+  // --- Finales (lot 4b) ----------------------------------------------------------------------
+
+  /** Progression des finales déjà tentées. */
+  endgameProgress(userId: string): { endgameId: string; attempts: number; successes: number }[] {
+    return this.#db
+      .prepare(
+        `SELECT endgame_id AS endgameId, attempts, successes FROM endgame_progress
+         WHERE user_id = ?`,
+      )
+      .all(userId) as { endgameId: string; attempts: number; successes: number }[];
+  }
+
+  /** Une partie terminée depuis une finale, réussie ou non. */
+  saveEndgameResult(userId: string, endgameId: string, success: boolean): void {
+    this.#db
+      .prepare(
+        `INSERT INTO endgame_progress (user_id, endgame_id, attempts, successes, updated_at)
+         VALUES (?, ?, 1, ?, ?)
+         ON CONFLICT(user_id, endgame_id) DO UPDATE SET attempts = attempts + 1,
+           successes = successes + excluded.successes, updated_at = excluded.updated_at`,
+      )
+      .run(userId, endgameId, success ? 1 : 0, Date.now());
   }
 
   // --- Séances d'entraînement (minutes du coach, étape 13) ----------------------------------

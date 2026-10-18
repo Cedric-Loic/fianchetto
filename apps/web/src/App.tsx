@@ -3,6 +3,7 @@ import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
 import { Coach } from './screens/Coach';
+import { Endgames } from './screens/Endgames';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
@@ -28,6 +29,7 @@ type Route =
   | { page: 'puzzles'; mode?: 'theme' | 'review' | 'mine'; theme?: string }
   | { page: 'coach' }
   | { page: 'lessons' }
+  | { page: 'endgames' }
   | { page: 'lesson'; id: string }
   | { page: 'review'; id: string; guided: boolean }
   | { page: 'game'; gameId: string };
@@ -61,6 +63,7 @@ function parseHash(h: string): Route {
   if (h === '#/puzzles/review') return { page: 'puzzles', mode: 'review' };
   if (h === '#/puzzles/mine') return { page: 'puzzles', mode: 'mine' };
   if (h === '#/lessons') return { page: 'lessons' };
+  if (h === '#/endgames') return { page: 'endgames' };
   m = /^#\/lessons\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'lesson', id: m[1] };
   if (h === '#/login') return { page: 'login' };
@@ -76,6 +79,7 @@ function sectionOf(route: Route): NavSection {
       return 'play';
     case 'lessons':
     case 'lesson':
+    case 'endgames':
       return 'lessons';
     case 'analyse':
     case 'review':
@@ -131,6 +135,7 @@ export function App() {
     );
   } else if (route.page === 'coach') content = <Coach />;
   else if (route.page === 'lessons') content = <Lessons />;
+  else if (route.page === 'endgames') content = <Endgames />;
   else if (route.page === 'lesson') content = <LessonPage key={route.id} id={route.id} />;
   else if (route.page === 'review')
     content = <Review key={hash} id={route.id} guided={route.guided} />;

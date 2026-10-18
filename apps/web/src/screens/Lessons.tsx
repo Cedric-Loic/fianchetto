@@ -75,6 +75,11 @@ export function Lessons() {
           {passed} leçon{passed > 1 ? 's' : ''} validée{passed > 1 ? 's' : ''} sur {lessons.length}.
           Une leçon est validée quand 80 % de ses exercices sont réussis du premier coup.
         </p>
+        <p>
+          <a href="#/endgames" data-testid="lessons-endgames">
+            Finales contre le bot : mets la théorie en pratique →
+          </a>
+        </p>
         {lessons.length === 0 && (
           <EmptyState icon={<IconBook size={40} />} title="Aucune leçon disponible">
             Le serveur n'a renvoyé aucune leçon.

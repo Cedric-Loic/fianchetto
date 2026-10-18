@@ -19,7 +19,7 @@ describe('leçons', () => {
 
     const { app, http } = await server();
     const { lessons } = (await http('GET', '/api/lessons')).json as LessonsResponse;
-    expect(lessons).toHaveLength(10);
+    expect(lessons).toHaveLength(20);
     expect(lessons[0]).toMatchObject({ id: 'routine', phase: 1, best: null, passed: false });
     const view = (await http('GET', '/api/lessons/fourchette')).json as LessonView;
     expect(view.exercises[0]).toMatchObject({ color: 'w' });

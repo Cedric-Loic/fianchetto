@@ -2,6 +2,8 @@ import type {
   BotLevelInfo,
   CoachDashboard,
   CheckMoveResponse,
+  EndgameStartResponse,
+  EndgamesResponse,
   HintResponse,
   ImportedGamesResponse,
   ImportResult,
@@ -182,6 +184,9 @@ export const api = {
     call<LessonMoveResponse>('POST', `/api/lessons/${id}/exercises/${index}/move`, { step, uci }),
   lessonResult: (id: string, correct: number) =>
     call<LessonSummary>('POST', `/api/lessons/${id}/result`, { correct }),
+  // Finales contre le bot.
+  endgames: () => call<EndgamesResponse>('GET', '/api/endgames'),
+  startEndgame: (id: string) => call<EndgameStartResponse>('POST', `/api/endgames/${id}/start`),
   // Puzzles.
   puzzleStats: () => call<PuzzleStats>('GET', '/api/puzzles/stats'),
   puzzleNext: (mode: PuzzleMode, theme: string | null) =>

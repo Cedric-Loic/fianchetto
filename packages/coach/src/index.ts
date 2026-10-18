@@ -53,3 +53,12 @@ export {
   type BotResult,
   type ThemeOfDayInput,
 } from './regularity.js';
+export {
+  ENDGAMES,
+  endgameByFen,
+  endgameById,
+  endgameColor,
+  endgameSucceeded,
+  type Endgame,
+  type EndgameGoal,
+} from './endgames.js';
