@@ -16,7 +16,7 @@ import { registerAnalysisRoutes } from './analysis/routes.js';
 import { AnalysisService, type LiveEngine } from './analysis/service.js';
 import { currentUser, registerAuthRoutes } from './auth.js';
 import type { BotDriver } from './bot/driver.js';
-import { loadConfig } from './config.js';
+import { humanPaceFromEnv, loadConfig } from './config.js';
 import { GameManager, InvalidGameRequest } from './games/manager.js';
 import type { GameSession, Participant } from './games/session.js';
 import { GameStore } from './persistence/db.js';
@@ -27,7 +27,7 @@ import { LessonService } from './lessons/service.js';
 import { registerPuzzleRoutes } from './puzzles/routes.js';
 import { PuzzleService } from './puzzles/service.js';
 import { registerReviewRoutes } from './review/routes.js';
-import { ReviewService } from './review/service.js';
+import { ReviewService, type ReviewEngine } from './review/service.js';
 import { registerTrainingRoutes } from './training/routes.js';
 import { TrainingService } from './training/service.js';
 import { serializeOutgoing } from './send.js';
@@ -46,8 +46,15 @@ export interface ServerOptions {
   config?: GameConfig;
   /** Fabrique de bots (tests). Par défaut : bot Stockfish dans un worker. */
   createBot?: ConstructorParameters<typeof GameManager>[0]['createBot'];
+  /**
+   * Bot par défaut : temps de réflexion « humain ». Défaut : variable d'environnement
+   * `FIANCHETTO_HUMAN_PACE` (`0` le désactive, pour les tests de bout en bout), sinon oui.
+   */
+  botHumanPace?: boolean;
   /** Temps Stockfish par position pour les revues (tests : plus court). Défaut : 150 ms. */
   reviewMovetimeMs?: number;
+  /** Moteur des revues et des évaluations (tests : faux moteur). Défaut : Stockfish. */
+  createReviewEngine?: () => ReviewEngine;
   /** Accès à l'API chess.com (tests : faux serveur). Défaut : `fetch`. */
   chessComFetcher?: JsonFetcher;
   /**
@@ -75,11 +82,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     initialRating: config.elo.initial,
     ...(options.puzzlesPath ? { puzzlesPath: options.puzzlesPath } : {}),
   });
-  const reviews = new ReviewService(store, { movetimeMs: options.reviewMovetimeMs });
+  const reviews = new ReviewService(store, {
+    movetimeMs: options.reviewMovetimeMs,
+    ...(options.createReviewEngine ? { createEngine: options.createReviewEngine } : {}),
+  });
   const games = new GameManager({
     store,
     config,
     createBot: options.createBot,
+    botHumanPace: options.botHumanPace ?? humanPaceFromEnv(),
+    logger: app.log,
     // Revue lancée d'office à la fin d'une partie classique contre le bot (bilan du coach).
     afterEnd: (session) => {
       if (session.variant === 'classic' && session.mode === 'bot') {

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { LessonMoveRequestSchema, LessonResultRequestSchema } from '@sq/shared';
 import { currentUser } from '../auth.js';
 import type { GameStore } from '../persistence/db.js';
+import { orEngineUnavailable } from '../engine-unavailable.js';
 import type { LessonService } from './service.js';
 
 /** Routes des leçons (étape 10), réservées aux comptes (progression personnelle). */
@@ -29,13 +30,15 @@ export function registerLessonRoutes(
       if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
       const parsed = LessonMoveRequestSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: 'BAD_REQUEST' });
-      const result = await lessons.move(
-        request.params.id,
-        Number(request.params.index),
-        parsed.data.step,
-        parsed.data.uci,
-      );
-      return result ?? reply.code(404).send({ error: 'NOT_FOUND' });
+      return orEngineUnavailable(reply, async () => {
+        const result = await lessons.move(
+          request.params.id,
+          Number(request.params.index),
+          parsed.data.step,
+          parsed.data.uci,
+        );
+        return result ?? reply.code(404).send({ error: 'NOT_FOUND' });
+      });
     },
   );
 

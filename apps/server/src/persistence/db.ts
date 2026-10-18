@@ -54,6 +54,32 @@ const IMPORTED_SELECT = `SELECT id, user_id AS userId, source, external_id AS ex
   white, black, white_elo AS whiteElo, black_elo AS blackElo, result, date,
   time_control AS timeControl, user_color AS userColor, plies, url FROM imported_games`;
 
+/** Résumé d'une revue, par camp : précision et nombre d'imprécisions, d'erreurs et de gaffes. */
+export interface ReviewSummary {
+  accuracy: GameReview['accuracy'];
+  counts: Record<Color, { inaccuracy: number; mistake: number; blunder: number }>;
+}
+
+/** Ligne de la liste des parties importées : sans le PGN, avec le résumé de la revue. */
+export type ImportedGameListRow = Omit<ImportedGameRow, 'pgn' | 'userId' | 'externalId'> & {
+  /** Une revue est enregistrée pour cette partie. */
+  reviewed: boolean;
+  /** Résumé de la revue (`null` : pas de revue, ou revue illisible). */
+  summary: ReviewSummary | null;
+};
+
+function reviewSummary(review: GameReview): ReviewSummary {
+  const counts = (c: GameReview['counts']['w']) => ({
+    inaccuracy: c.inaccuracy,
+    mistake: c.mistake,
+    blunder: c.blunder,
+  });
+  return {
+    accuracy: { w: review.accuracy.w, b: review.accuracy.b },
+    counts: { w: counts(review.counts.w), b: counts(review.counts.b) },
+  };
+}
+
 export interface SavedGame {
   record: SessionRecord;
   secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedAny> | null };
@@ -150,10 +176,37 @@ export class GameStore {
       -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
       INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
         SELECT id, 'secret-queen', rating, games_played FROM users WHERE games_played > 0;`);
+    this.#migrateReviewSummaries();
     this.puzzles = new PuzzleStore(
       this.#db,
       options.puzzlesPath ?? (path === ':memory:' ? ':memory:' : join(dirname(path), 'puzzles.db')),
     );
+  }
+
+  /**
+   * Migration : colonne `reviews.summary` (statistiques résumées, lues par la liste des parties
+   * importées sans relire la revue complète), calculée pour les revues qui ne l'ont pas encore.
+   */
+  #migrateReviewSummaries(): void {
+    const columns = this.#db.prepare(`PRAGMA table_info(reviews)`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'summary')) {
+      this.#db.exec(`ALTER TABLE reviews ADD COLUMN summary TEXT`);
+    }
+    const rows = this.#db
+      .prepare(`SELECT game_id AS gameId, review FROM reviews WHERE summary IS NULL`)
+      .all() as { gameId: string; review: string }[];
+    if (rows.length === 0) return;
+    const update = this.#db.prepare(`UPDATE reviews SET summary = ? WHERE game_id = ?`);
+    this.#db.transaction(() => {
+      for (const row of rows) {
+        try {
+          const summary = reviewSummary(JSON.parse(row.review) as GameReview);
+          update.run(JSON.stringify(summary), row.gameId);
+        } catch {
+          // Revue illisible : pas de résumé (la liste affiche la partie sans statistiques).
+        }
+      }
+    })();
   }
 
   // --- Comptes ---------------------------------------------------------------------------
@@ -337,6 +390,11 @@ export class GameStore {
     return row ? (JSON.parse(row.review) as GameReview) : undefined;
   }
 
+  /** Présence d'une revue, sans la lire. */
+  hasReview(gameId: string): boolean {
+    return this.#db.prepare(`SELECT 1 FROM reviews WHERE game_id = ?`).get(gameId) !== undefined;
+  }
+
   /** Instant (ms) de la revue d'une partie, `null` si elle n'est pas analysée. */
   reviewDate(gameId: string): number | null {
     const row = this.#db.prepare(`SELECT created_at FROM reviews WHERE game_id = ?`).get(gameId) as
@@ -346,8 +404,10 @@ export class GameStore {
 
   saveReview(gameId: string, review: GameReview): void {
     this.#db
-      .prepare(`INSERT OR REPLACE INTO reviews (game_id, review, created_at) VALUES (?, ?, ?)`)
-      .run(gameId, JSON.stringify(review), Date.now());
+      .prepare(
+        `INSERT OR REPLACE INTO reviews (game_id, review, summary, created_at) VALUES (?, ?, ?, ?)`,
+      )
+      .run(gameId, JSON.stringify(review), JSON.stringify(reviewSummary(review)), Date.now());
   }
 
   /** Enregistre une partie importée ; `false` si elle l'était déjà (même `externalId`). */
@@ -370,6 +430,35 @@ export class GameStore {
         `${IMPORTED_SELECT} WHERE user_id = ? ORDER BY COALESCE(date, '') DESC, created_at DESC`,
       )
       .all(userId) as ImportedGameRow[];
+  }
+
+  /**
+   * Liste des parties importées (rafraîchie souvent pendant une analyse) : seulement les colonnes
+   * affichées et le résumé de la revue, jamais le PGN ni la revue complète.
+   */
+  listImportedSummaries(userId: string): ImportedGameListRow[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT g.id, g.source, g.white, g.black, g.white_elo AS whiteElo,
+           g.black_elo AS blackElo, g.result, g.date, g.time_control AS timeControl,
+           g.user_color AS userColor, g.plies, g.url,
+           r.game_id IS NOT NULL AS reviewed, r.summary
+         FROM imported_games g LEFT JOIN reviews r ON r.game_id = g.id
+         WHERE g.user_id = ? ORDER BY COALESCE(g.date, '') DESC, g.created_at DESC`,
+      )
+      .all(userId) as (Omit<ImportedGameListRow, 'reviewed' | 'summary'> & {
+      reviewed: number;
+      summary: string | null;
+    })[];
+    return rows.map((row) => {
+      let summary: ReviewSummary | null;
+      try {
+        summary = row.summary ? (JSON.parse(row.summary) as ReviewSummary) : null;
+      } catch {
+        summary = null;
+      }
+      return { ...row, reviewed: row.reviewed === 1, summary };
+    });
   }
 
   getImported(id: string): ImportedGameRow | undefined {

@@ -13,7 +13,7 @@ import {
 import { WorkerBot, type BotDriver } from '../bot/driver.js';
 import { updateRating } from '../elo.js';
 import type { GameStore } from '../persistence/db.js';
-import { GameSession } from './session.js';
+import { GameSession, type SessionLogger } from './session.js';
 
 export interface ManagerOptions {
   store: GameStore;
@@ -22,6 +22,10 @@ export interface ManagerOptions {
   createBot?: (level: BotLevel) => BotDriver;
   /** Après la fin d'une partie (par exemple : lancer sa revue). */
   afterEnd?: (session: GameSession) => void;
+  /** Bot par défaut : temps de réflexion « humain » (défaut : oui). */
+  botHumanPace?: boolean;
+  /** Journal des parties (échecs du bot), sans donnée de jeu. */
+  logger?: SessionLogger;
 }
 
 /** Demande de partie invalide (FEN, combinaison d'options). */
@@ -38,12 +42,15 @@ export class GameManager {
   readonly #config: GameConfig;
   readonly #createBot: (level: BotLevel) => BotDriver;
   readonly #afterEnd: ((session: GameSession) => void) | undefined;
+  readonly #logger: SessionLogger | undefined;
 
   constructor(options: ManagerOptions) {
     this.#store = options.store;
     this.#config = options.config;
-    this.#createBot = options.createBot ?? ((level) => new WorkerBot(level));
+    const humanPace = options.botHumanPace ?? true;
+    this.#createBot = options.createBot ?? ((level) => new WorkerBot(level, { humanPace }));
     this.#afterEnd = options.afterEnd;
+    this.#logger = options.logger;
     for (const saved of this.#store.loadUnfinished()) {
       try {
         const level = saved.record.botColor
@@ -66,6 +73,7 @@ export class GameManager {
 
   #hooks() {
     return {
+      ...(this.#logger ? { logger: this.#logger } : {}),
       onRematch: (previous: GameSession) => this.#rematch(previous),
       onChange: (session: GameSession) => {
         const { record, secrets } = session.toRecord();

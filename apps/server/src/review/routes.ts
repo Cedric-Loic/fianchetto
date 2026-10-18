@@ -4,7 +4,6 @@ import {
   ImportChessComRequestSchema,
   ImportPgnRequestSchema,
   RetryMoveRequestSchema,
-  type GameReview,
   type ImportResult,
   type ImportedGamesResponse,
   type ImportedGameSummary,
@@ -15,7 +14,7 @@ import {
 import { splitPgn } from '@sq/coach';
 import { currentUser } from '../auth.js';
 import type { GameSession } from '../games/session.js';
-import type { GameStore, ImportedGameRow } from '../persistence/db.js';
+import type { GameStore, ImportedGameListRow, ImportedGameRow } from '../persistence/db.js';
 import { ChessComError, fetchRecentGames, type JsonFetcher } from './chesscom.js';
 import { importedRow } from './imports.js';
 import { judgeRetry } from './retry.js';
@@ -77,12 +76,12 @@ function importedTarget(row: ImportedGameRow): Target {
   };
 }
 
-/** Statistiques du camp de l'utilisateur dans une revue. */
-function userStats(review: GameReview, row: ImportedGameRow): UserGameStats | null {
-  if (!row.userColor) return null;
-  const counts = review.counts[row.userColor];
+/** Statistiques du camp de l'utilisateur, tirées du résumé enregistré avec la revue. */
+function userStats(row: ImportedGameListRow): UserGameStats | null {
+  if (!row.userColor || !row.summary) return null;
+  const counts = row.summary.counts[row.userColor];
   return {
-    accuracy: review.accuracy[row.userColor],
+    accuracy: row.summary.accuracy[row.userColor],
     inaccuracy: counts.inaccuracy,
     mistake: counts.mistake,
     blunder: counts.blunder,
@@ -201,8 +200,9 @@ export function registerReviewRoutes(app: FastifyInstance, deps: ReviewDeps): vo
   app.get('/api/imports', (request, reply) => {
     const user = currentUser(store, request);
     if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
-    const games = store.listImported(user.id).map((row): ImportedGameSummary => {
-      const state = reviews.status(row.id);
+    // Rafraîchie souvent pendant une analyse : ni PGN ni revue complète relus.
+    const games = store.listImportedSummaries(user.id).map((row): ImportedGameSummary => {
+      const status = row.reviewed ? 'done' : reviews.pendingStatus(row.id).status;
       return {
         id: row.id,
         source: row.source,
@@ -216,8 +216,8 @@ export function registerReviewRoutes(app: FastifyInstance, deps: ReviewDeps): vo
         userColor: row.userColor,
         plies: row.plies,
         url: row.url,
-        review: state.status,
-        stats: state.status === 'done' ? userStats(state.review, row) : null,
+        review: status,
+        stats: row.reviewed ? userStats(row) : null,
       };
     });
     const response: ImportedGamesResponse = { games };
@@ -238,10 +238,14 @@ export function registerReviewRoutes(app: FastifyInstance, deps: ReviewDeps): vo
     const user = currentUser(store, request);
     if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
     let queued = 0;
-    for (const row of store.listImported(user.id)) {
-      const status = reviews.status(row.id).status;
+    for (const row of store.listImportedSummaries(user.id)) {
+      const status = row.reviewed ? 'done' : reviews.pendingStatus(row.id).status;
       if (status === 'done' || status === 'queued' || status === 'running') continue;
-      reviews.request(row.id, importedTarget(row).load);
+      // PGN lu au moment de l'analyse seulement.
+      reviews.request(row.id, () => {
+        const full = store.getImported(row.id);
+        return full ? parseGame(full.pgn) : null;
+      });
       queued++;
     }
     return { queued };

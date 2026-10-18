@@ -85,7 +85,14 @@ export const useGame = create<GameStore>((set, get) => ({
         if (get().peekHeld) set({ peek: { color: message.color, square: message.square } });
         return;
       case 'error':
-        set({ toast: message.code === 'GAME_NOT_FOUND' ? 'Partie introuvable.' : 'Erreur.' });
+        set({
+          toast:
+            message.code === 'GAME_NOT_FOUND'
+              ? 'Partie introuvable.'
+              : message.code === 'BOT_UNAVAILABLE'
+                ? 'Le bot ne répond pas : joue un coup ou recharge la page pour réessayer.'
+                : 'Erreur.',
+        });
         return;
     }
   },

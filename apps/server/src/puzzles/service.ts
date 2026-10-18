@@ -10,6 +10,7 @@ import type {
   PuzzleStats,
 } from '@sq/shared';
 import type { PositionAnalysis } from '@sq/bot';
+import { EngineUnavailableError } from '../engine-unavailable.js';
 import { legalMoves, playLine as line, playStep as play } from '../chess-utils.js';
 import type { GameStore } from '../persistence/db.js';
 
@@ -270,10 +271,10 @@ export class PuzzleService {
     if (!correct && live.source === 'mine' && live.evaluation) {
       // Mes erreurs : un autre coup presque aussi bon que celui du moteur est accepté.
       const after = await this.#evaluate(step.fen);
-      if (after) {
-        const before = winChance(live.evaluation, live.color);
-        correct = before - winChance(after, live.color) <= OWN_TOLERANCE;
-      }
+      // Moteur indisponible : 503, la tentative reste en l'état (le joueur peut rejouer).
+      if (!after) throw new EngineUnavailableError();
+      const before = winChance(live.evaluation, live.color);
+      correct = before - winChance(after, live.color) <= OWN_TOLERANCE;
     }
     if (!correct) {
       const solution = remaining();

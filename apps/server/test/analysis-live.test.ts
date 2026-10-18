@@ -172,7 +172,7 @@ describe('moteur en direct (SSE)', () => {
     await until(() => a.lines().length >= 1, 30_000);
     const b = await stream('r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 2);
     await a.reading;
-    expect(a.events.at(-1)).toEqual({ type: 'done', fen: WHITE_UP });
+    expect(a.events.at(-1)).toEqual({ type: 'interrupted', fen: WHITE_UP });
     await until(() => b.lines().length >= 1, 10_000);
     const lines = b.lines()[0];
     expect(lines?.type === 'lines' && lines.lines).toHaveLength(2);
@@ -236,5 +236,45 @@ describe('service d’analyse', () => {
     expect(fake.engines).toHaveLength(2);
     await service.dispose();
     expect(fake.engines[1]?.quit).toBe(1);
+  });
+
+  it('recherche arrêtée par une autre demande : « interrupted » ; fin naturelle : « done »', async () => {
+    /** Faux moteur : une recherche dure jusqu'à son arrêt, ou se termine seule si `quick`. */
+    let quick = false;
+    const create = (): LiveEngine => ({
+      alive: true,
+      quit: () => undefined,
+      analyzeStream(): AnalysisStream {
+        let finish: (lines: UciLine[]) => void = () => undefined;
+        const done = new Promise<UciLine[]>((resolve) => (finish = resolve));
+        if (quick) setTimeout(() => finish([]), 5);
+        return {
+          done,
+          stop: () => {
+            finish([]);
+            return done.then(() => undefined);
+          },
+        };
+      },
+    });
+    const service = new AnalysisService({ createEngine: create });
+    const first: AnalysisEvent[] = [];
+    const second: AnalysisEvent[] = [];
+    const fenA = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+    const fenB = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+    service.start(fenA, 1, (e) => first.push(e));
+    quick = true;
+    service.start(fenB, 1, (e) => second.push(e));
+    await until(() => first.length > 0 && second.length > 0);
+    expect(first).toEqual([{ type: 'interrupted', fen: fenA }]);
+    expect(second).toEqual([{ type: 'done', fen: fenB }]);
+    // L'appelant qui arrête sa propre recherche reçoit « done ».
+    quick = false;
+    const third: AnalysisEvent[] = [];
+    const search = service.start(fenA, 1, (e) => third.push(e));
+    await search.stop();
+    await until(() => third.length > 0);
+    expect(third).toEqual([{ type: 'done', fen: fenA }]);
+    await service.dispose();
   });
 });

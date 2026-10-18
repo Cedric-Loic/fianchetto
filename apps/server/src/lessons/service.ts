@@ -2,6 +2,7 @@ import { Chess } from 'chess.js';
 import { LESSONS, PASS_RATIO, lessonById, winChance, type Lesson } from '@sq/coach';
 import type { LessonMoveResponse, LessonSummary, LessonView, PuzzleStep, Square } from '@sq/shared';
 import type { PositionAnalysis } from '@sq/bot';
+import { EngineUnavailableError } from '../engine-unavailable.js';
 import { legalMoves, playLine, playStep } from '../chess-utils.js';
 import type { GameStore } from '../persistence/db.js';
 
@@ -104,10 +105,8 @@ export class LessonService {
     else if (exact) correct = played.uci === exercise.solution[step] || probe.isCheckmate();
     else {
       const [before, after] = [await this.#evaluate(fen), await this.#evaluate(played.fen)];
-      correct =
-        before !== null &&
-        after !== null &&
-        winChance(before, color) - winChance(after, color) <= (exercise.tolerance ?? 5);
+      if (!before || !after) throw new EngineUnavailableError();
+      correct = winChance(before, color) - winChance(after, color) <= (exercise.tolerance ?? 5);
     }
     if (!correct) {
       const remaining: PuzzleStep[] = playLine(

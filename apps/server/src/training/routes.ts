@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { CheckMoveRequestSchema, HintRequestSchema, type CheckMoveResponse } from '@sq/shared';
 import type { GameSession } from '../games/session.js';
+import { orEngineUnavailable } from '../engine-unavailable.js';
 import type { TrainingService } from './service.js';
 
 /**
@@ -32,9 +33,11 @@ export function registerTrainingRoutes(
     if (!parsed.success) return reply.code(400).send({ error: 'BAD_REQUEST' });
     const pos = position(request.params.id, request);
     if (!pos) return reply.code(409).send({ error: 'NOT_AVAILABLE' });
-    const response: CheckMoveResponse = {
-      warning: await training.checkMove(pos.fen, pos.color, parsed.data.uci),
-    };
-    return response;
+    return orEngineUnavailable(reply, async () => {
+      const response: CheckMoveResponse = {
+        warning: await training.checkMove(pos.fen, pos.color, parsed.data.uci),
+      };
+      return response;
+    });
   });
 }

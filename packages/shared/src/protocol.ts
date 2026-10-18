@@ -47,6 +47,8 @@ export const PROTOCOL_ERROR_CODES = [
   'GAME_NOT_FOUND',
   'FORBIDDEN',
   'INVALID_ACTION',
+  /** Le bot ne répond pas (moteur indisponible) ; aucune information sur la partie. */
+  'BOT_UNAVAILABLE',
 ] as const;
 export const ProtocolErrorCodeSchema = z.enum(PROTOCOL_ERROR_CODES);
 export type ProtocolErrorCode = z.infer<typeof ProtocolErrorCodeSchema>;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PuzzleModeSchema, PuzzleMoveRequestSchema } from '@sq/shared';
 import { currentUser } from '../auth.js';
 import type { GameStore } from '../persistence/db.js';
+import { orEngineUnavailable } from '../engine-unavailable.js';
 import type { PuzzleService } from './service.js';
 
 const NextRequestSchema = z.object({
@@ -42,8 +43,10 @@ export function registerPuzzleRoutes(
     if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
     const parsed = PuzzleMoveRequestSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'BAD_REQUEST' });
-    const result = await puzzles.move(user.id, request.params.id, parsed.data.uci);
-    return result ?? reply.code(404).send({ error: 'NOT_FOUND' });
+    return orEngineUnavailable(reply, async () => {
+      const result = await puzzles.move(user.id, request.params.id, parsed.data.uci);
+      return result ?? reply.code(404).send({ error: 'NOT_FOUND' });
+    });
   });
 
   app.post<{ Params: { id: string } }>('/api/puzzles/:id/hint', (request, reply) => {

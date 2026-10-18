@@ -65,6 +65,12 @@ export interface SessionSecrets {
   game: Secret<PersistedAny> | null;
 }
 
+/** Journal minimal d'une partie (pino en production). Jamais de donnée de jeu dedans. */
+export interface SessionLogger {
+  warn(details: Record<string, unknown>, message: string): void;
+  error(details: Record<string, unknown>, message: string): void;
+}
+
 export interface SessionOptions {
   id: string;
   variant: Variant;
@@ -88,6 +94,8 @@ export interface SessionOptions {
   onChange?: (session: GameSession) => void;
   /** Appelé une fois, à la fin de la partie (Elo, historique). */
   onEnd?: (session: GameSession, result: GameResult) => void;
+  /** Journal (échecs du bot). Seuls l'identifiant de partie et des compteurs y sont écrits. */
+  logger?: SessionLogger;
 }
 
 /** Un client connecté à la partie : son camp de vue et sa fonction d'envoi. */
@@ -105,6 +113,8 @@ interface ClockData {
 
 /** Nombre maximal de coups refusés d'affilée avant d'abandonner pour le bot (sécurité). */
 const MAX_BOT_ATTEMPTS = 80;
+/** Nouvelles tentatives (avec un bot recréé) quand le bot ne répond pas, avant de renoncer. */
+export const BOT_RETRIES = 2;
 
 /**
  * Une partie côté serveur, classique ou Secret Queen, hot-seat ou contre le bot. Gère la phase
@@ -146,6 +156,11 @@ export class GameSession {
   #participants = new Set<Participant>();
   #bot: BotDriver | null;
   #botThinking = false;
+  /**
+   * Le bot a échoué plusieurs fois de suite : on ne le relance plus d'office (pas de boucle),
+   * mais au prochain événement du joueur (message, reconnexion).
+   */
+  #botStalled = false;
   /** Incrémenté à chaque reprise de coup : un coup du bot calculé avant est ignoré. */
   #botGeneration = 0;
   /** Refus des coups du bot : renvoyés au bot seulement. */
@@ -192,10 +207,13 @@ export class GameSession {
   start(): void {
     this.#ensureBot();
     if (this.variant === 'classic') return this.#maybeBotTurn();
-    if (this.mode !== 'bot' || this.#phase !== 'secret-selection' || !this.#bot) return;
+    if (this.mode !== 'bot' || this.#phase !== 'secret-selection') return;
     const botColor = this.botColor ?? 'b';
     if (this.#secrets[botColor] === undefined) {
-      this.#secrets[botColor] = this.#bot.chooseSecret(pawnStartSquares(botColor));
+      // Bot pas encore disponible (création en échec) : même tirage uniforme (CSPRNG).
+      const candidates = pawnStartSquares(botColor);
+      this.#secrets[botColor] =
+        this.#bot?.chooseSecret(candidates) ?? candidates[randomInt(candidates.length)];
     }
     this.#armSelectionTimer(opposite(botColor));
   }
@@ -212,14 +230,25 @@ export class GameSession {
   join(participant: Participant): void {
     this.#participants.add(participant);
     participant.send({ type: 'snapshot', state: this.stateFor(participant.viewer), cause: null });
-    // Partie restaurée : le bot se réveille quand le joueur revient.
-    this.#ensureBot();
-    this.#maybeBotTurn();
+    // Partie restaurée (ou bot en échec) : le bot se réveille quand le joueur revient.
+    this.#wakeBot();
   }
 
   #ensureBot(): void {
     if (this.mode !== 'bot' || this.#bot || this.#phase === 'ended') return;
-    this.#bot = this.#options.createBot?.() ?? null;
+    try {
+      this.#bot = this.#options.createBot?.() ?? null;
+    } catch {
+      this.#bot = null;
+      this.#options.logger?.error({ gameId: this.id }, 'Création du bot impossible');
+    }
+  }
+
+  /** Nouvelle tentative du bot après un échec, puis son tour s'il a le trait. */
+  #wakeBot(): void {
+    this.#botStalled = false;
+    this.#ensureBot();
+    this.#maybeBotTurn();
   }
 
   leave(participant: Participant): void {
@@ -229,8 +258,13 @@ export class GameSession {
   dispose(): void {
     this.#clearTimers();
     this.#participants.clear();
-    this.#bot?.dispose();
+    this.#disposeBot();
+  }
+
+  #disposeBot(): void {
+    const bot = this.#bot;
     this.#bot = null;
+    if (bot) void Promise.resolve(bot.dispose()).catch(() => undefined);
   }
 
   /**
@@ -239,6 +273,7 @@ export class GameSession {
    */
   handle(participant: Participant, message: ClientMessage): void {
     const actor = this.#actor(participant, message);
+    if (this.#botStalled && participant.viewer !== 'public') this.#wakeBot();
     switch (message.type) {
       case 'join':
         return;
@@ -437,8 +472,7 @@ export class GameSession {
     }
     if (cause) this.#broadcast(cause);
     this.#broadcast({ kind: 'game-ended', result });
-    this.#bot?.dispose();
-    this.#bot = null;
+    this.#disposeBot();
   }
 
   // --- Bot ------------------------------------------------------------------------------
@@ -451,7 +485,8 @@ export class GameSession {
 
   #maybeBotTurn(): void {
     const game = this.#game;
-    if (!this.#bot || this.#botThinking || this.#phase !== 'playing' || !game) return;
+    if (!this.#bot || this.#botThinking || this.#botStalled) return;
+    if (this.#phase !== 'playing' || !game) return;
     if (game.turn !== this.botColor) return;
     this.#botThinking = true;
     void this.#botPlay().finally(() => {
@@ -463,7 +498,8 @@ export class GameSession {
   async #botPlay(): Promise<void> {
     const color = this.botColor;
     const generation = this.#botGeneration;
-    for (let attempt = 0; attempt < MAX_BOT_ATTEMPTS; attempt++) {
+    let failures = 0;
+    for (let rejected = 0; rejected < MAX_BOT_ATTEMPTS;) {
       const bot = this.#bot;
       const game = this.#game;
       if (!bot || !game || color === null || this.#phase !== 'playing' || game.turn !== color) {
@@ -473,7 +509,20 @@ export class GameSession {
       try {
         move = await bot.chooseMove(this.#observation());
       } catch {
-        return;
+        // Bot arrêté entre-temps (fin de partie, arrêt du serveur) : rien à signaler.
+        if (this.#bot !== bot || generation !== this.#botGeneration) return;
+        failures++;
+        // Jamais l'erreur elle-même : elle pourrait citer le coup du bot (donc sa dame).
+        this.#options.logger?.warn(
+          { gameId: this.id, failures, retries: BOT_RETRIES },
+          'Le bot n’a pas pu jouer',
+        );
+        if (failures > BOT_RETRIES) return this.#stallBot();
+        // Worker ou Stockfish probablement morts : on repart d'un bot neuf.
+        this.#disposeBot();
+        this.#ensureBot();
+        if (!this.#bot) return this.#stallBot();
+        continue;
       }
       // Coup repris pendant la réflexion du bot : ce coup ne vaut plus.
       if (generation !== this.#botGeneration) return;
@@ -481,9 +530,24 @@ export class GameSession {
       if (this.#applyMove(color, move)) return;
       if (this.#phase !== 'playing') return;
       this.#botRejections.push({ ply: plies, move });
+      rejected++;
     }
     // Ne devrait jamais arriver (le monde réel n'est jamais éliminé) : le bot abandonne.
     if (color !== null) this.#resign(color);
+  }
+
+  /**
+   * Le bot a échoué trop de fois : le joueur reçoit une erreur générique (aucune donnée de jeu)
+   * et la partie reste en l'état. Le bot sera relancé au prochain message du joueur ou à sa
+   * reconnexion ; d'ici là, le joueur peut aussi abandonner (ou gagner au temps).
+   */
+  #stallBot(): void {
+    this.#botStalled = true;
+    this.#disposeBot();
+    this.#options.logger?.error({ gameId: this.id }, 'Bot indisponible : partie en attente');
+    for (const p of this.#participants) {
+      if (p.viewer !== 'public') p.send({ type: 'error', code: 'BOT_UNAVAILABLE' });
+    }
   }
 
   async #botAnswersDraw(): Promise<void> {

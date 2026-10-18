@@ -2,6 +2,7 @@ import { Chess, type Move, type PieceSymbol, type Square } from 'chess.js';
 import { explainMove, forkTargets, winChance, winsMaterial, type EngineEval } from '@sq/coach';
 import type { Color, HintResponse, SquareMark } from '@sq/shared';
 import type { PositionAnalysis } from '@sq/bot';
+import { EngineUnavailableError } from '../engine-unavailable.js';
 
 /** Seuil de gaffe (points de % de gain perdus) qui déclenche le garde-fou. */
 const BLUNDER = 15;
@@ -151,7 +152,7 @@ export class TrainingService {
     }
     const before = await this.#analysis(fen);
     const after = await this.#analysis(chess.fen());
-    if (!before || !after) return null;
+    if (!before || !after) throw new EngineUnavailableError();
     if (winChance(before, color) - winChance(after, color) < BLUNDER) return null;
     const explanation = explainMove(
       {

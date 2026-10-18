@@ -28,6 +28,8 @@ export interface LiveSearch {
 
 interface Current {
   stream: AnalysisStream;
+  /** Arrêtée par une autre demande : sa fin est `interrupted`, pas `done`. */
+  interrupted: boolean;
 }
 
 const IDLE_MS = 2 * 60_000;
@@ -62,8 +64,9 @@ export class AnalysisService {
 
   /**
    * Lance l'analyse de `fen` : `onEvent` reçoit des événements `lines`, puis exactement un
-   * événement final (`done` ou `error`). La recherche précédente éventuelle est arrêtée (elle
-   * reçoit son `done`).
+   * événement final : `done` (fin naturelle, position finale, arrêt par l'appelant),
+   * `interrupted` (arrêtée par une autre demande) ou `error`. La recherche précédente
+   * éventuelle est arrêtée : elle reçoit `interrupted`.
    */
   start(fen: string, multipv: number, onEvent: (event: AnalysisEvent) => void): LiveSearch {
     const idle: LiveSearch = { stop: () => Promise.resolve() };
@@ -77,7 +80,11 @@ export class AnalysisService {
       return idle;
     }
     this.#clearIdle();
-    void this.#current?.stream.stop();
+    const previous = this.#current;
+    if (previous) {
+      previous.interrupted = true;
+      void previous.stream.stop();
+    }
 
     const engineFen = chess.fen();
     let ended = false;
@@ -100,11 +107,11 @@ export class AnalysisService {
       end({ type: 'error', error: 'ENGINE_ERROR' });
       return idle;
     }
-    const current: Current = { stream };
+    const current: Current = { stream, interrupted: false };
     this.#current = current;
     void stream.done
       .then(
-        () => end({ type: 'done', fen }),
+        () => end(current.interrupted ? { type: 'interrupted', fen } : { type: 'done', fen }),
         () => end({ type: 'error', error: 'ENGINE_ERROR' }),
       )
       .finally(() => {

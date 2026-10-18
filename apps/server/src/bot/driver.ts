@@ -14,7 +14,20 @@ export interface BotDriver {
   chooseSecret(candidates: readonly Square[]): Square;
   chooseMove(observation: BotObservation): Promise<MoveIntent>;
   shouldAcceptDraw(observation: BotObservation): Promise<boolean>;
-  dispose(): void;
+  /** Arrêt du bot (et de son moteur) ; la promesse éventuelle se résout une fois tout arrêté. */
+  dispose(): void | Promise<void>;
+}
+
+/** Délai laissé au worker pour arrêter Stockfish avant de le forcer à s'arrêter. */
+const STOP_GRACE_MS = 1000;
+
+export interface WorkerBotOptions {
+  /** `false` : le bot joue sans temps de réflexion simulé (tests, e2e). */
+  humanPace?: boolean;
+  /** Délai de grâce de l'arrêt (tests). Défaut : 1 s. */
+  stopGraceMs?: number;
+  /** Module du worker (tests). Défaut : le worker du bot. */
+  workerUrl?: URL;
 }
 
 /**
@@ -23,12 +36,16 @@ export interface BotDriver {
  */
 export class WorkerBot implements BotDriver {
   readonly #worker: Worker;
+  readonly #stopGraceMs: number;
   #nextId = 1;
   readonly #pending = new Map<number, (response: BotResponse) => void>();
+  #exited = false;
+  readonly #exit: Promise<void>;
+  #disposing: Promise<void> | null = null;
 
-  /** `humanPace: false` : le bot joue sans temps de réflexion simulé (tests). */
-  constructor(level: BotLevel, options: { humanPace?: boolean } = {}) {
-    this.#worker = new Worker(BOT_WORKER_URL, {
+  constructor(level: BotLevel, options: WorkerBotOptions = {}) {
+    this.#stopGraceMs = options.stopGraceMs ?? STOP_GRACE_MS;
+    this.#worker = new Worker(options.workerUrl ?? BOT_WORKER_URL, {
       workerData: { level, humanPace: options.humanPace ?? true },
     });
     this.#worker.on('message', (response: BotResponse) => {
@@ -36,14 +53,29 @@ export class WorkerBot implements BotDriver {
       this.#pending.delete(response.id);
     });
     // Worker en erreur : les demandes en cours échouent (la partie n'est pas bloquée à vie).
-    this.#worker.on('error', () => {
-      for (const [id, done] of this.#pending) done({ id, ok: false });
-      this.#pending.clear();
+    this.#worker.on('error', () => this.#failPending());
+    this.#exit = new Promise((resolve) => {
+      this.#worker.once('exit', () => {
+        this.#exited = true;
+        this.#failPending();
+        resolve();
+      });
     });
     this.#worker.unref();
   }
 
+  /** Le worker s'est arrêté (normalement ou non). */
+  get exited(): boolean {
+    return this.#exited;
+  }
+
+  #failPending(): void {
+    for (const [id, done] of this.#pending) done({ id, ok: false });
+    this.#pending.clear();
+  }
+
   #request(kind: BotRequest['kind'], observation: BotObservation): Promise<unknown> {
+    if (this.#exited || this.#disposing) return Promise.reject(new Error('Bot arrêté.'));
     const id = this.#nextId++;
     return new Promise((resolve, reject) => {
       this.#pending.set(id, (response) =>
@@ -68,8 +100,19 @@ export class WorkerBot implements BotDriver {
     return (await this.#request('shouldAcceptDraw', observation)) === true;
   }
 
-  dispose(): void {
+  /**
+   * Demande au worker de s'arrêter (il arrête Stockfish puis se termine) et attend sa sortie ;
+   * passé le délai de grâce, il est arrêté de force. Sans cette attente, Stockfish resterait
+   * orphelin.
+   */
+  dispose(): Promise<void> {
+    if (this.#disposing) return this.#disposing;
+    this.#failPending();
+    if (this.#exited) return (this.#disposing = Promise.resolve());
     this.#worker.postMessage('stop');
-    void this.#worker.terminate();
+    const timer = setTimeout(() => void this.#worker.terminate(), this.#stopGraceMs);
+    timer.unref();
+    this.#disposing = this.#exit.then(() => clearTimeout(timer));
+    return this.#disposing;
   }
 }
