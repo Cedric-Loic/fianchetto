@@ -53,3 +53,54 @@ export function parseGame(text: string): ParsedGame | null {
     moves: history.map((m) => ({ uci: m.lan, san: m.san })),
   };
 }
+
+/** « [%clk 0:09:57.3] » → millisecondes ; `null` sans pendule. */
+function clockOf(comment: string): number | null {
+  const m = /\[%clk\s+(\d+):(\d{1,2}):(\d{1,2}(?:\.\d+)?)\]/.exec(comment);
+  if (!m) return null;
+  return Math.round((Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])) * 1000);
+}
+
+/**
+ * Temps restant (ms) après chaque demi-coup, lu dans les commentaires `[%clk h:mm:ss]` des PGN
+ * de chess.com et Lichess : `clocks[i]` suit le demi-coup `i + 1` (`null` s'il n'a pas de
+ * pendule). `null` si la partie n'en a aucune. Lecture rapide du texte des coups (sans rejouer
+ * la partie) : les variantes entre parenthèses sont ignorées.
+ */
+export function pgnClocks(pgn: string): (number | null)[] | null {
+  const moves = pgn
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .filter((line) => !/^\s*\[/.test(line))
+    .join(' ');
+  const clocks: (number | null)[] = [];
+  let found = false;
+  let depth = 0;
+  // Jetons : commentaire {…}, commentaire de fin de ligne ;…, parenthèse, ou mot.
+  for (const [token] of moves.matchAll(/\{[^}]*\}|;[^\n]*|[()]|[^\s{}();]+/g)) {
+    if (token === '(') depth++;
+    else if (token === ')') depth = Math.max(0, depth - 1);
+    else if (depth > 0) continue;
+    else if (token.startsWith('{') || token.startsWith(';')) {
+      const clock = clockOf(token);
+      if (clock !== null && clocks.length > 0) {
+        clocks[clocks.length - 1] = clock;
+        found = true;
+      }
+    } else if (/^\d+\.+$/.test(token) || /^\$\d+$/.test(token)) {
+      continue;
+    } else if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(token)) {
+      break;
+    } else {
+      // Un numéro collé au coup (« 1.e4 ») n'est pas un demi-coup à part.
+      if (token.replace(/^\d+\.+/, '') !== '') clocks.push(null);
+    }
+  }
+  return found ? clocks : null;
+}
+
+/** Temps initial (ms) d'après l'en-tête TimeControl (« 600+5 », « 180 ») ; `null` sinon. */
+export function initialClockMs(timeControl: string | null | undefined): number | null {
+  const m = /^(\d+)(?:\+\d+)?$/.exec(timeControl ?? '');
+  return m ? Number(m[1]) * 1000 : null;
+}

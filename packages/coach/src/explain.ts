@@ -12,6 +12,8 @@ import {
 import {
   balanceAfterLine,
   forkTargets,
+  isEndgame,
+  lineTactics,
   pieceLabel,
   pieceShort,
   playUci,
@@ -19,8 +21,9 @@ import {
   uciToSan,
   winsMaterial,
   type ForkTarget,
+  type LineTactic,
 } from './board.js';
-import { formatEval, type EvalLike } from './win.js';
+import { formatEval, winChance, type EvalLike } from './win.js';
 
 /** Évaluation moteur d'une position (point de vue des Blancs), avec la ligne principale. */
 export interface EngineEval extends EvalLike {
@@ -97,11 +100,30 @@ function listTargets(targets: readonly ForkTarget[]): string {
     : `${names.slice(0, -1).join(', ')} et ${names[names.length - 1] ?? ''}`;
 }
 
+/** « est cloué devant le roi e8 », « est clouée devant la dame d8 ». */
+function pinnedText(t: LineTactic): string {
+  return `${pieceLabel(t.front.type, t.front.square)} est ${pronoun(t.front.type) === 'la' ? 'clouée' : 'cloué'} devant ${pieceLabel(t.back.type, t.back.square)}`;
+}
+
+/** Marques d'un clouage ou d'une enfilade : cible de devant, pièce gagnée derrière, attaquant. */
+function lineMarks(t: LineTactic, attacker: string): SquareMark[] {
+  return [
+    ...marks([t.front.square], 'target'),
+    ...marks([t.back.square], t.kind === 'skewer' ? 'hanging' : 'target'),
+    ...marks([attacker], 'attacker'),
+  ];
+}
+
+/** Finale mal convertie : probabilité de gain d'au moins 80 % avant le coup… */
+export const ENDGAME_WIN_FROM = 80;
+/** … et d'au plus 60 % après (le gain a disparu). */
+export const ENDGAME_WIN_AFTER_MAX = 60;
+
 /**
  * Explication en français d'un coup imprécis, d'une erreur ou d'une gaffe. Détecteurs, du plus
  * précis au plus général : mat manqué, mat permis, pièce laissée en prise, fourchette permise,
- * fourchette manquée, prise gagnante manquée, perte de matériel sur la suite, puis repli
- * générique (meilleur coup et évaluations). Formulation neutre : elle vaut pour les deux camps.
+ * clouage ou enfilade permis, fourchette, clouage ou enfilade manqués, prise gagnante manquée,
+ * perte de matériel sur la suite, finale gagnante mal convertie, puis repli générique (meilleur coup et évaluations). Formulation neutre : elle vaut pour les deux camps.
  */
 export function explainMove(
   ctx: MoveContext,
@@ -191,6 +213,20 @@ export function explainMove(
     }
   }
 
+  if (replyUci && reply) {
+    const tactic = lineTactics(fenAfter, replyUci)[0];
+    if (tactic) {
+      return {
+        kind: tactic.kind === 'pin' ? 'allowed-pin' : 'allowed-skewer',
+        text:
+          tactic.kind === 'pin'
+            ? `Permet le clouage ${reply.san} : ${pinnedText(tactic)}.`
+            : `Permet l’enfilade ${reply.san} : ${pieceLabel(tactic.front.type, tactic.front.square)} doit s’écarter et ${pieceLabel(tactic.back.type, tactic.back.square)} tombe.`,
+        visual: visual(arrow(replyUci, 'threat'), lineMarks(tactic, reply.to), refutation),
+      };
+    }
+  }
+
   if (missed && bestUci && bestSan && !playedBest) {
     const targets = forkTargets(fenBefore, bestUci);
     if (targets.length > 0) {
@@ -205,6 +241,17 @@ export function explainMove(
           ),
           bestLine,
         ),
+      };
+    }
+    const tactic = lineTactics(fenBefore, bestUci)[0];
+    if (tactic) {
+      return {
+        kind: tactic.kind === 'pin' ? 'missed-pin' : 'missed-skewer',
+        text:
+          tactic.kind === 'pin'
+            ? `${bestSan} clouait ${pieceLabel(tactic.front.type, tactic.front.square)} devant ${pieceLabel(tactic.back.type, tactic.back.square)}.`
+            : `${bestSan} était une enfilade : ${pieceLabel(tactic.front.type, tactic.front.square)} devait s’écarter et ${pieceLabel(tactic.back.type, tactic.back.square)} tombait.`,
+        visual: visual(arrow(bestUci, 'best'), lineMarks(tactic, bestUci.slice(2, 4)), bestLine),
       };
     }
     const best = playUci(new Chess(fenBefore), bestUci);
@@ -228,6 +275,22 @@ export function explainMove(
         visual: visual([...arrow(replyUci, 'threat'), ...arrow(bestUci, 'best')], [], refutation),
       };
     }
+  }
+
+  const winBefore = winChance(before, color);
+  const winAfter = winChance(after, color);
+  if (
+    missed &&
+    bestSan &&
+    winBefore >= ENDGAME_WIN_FROM &&
+    winAfter <= ENDGAME_WIN_AFTER_MAX &&
+    isEndgame(fenBefore)
+  ) {
+    return {
+      kind: 'endgame-conversion',
+      text: `Finale gagnante mal convertie : ${Math.round(winBefore)} % de chances de gain avant ce coup, ${Math.round(winAfter)} % après. ${bestSan} gardait le gain.`,
+      visual: visual(arrow(bestUci, 'best'), [], bestLine),
+    };
   }
 
   return {

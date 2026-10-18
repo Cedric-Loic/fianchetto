@@ -7,6 +7,7 @@ import { Endgames } from './screens/Endgames';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
+import { Openings } from './screens/Openings';
 import { Login } from './screens/Login';
 import { LessonPage, Lessons } from './screens/Lessons';
 import { Profile } from './screens/Profile';
@@ -30,6 +31,7 @@ type Route =
   | { page: 'coach' }
   | { page: 'lessons' }
   | { page: 'endgames' }
+  | { page: 'openings' }
   | { page: 'lesson'; id: string }
   | { page: 'review'; id: string; guided: boolean }
   | { page: 'game'; gameId: string };
@@ -64,6 +66,7 @@ function parseHash(h: string): Route {
   if (h === '#/puzzles/mine') return { page: 'puzzles', mode: 'mine' };
   if (h === '#/lessons') return { page: 'lessons' };
   if (h === '#/endgames') return { page: 'endgames' };
+  if (h === '#/openings') return { page: 'openings' };
   m = /^#\/lessons\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'lesson', id: m[1] };
   if (h === '#/login') return { page: 'login' };
@@ -80,6 +83,7 @@ function sectionOf(route: Route): NavSection {
     case 'lessons':
     case 'lesson':
     case 'endgames':
+    case 'openings':
       return 'lessons';
     case 'analyse':
     case 'review':
@@ -136,6 +140,7 @@ export function App() {
   } else if (route.page === 'coach') content = <Coach />;
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'endgames') content = <Endgames />;
+  else if (route.page === 'openings') content = <Openings />;
   else if (route.page === 'lesson') content = <LessonPage key={route.id} id={route.id} />;
   else if (route.page === 'review')
     content = <Review key={hash} id={route.id} guided={route.guided} />;

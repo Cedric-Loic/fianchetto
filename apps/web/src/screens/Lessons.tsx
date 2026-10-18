@@ -80,6 +80,11 @@ export function Lessons() {
             Finales contre le bot : mets la théorie en pratique →
           </a>
         </p>
+        <p>
+          <a href="#/openings" data-testid="lessons-openings">
+            Répertoire d’ouvertures : révise tes lignes en répétition espacée →
+          </a>
+        </p>
         {lessons.length === 0 && (
           <EmptyState icon={<IconBook size={40} />} title="Aucune leçon disponible">
             Le serveur n'a renvoyé aucune leçon.

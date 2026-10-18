@@ -84,6 +84,16 @@ export const TIPS: Record<ExplanationKind, string> = {
     'Cherche les coups qui attaquent deux cibles à la fois : fourchettes, échecs doubles.',
   'missed-material':
     'Avant de jouer, vérifie si une pièce adverse est en prise : prends ce qu’on te donne.',
+  'allowed-pin':
+    'Avant de jouer, regarde les lignes (colonnes, diagonales) qui mènent à ton roi ou à ta dame : une pièce placée devant risque d’être clouée.',
+  'missed-pin':
+    'Cherche les pièces adverses alignées avec leur roi ou leur dame : un fou ou une tour peut les clouer.',
+  'allowed-skewer':
+    'Évite d’aligner ton roi ou ta dame avec une pièce non défendue derrière : une enfilade la gagnerait.',
+  'missed-skewer':
+    'Quand le roi ou la dame adverse est aligné avec une autre pièce, cherche l’échec ou l’attaque qui la fait s’écarter.',
+  'endgame-conversion':
+    'En finale gagnante, simplifie, active ton roi et pousse tes pions passés ; vérifie chaque coup avant de jouer vite.',
   generic:
     'Compare deux ou trois coups candidats avant de jouer, surtout dans les positions tendues.',
 };
@@ -150,4 +160,13 @@ export function splitSquares(text: string): { text: string; square: string | nul
   }
   if (last < text.length) parts.push({ text: text.slice(last), square: null });
   return parts;
+}
+
+/** Temps restant à la pendule : « 4:07 », « 1:02:05 » (au-delà d'une heure). */
+export function formatMoveClock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = String(total % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }

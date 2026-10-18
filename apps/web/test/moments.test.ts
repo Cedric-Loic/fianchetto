@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { ExplanationKind, GameReview, MoveClass, ReviewMove } from '@sq/shared';
 import { threatFen } from '../src/analysis/useEngine';
-import { guidedSummary, keyMoments, mistakesOf, splitSquares } from '../src/review/moments';
+import {
+  TIPS,
+  formatMoveClock,
+  guidedSummary,
+  keyMoments,
+  mistakesOf,
+  splitSquares,
+} from '../src/review/moments';
 
 const zero = { best: 0, excellent: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
 
@@ -113,5 +120,26 @@ describe('menace', () => {
     expect(threatFen('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2')).toBe(
       'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2',
     );
+  });
+});
+
+describe('pendule et conseils (lot 4d)', () => {
+  it('temps restant lisible', () => {
+    expect(formatMoveClock(603_400)).toBe('10:03');
+    expect(formatMoveClock(7_900)).toBe('0:07');
+    expect(formatMoveClock(3_725_000)).toBe('1:02:05');
+    expect(formatMoveClock(-5)).toBe('0:00');
+  });
+
+  it('un conseil pour chaque nouveau type d’erreur', () => {
+    for (const kind of [
+      'allowed-pin',
+      'missed-pin',
+      'allowed-skewer',
+      'missed-skewer',
+      'endgame-conversion',
+    ] as const) {
+      expect(TIPS[kind].length).toBeGreaterThan(20);
+    }
   });
 });

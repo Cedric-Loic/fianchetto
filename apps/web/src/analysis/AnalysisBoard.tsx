@@ -29,6 +29,8 @@ export interface AnalysisBoardProps {
   evals?: readonly (EvalLike | undefined)[];
   /** Classe de chaque coup de la ligne fournie (indice = demi-coup − 1). */
   moveClasses?: readonly (MoveClass | null | undefined)[];
+  /** Temps restant (ms) après chaque coup de la ligne fournie (indice = demi-coup − 1). */
+  clocks?: readonly (number | null | undefined)[];
   orientation?: Color;
   /** Flèches et cases supplémentaires fournies par la page (explication du coup…). */
   arrows?: readonly BoardArrow[];
@@ -178,6 +180,11 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
     const cls = props.moveClasses?.[i];
     if (cls) annotations.set(id, cls);
   });
+  const clocks = new Map<string, number>();
+  tree.initialLine.forEach((id, i) => {
+    const ms = props.clocks?.[i];
+    if (ms != null) clocks.set(id, ms);
+  });
   const locked = new Set(props.lockMainline ? tree.initialLine : []);
 
   const name = (c: Color) =>
@@ -232,6 +239,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
               onDelete={ctl.remove}
               annotations={annotations}
               locked={locked}
+              clocks={clocks}
             />
             <div className="nav">
               <button title="Début" aria-label="Début" onClick={() => go(tree.rootId)}>

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { parseGame, type ReviewInput } from '@sq/coach';
+import { parseGame, pgnClocks, type ReviewInput } from '@sq/coach';
 import {
   ImportChessComRequestSchema,
   ImportPgnRequestSchema,
@@ -71,6 +71,7 @@ function importedTarget(row: ImportedGameRow): Target {
       result: row.result,
       date: row.date,
       url: row.url,
+      clocks: pgnClocks(row.pgn),
     },
     load: () => parseGame(row.pgn),
   };

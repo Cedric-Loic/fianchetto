@@ -42,6 +42,11 @@ export const EXPLANATION_KINDS = [
   'material-loss',
   'missed-fork',
   'missed-material',
+  'allowed-pin',
+  'missed-pin',
+  'allowed-skewer',
+  'missed-skewer',
+  'endgame-conversion',
   'generic',
 ] as const;
 export const ExplanationKindSchema = z.enum(EXPLANATION_KINDS);
@@ -55,6 +60,11 @@ export const PUZZLE_THEME_FOR_KIND: Partial<Record<ExplanationKind, string>> = {
   'missed-fork': 'fork',
   'allowed-mate': 'mateIn2',
   'missed-mate': 'mateIn2',
+  'allowed-pin': 'pin',
+  'missed-pin': 'pin',
+  'allowed-skewer': 'skewer',
+  'missed-skewer': 'skewer',
+  'endgame-conversion': 'endgame',
 };
 
 export const ExplanationSchema = z.object({
@@ -125,6 +135,11 @@ export const ReviewInfoSchema = z.object({
   result: z.string(),
   date: z.string().nullable(),
   url: z.string().nullable(),
+  /**
+   * Temps restant (ms) après chaque demi-coup (`clocks[ply - 1]`), lu dans les `[%clk]` du PGN
+   * importé ; absent ou `null` sans pendule (lot 4d).
+   */
+  clocks: z.array(z.number().int().nonnegative().nullable()).nullable().optional(),
 });
 export type ReviewInfo = z.infer<typeof ReviewInfoSchema>;
 

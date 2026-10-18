@@ -1,4 +1,3 @@
-import { Chess } from 'chess.js';
 import {
   DAILY_MINUTES_GOAL,
   DAILY_PUZZLE_GOAL,
@@ -15,6 +14,8 @@ import {
   type Target,
   type WeeklyTask,
 } from '@sq/shared';
+import { isEndgame } from './board.js';
+import { openingsRecommendation } from './openings.js';
 import {
   eloTarget,
   guardPolicy,
@@ -47,10 +48,16 @@ export interface DashboardGame {
   userElo: number | null;
   /** Durée réelle de la partie (ms), si connue (étape 13, optionnel). */
   durationMs?: number | null;
+  /** Temps restant (ms) après chaque demi-coup (`[%clk]` du PGN), si connu (lot 4d). */
+  clocks?: (number | null)[] | null;
+  /** Temps initial de la cadence (ms), si connu (lot 4d). */
+  initialClockMs?: number | null;
 }
 
 export interface DashboardInput {
   now: Date;
+  /** Lignes du répertoire d'ouvertures à réviser aujourd'hui. */
+  dueOpenings?: number;
   games: DashboardGame[];
   puzzleAttempts: {
     at: number;
@@ -217,6 +224,11 @@ const KIND_LABEL: Record<string, string> = {
   'allowed-mate': 'mats permis',
   'missed-mate': 'mats manqués',
   'material-loss': 'pertes de matériel',
+  'allowed-pin': 'clouages permis',
+  'missed-pin': 'clouages manqués',
+  'allowed-skewer': 'enfilades permises',
+  'missed-skewer': 'enfilades manquées',
+  'endgame-conversion': 'finales gagnantes mal converties',
   generic: 'mauvais choix de plan',
 };
 
@@ -259,12 +271,20 @@ function userStats(game: DashboardGame) {
 /** Phase de jeu d'une position : ouverture (10 premiers coups), finale (peu de pièces), sinon milieu. */
 function gamePhase(fen: string, ply: number): 'opening' | 'middlegame' | 'endgame' {
   if (ply <= 20) return 'opening';
-  const value: Record<string, number> = { n: 3, b: 3, r: 5, q: 9 };
-  let material = 0;
-  for (const row of new Chess(fen).board()) {
-    for (const p of row) if (p) material += value[p.type] ?? 0;
-  }
-  return material <= 26 ? 'endgame' : 'middlegame';
+  return isEndgame(fen) ? 'endgame' : 'middlegame';
+}
+
+/** Zeitnot : moins de 10 % du temps initial à la pendule au moment de jouer. */
+export const LOW_TIME_RATIO = 0.1;
+
+/**
+ * Temps à la pendule (ms) du joueur AVANT son coup au demi-coup `ply` : celui laissé après son
+ * coup précédent, ou le temps initial pour son premier coup. `null` si inconnu.
+ */
+export function clockBeforeMove(game: DashboardGame, ply: number): number | null {
+  if (!game.clocks) return null;
+  if (ply <= 2) return game.initialClockMs ?? null;
+  return game.clocks[ply - 3] ?? null;
 }
 
 export function buildDashboard(input: DashboardInput): CoachDashboard {
@@ -296,7 +316,11 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
   // Profil de faiblesses : types d'erreurs et phases de jeu.
   const kinds = new Map<string, number>();
   const phases = { opening: 0, middlegame: 0, endgame: 0 };
+  const clock = { lowTime: 0, withTime: 0 };
+  let clockedGames = 0;
   for (const g of recent) {
+    const initial = g.initialClockMs ?? null;
+    if (g.clocks && initial) clockedGames++;
     const review = g.review as GameReview;
     for (const m of review.moves) {
       if (
@@ -307,6 +331,11 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
       }
       if (m.explanation) kinds.set(m.explanation.kind, (kinds.get(m.explanation.kind) ?? 0) + 1);
       phases[gamePhase(review.positions[m.ply - 1] ?? '', m.ply)]++;
+      const left = initial ? clockBeforeMove(g, m.ply) : null;
+      if (left !== null && initial) {
+        if (left < LOW_TIME_RATIO * initial) clock.lowTime++;
+        else clock.withTime++;
+      }
     }
   }
   const sortedKinds = [...kinds.entries()]
@@ -336,6 +365,8 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
   const solvedPuzzles = input.puzzleAttempts.filter((a) => a.success).length;
   const phase1Lessons = input.lessons.filter((l) => l.phase === 1);
   const passed1 = phase1Lessons.filter((l) => l.passed).length;
+  const phase2Lessons = input.lessons.filter((l) => l.phase === 2);
+  const passed2 = phase2Lessons.filter((l) => l.passed).length;
   const enoughGames = last10.length >= 5;
   const criteriaByPhase = [
     [
@@ -376,6 +407,12 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         value: String(Math.round(input.puzzleRating)),
         target: 'au moins 1700',
         met: input.puzzleRating >= 1700,
+      },
+      {
+        label: 'Leçons de la phase 2 validées',
+        value: `${passed2} / ${phase2Lessons.length}`,
+        target: 'au moins 8',
+        met: passed2 >= 8,
       },
     ],
     [
@@ -636,6 +673,8 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
       href: `#/lessons/${nextLesson.id}`,
     });
   }
+  const openings = openingsRecommendation(input.dueOpenings ?? 0);
+  if (openings) recommendations.push(openings);
   // Phase 2 et suivantes : première finale pas encore réussie.
   const nextEndgame = current >= 2 ? input.endgames?.find((e) => !e.passed) : undefined;
   if (nextEndgame) {
@@ -685,6 +724,7 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
       accuracy: recentStats?.accuracy != null ? Math.round(recentStats.accuracy * 10) / 10 : null,
       kinds: sortedKinds,
       phases,
+      clock: clockedGames > 0 ? { games: clockedGames, ...clock } : null,
       weakThemes,
     },
     curves,

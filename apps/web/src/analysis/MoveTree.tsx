@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { MoveClass } from '@sq/shared';
 import { CLASS_SYMBOL, classCss } from '../lib/classes';
 import { useSan } from '../lib/notation';
+import { formatMoveClock } from '../review/moments';
 import { Button } from '../ui/Button';
 import { IconClose, IconUp } from '../ui/icons';
 import type { AnalysisTree } from './tree';
@@ -21,6 +22,8 @@ export interface MoveTreeProps {
   annotations?: ReadonlyMap<string, MoveClass>;
   /** Nœuds protégés (coups de la partie revue) : ni supprimés, ni déclassés. */
   locked?: ReadonlySet<string>;
+  /** Temps restant à la pendule après certains coups (revue d'une partie importée), en ms. */
+  clocks?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -35,6 +38,7 @@ export function MoveTree(props: MoveTreeProps) {
   const moveButton = (id: string, extra = '') => {
     const node = tree.get(id);
     const cls = props.annotations?.get(id);
+    const clock = props.clocks?.get(id);
     return (
       <button
         key={id}
@@ -50,6 +54,11 @@ export function MoveTree(props: MoveTreeProps) {
         {san(node.san ?? '')}
         {cls && SHOWN.includes(cls) && (
           <span className={`class-symbol ${classCss(cls)}`}> {CLASS_SYMBOL[cls]}</span>
+        )}
+        {clock !== undefined && (
+          <span className="move-clock" title="Temps restant à la pendule">
+            {formatMoveClock(clock)}
+          </span>
         )}
       </button>
     );

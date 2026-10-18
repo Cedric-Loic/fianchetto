@@ -6,13 +6,16 @@
 export {
   balanceAfterLine,
   forkTargets,
+  isEndgame,
+  lineTactics,
   materialBalance,
   uciToSan,
   winsMaterial,
   type ForkTarget,
+  type LineTactic,
 } from './board.js';
 export { explainMove, type EngineEval, type Explanation, type MoveContext } from './explain.js';
-export { parseGame, splitPgn, type ParsedGame } from './pgn.js';
+export { initialClockMs, parseGame, pgnClocks, splitPgn, type ParsedGame } from './pgn.js';
 export { buildReview, type ReviewInput } from './review.js';
 export { classify, formatEval, gameAccuracy, moveAccuracy, winChance } from './win.js';
 export { INITIAL_GLICKO, updateGlicko, type Glicko } from './glicko.js';
@@ -62,3 +65,16 @@ export {
   type Endgame,
   type EndgameGoal,
 } from './endgames.js';
+export {
+  OPENING_INTERVALS_DAYS,
+  OPENING_LINES,
+  nextOpeningSchedule,
+  openingLearned,
+  openingLineById,
+  openingLineSteps,
+  openingsRecommendation,
+  repertoireDeviation,
+  type OpeningLine,
+  type OpeningLineStep,
+  type OpeningSchedule,
+} from './openings.js';

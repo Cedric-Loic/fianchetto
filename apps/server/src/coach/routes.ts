@@ -1,3 +1,4 @@
+import { OpeningService } from '../openings/service.js';
 import type { FastifyInstance } from 'fastify';
 import {
   ENDGAMES,
@@ -5,6 +6,8 @@ import {
   PASS_RATIO,
   buildDashboard,
   guardActive,
+  initialClockMs,
+  pgnClocks,
   timeClassOf,
   type BotResult,
   type DashboardGame,
@@ -104,6 +107,9 @@ export function dashboardFor(
       source: row.source,
       timeClass,
       userElo: row.userColor === 'w' ? row.whiteElo : row.blackElo,
+      // Pendule relue dans le PGN enregistré (pas de migration : les anciens imports en profitent).
+      clocks: timeClass === 'daily' ? null : pgnClocks(row.pgn),
+      initialClockMs: initialClockMs(row.timeControl),
     });
   }
   const history = store.history(userId);
@@ -139,6 +145,7 @@ export function dashboardFor(
   );
   return buildDashboard({
     now,
+    dueOpenings: new OpeningService(store).dueCount(userId),
     games,
     puzzleAttempts: store.puzzles.attempts(userId).map((a) => ({
       at: a.at,

@@ -370,4 +370,15 @@ describe('MoveTree', () => {
     expect(text).toContain('e4 ★');
     expect(text).toContain('e5 ??');
   });
+
+  it('temps restant à la pendule à côté des coups connus', () => {
+    const { tree, e4, e5 } = setup();
+    const clocks = new Map([
+      [e4, 603_000],
+      [e5, 42_000],
+    ]);
+    render(<MoveTree tree={tree} current={tree.rootId} clocks={clocks} {...handlers()} />);
+    const shown = screen.getAllByTitle('Temps restant à la pendule').map((el) => el.textContent);
+    expect(shown).toEqual(['10:03', '0:42']);
+  });
 });

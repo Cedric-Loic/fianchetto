@@ -169,6 +169,8 @@ export class TrainingService {
       case 'hanging-piece':
       case 'allowed-mate':
       case 'allowed-fork':
+      case 'allowed-pin':
+      case 'allowed-skewer':
         return explanation.text;
       case 'material-loss':
         return 'Ce coup perd du matériel : regarde les réponses de l’adversaire.';

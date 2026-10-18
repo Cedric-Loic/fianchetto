@@ -26,6 +26,8 @@ import { registerEndgameRoutes } from './endgames/routes.js';
 import { EndgameService } from './endgames/service.js';
 import { registerLessonRoutes } from './lessons/routes.js';
 import { LessonService } from './lessons/service.js';
+import { registerOpeningRoutes } from './openings/routes.js';
+import { OpeningService } from './openings/service.js';
 import { registerPuzzleRoutes } from './puzzles/routes.js';
 import { PuzzleService } from './puzzles/service.js';
 import { registerReviewRoutes } from './review/routes.js';
@@ -106,6 +108,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const training = new TrainingService((fen) => reviews.evaluate(fen));
   const lessons = new LessonService(store, (fen) => reviews.evaluate(fen, 400));
   const coach = new CoachService(store, config.botLevels);
+  const openings = new OpeningService(store);
   const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen), {
     themeOfDay: (userId) => coach.themeOfDay(userId),
   });
@@ -181,6 +184,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   registerPuzzleRoutes(app, store, puzzles);
   registerLessonRoutes(app, store, lessons);
   registerEndgameRoutes(app, store, endgames);
+  registerOpeningRoutes(app, store, openings);
   registerCoachRoutes(app, store, coach);
   registerAnalysisRoutes(app, store, analysis);
   registerTrainingRoutes(

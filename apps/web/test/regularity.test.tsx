@@ -39,6 +39,7 @@ function dashboard(over: Partial<CoachDashboard> = {}): CoachDashboard {
       accuracy: null,
       kinds: [],
       phases: { opening: 0, middlegame: 0, endgame: 0 },
+      clock: null,
       weakThemes: [],
     },
     curves: [],
@@ -130,6 +131,42 @@ describe('Coach : régularité et bilan mensuel', () => {
     expect(screen.getByTestId('month-advice').textContent).toContain('plan minimal');
     expect(verdict.textContent).toContain('Elo visé : 1000');
     expect(verdict.textContent).toContain("2 h 05 d'entraînement");
+  });
+});
+
+describe('Coach : profil (lot 4d)', () => {
+  it('nouveaux types d’erreurs et répartition zeitnot / avec du temps', async () => {
+    const base = dashboard().weaknesses;
+    vi.mocked(api.dashboard).mockResolvedValue(
+      dashboard({
+        weaknesses: {
+          ...base,
+          games: 3,
+          kinds: [
+            { kind: 'allowed-pin', count: 2 },
+            { kind: 'endgame-conversion', count: 1 },
+          ],
+          clock: { games: 2, lowTime: 3, withTime: 1 },
+        },
+      }),
+    );
+    render(<Coach />);
+    const profile = await screen.findByTestId('coach-weaknesses');
+    expect(profile.textContent).toContain('Clouage permis');
+    expect(profile.textContent).toContain('Finale mal convertie');
+    const clock = screen.getByTestId('coach-clock');
+    expect(clock.textContent).toContain('En zeitnot (moins de 10 % du temps)3');
+    expect(clock.textContent).toContain('Avec du temps1');
+    expect(clock.textContent).toContain('2 parties avec pendule');
+  });
+
+  it('sans pendule : pas de répartition', async () => {
+    vi.mocked(api.dashboard).mockResolvedValue(
+      dashboard({ weaknesses: { ...dashboard().weaknesses, games: 1 } }),
+    );
+    render(<Coach />);
+    await screen.findByTestId('coach-weaknesses');
+    expect(screen.queryByTestId('coach-clock')).toBeNull();
   });
 });
 

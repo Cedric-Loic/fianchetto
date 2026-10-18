@@ -2,7 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import type { CoachDashboard, ImportedGamesResponse, PuzzleAttempt } from '@sq/shared';
+import type {
+  CoachDashboard,
+  ImportedGamesResponse,
+  PuzzleAttempt,
+  ReviewResponse,
+} from '@sq/shared';
 import { importPuzzles } from '../src/puzzles/importer.js';
 import { testServer } from './client.js';
 
@@ -21,7 +26,10 @@ const PGN = `[Event "Live Chess"]
 [WhiteElo "980"]
 [TimeControl "900+10"]
 
-1. e4 e5 2. Nf3 Nc6 3. Nxe5 Nxe5 4. d4 Nc6 5. d5 Nb4 6. a3 Qh4 7. axb4 Qxe4+ 0-1
+1. e4 {[%clk 0:15:05]} e5 {[%clk 0:15:08]} 2. Nf3 {[%clk 0:14:50]} Nc6 {[%clk 0:15:00]}
+3. Nxe5 {[%clk 0:01:00]} Nxe5 {[%clk 0:14:55]} 4. d4 {[%clk 0:00:50]} Nc6 {[%clk 0:14:50]}
+5. d5 {[%clk 0:00:40]} Nb4 {[%clk 0:14:45]} 6. a3 {[%clk 0:00:30]} Qh4 {[%clk 0:14:40]}
+7. axb4 {[%clk 0:00:20]} Qxe4+ {[%clk 0:14:35]} 0-1
 `;
 
 describe('tableau de bord du coach', () => {
@@ -64,6 +72,16 @@ describe('tableau de bord du coach', () => {
     ]);
     expect(d.curves.find((c) => c.id === 'puzzle')?.points).toHaveLength(1);
     expect(d.phase.criteria.find((c) => c.label.startsWith('Leçons'))?.value).toBe('1 / 10');
+    // Lot 4d : pendule relue dans le PGN ; dès le coup 4, les Blancs ont moins de 90 s (10 %).
+    const reviewed = (await http('GET', `/api/reviews/${games[0]?.id ?? ''}`))
+      .json as ReviewResponse;
+    expect(reviewed.info.clocks?.slice(0, 3)).toEqual([905_000, 908_000, 890_000]);
+    expect(reviewed.info.clocks).toHaveLength(14);
+    const done = reviewed.state.status === 'done' ? reviewed.state.review : null;
+    const late = (done?.moves ?? []).filter(
+      (m) => m.color === 'w' && m.ply >= 7 && ['mistake', 'blunder'].includes(m.classification),
+    ).length;
+    expect(d.weaknesses.clock).toMatchObject({ games: 1, lowTime: late });
     // Étape 13 : partie lente (30 min estimées), leçon (20), revue consultée (10), puzzle chronométré.
     await http('GET', `/api/reviews/${games[0]?.id ?? ''}`);
     d = (await http('GET', '/api/coach/dashboard')).json as CoachDashboard;

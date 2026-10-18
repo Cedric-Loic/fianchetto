@@ -1630,6 +1630,13 @@ textarea:focus-visible {
 .cls-blunder {
   --cls: var(--class-blunder);
 }
+.move-clock {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
 .class-symbol,
 .class-count {
   color: var(--cls);

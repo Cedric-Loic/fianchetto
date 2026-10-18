@@ -111,6 +111,18 @@ export const CoachDashboardSchema = z.object({
       middlegame: z.number().int(),
       endgame: z.number().int(),
     }),
+    /**
+     * Erreurs et gaffes selon la pendule (lot 4d) : jouées en zeitnot (moins de 10 % du temps
+     * initial) ou avec du temps. `null` si aucune partie récente n'a de pendule (`[%clk]`).
+     */
+    clock: z
+      .object({
+        /** Parties avec pendule prises en compte. */
+        games: z.number().int(),
+        lowTime: z.number().int(),
+        withTime: z.number().int(),
+      })
+      .nullable(),
     /** Thèmes de puzzles les moins réussis (au moins 5 essais). */
     weakThemes: z.array(
       z.object({ theme: z.string(), rate: z.number(), attempts: z.number().int() }),

@@ -22,7 +22,8 @@ import { useSan } from '../lib/notation';
 import { useSettings } from '../lib/settings';
 import { ExplainText, GuidedPanel } from '../review/GuidedReview';
 import { LearnMistakes } from '../review/LearnMistakes';
-import { keyMoments, mistakesOf, TIPS } from '../review/moments';
+import { formatMoveClock, keyMoments, mistakesOf, TIPS } from '../review/moments';
+import { RepertoireNote } from './Openings';
 import { SIDE, VARIANT_LABEL } from './labels';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -443,6 +444,12 @@ function ReviewBoard({
               {CLASS_LABEL[move.classification]}
             </span>{' '}
             <span className="muted">({evalLabel(here)})</span>
+            {info.clocks?.[move.ply - 1] != null && (
+              <span className="muted" data-testid="move-clock">
+                {' '}
+                · {formatMoveClock(info.clocks[move.ply - 1] ?? 0)} à la pendule
+              </span>
+            )}
           </p>
           {move.explanation && (
             <p data-testid="explanation">
@@ -542,6 +549,7 @@ function ReviewBoard({
       controller={ctl}
       evals={review.evals}
       moveClasses={review.moves.map((m) => m.classification)}
+      {...(info.clocks ? { clocks: info.clocks } : {})}
       orientation={info.userColor ?? 'w'}
       arrows={arrows}
       marks={marks}
@@ -602,7 +610,15 @@ function ReviewBoard({
       }
       panelBottom={
         info.userColor && (
-          <CoachSummary moves={review.moves} color={info.userColor} onSelect={setCursor} />
+          <>
+            <RepertoireNote
+              moves={review.moves.map((m) => m.san)}
+              color={info.userColor}
+              initialFen={review.positions[0]}
+              onSelect={setCursor}
+            />
+            <CoachSummary moves={review.moves} color={info.userColor} onSelect={setCursor} />
+          </>
         )
       }
     />

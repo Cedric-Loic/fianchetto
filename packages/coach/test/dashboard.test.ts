@@ -190,4 +190,60 @@ describe('tableau de bord', () => {
     const d1 = buildDashboard(input({ endgames }));
     expect(d1.recommendations.some((r) => r.href === '#/endgames')).toBe(false);
   });
+
+  it('profil pendule : gaffes en zeitnot ou avec du temps', () => {
+    // Gaffes aux demi-coups 30 et 32 (review(2, 70)) ; 10 min au départ.
+    const clocks: (number | null)[] = Array.from({ length: 40 }, () => 300_000);
+    clocks[29] = 40_000; // après le coup 30 : sert au coup 32 (moins de 60 s : zeitnot).
+    const d = buildDashboard(
+      input({
+        games: [
+          game(0, { clocks, initialClockMs: 600_000 }),
+          // Sans pendule : ignorée dans la répartition.
+          game(1),
+        ],
+      }),
+    );
+    expect(d.weaknesses.clock).toEqual({ games: 1, lowTime: 1, withTime: 1 });
+    expect(buildDashboard(input({ games: [game(0)] })).weaknesses.clock).toBeNull();
+  });
+
+  it('phase 2 : les leçons de la phase 2 comptent pour passer en phase 3', () => {
+    const clean = Array.from({ length: 10 }, (_, i) => game(i, { review: review(0, 85) }));
+    const solved = Array.from({ length: 150 }, (_, i) => ({
+      at: i,
+      success: true,
+      ratingAfter: null,
+      themes: '',
+    }));
+    const lessons = [
+      ...input().lessons.map((l) => ({ ...l, passed: true })),
+      ...Array.from({ length: 10 }, (_, i) => ({
+        id: `p2-${i}`,
+        phase: 2,
+        title: `Leçon P2 ${i}`,
+        passed: i < 7,
+        updatedAt: null,
+      })),
+    ];
+    const d = buildDashboard(
+      input({ games: clean, lessons, puzzleAttempts: solved, puzzleRating: 1800 }),
+    );
+    expect(d.phase.current).toBe(2);
+    expect(d.phase.criteria.find((c) => c.label === 'Leçons de la phase 2 validées')).toEqual({
+      label: 'Leçons de la phase 2 validées',
+      value: '7 / 10',
+      target: 'au moins 8',
+      met: false,
+    });
+    const d3 = buildDashboard(
+      input({
+        games: clean,
+        lessons: lessons.map((l) => ({ ...l, passed: true })),
+        puzzleAttempts: solved,
+        puzzleRating: 1800,
+      }),
+    );
+    expect(d3.phase.current).toBe(3);
+  });
 });

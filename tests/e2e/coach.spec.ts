@@ -6,8 +6,12 @@ const PGN = `[Event "Live Chess"]
 [Black "rival"]
 [Result "0-1"]
 [WhiteElo "1000"]
+[TimeControl "600+5"]
 
-1. e4 e5 2. Nf3 Nc6 3. Nxe5 Nxe5 4. d4 Nc6 5. d5 Nb4 6. a3 Qh4 7. axb4 Qxe4+ 0-1
+1. e4 {[%clk 0:10:03]} e5 {[%clk 0:10:04]} 2. Nf3 {[%clk 0:09:58]} Nc6 {[%clk 0:10:00]}
+3. Nxe5 {[%clk 0:00:42]} Nxe5 {[%clk 0:09:55]} 4. d4 {[%clk 0:00:40]} Nc6 {[%clk 0:09:50]}
+5. d5 {[%clk 0:00:35]} Nb4 {[%clk 0:09:45]} 6. a3 {[%clk 0:00:30]} Qh4 {[%clk 0:09:40]}
+7. axb4 {[%clk 0:00:20]} Qxe4+ {[%clk 0:09:35]} 0-1
 `;
 
 test('import PGN, analyse, revue avec explication, point de départ', async ({ page }) => {
@@ -37,6 +41,9 @@ test('import PGN, analyse, revue avec explication, point de départ', async ({ p
   await expect(page.getByTestId('explanation')).toContainText(
     'Le cavalier joué en e5 est en prise',
   );
+  // Pendule lue dans le PGN : temps restant à côté du coup et dans la fiche du coup.
+  await expect(page.getByTestId('move-clock')).toHaveText('· 0:42 à la pendule');
+  await expect(page.getByTestId('move-list')).toContainText('Nxe5 ??0:42');
   await page.screenshot({ path: 'test-results/revue.png' });
   // Bilan du coach : la gaffe fait partie des moments clés, avec un conseil.
   await expect(page.getByTestId('coach-summary')).toContainText('Nxe5');

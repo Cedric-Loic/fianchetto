@@ -253,6 +253,37 @@ export function Coach() {
                     <strong>{w.phases[key]}</strong>
                   </div>
                 ))}
+                {w.clock && (
+                  <div data-testid="coach-clock">
+                    <h3>Et la pendule ?</h3>
+                    {(
+                      [
+                        ['lowTime', 'En zeitnot (moins de 10 % du temps)'],
+                        ['withTime', 'Avec du temps'],
+                      ] as const
+                    ).map(([key, label]) => {
+                      const clock = w.clock;
+                      const total = clock ? clock.lowTime + clock.withTime : 0;
+                      const value = clock ? clock[key] : 0;
+                      return (
+                        <div key={key} className="hbar">
+                          <span>{label}</span>
+                          <span className="hbar-track">
+                            <span
+                              className="hbar-fill"
+                              style={{ width: `${total ? (value / total) * 100 : 0}%` }}
+                            />
+                          </span>
+                          <strong>{value}</strong>
+                        </div>
+                      );
+                    })}
+                    <p className="muted">
+                      Erreurs et gaffes de {w.clock.games} partie{w.clock.games > 1 ? 's' : ''} avec
+                      pendule (temps lu dans le PGN).
+                    </p>
+                  </div>
+                )}
                 {w.weakThemes.length > 0 && (
                   <>
                     <h3>Thèmes de puzzles à travailler</h3>

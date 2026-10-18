@@ -1,4 +1,4 @@
-import { Chess, type Move, type PieceSymbol } from 'chess.js';
+import { Chess, type Move, type PieceSymbol, type Square } from 'chess.js';
 import type { Color } from '@sq/shared';
 
 /** Valeur conventionnelle des pièces (le roi n'est jamais échangé). */
@@ -127,4 +127,117 @@ export function forkTargets(fen: string, uci: string): ForkTarget[] {
   const rank = (t: ForkTarget) => (t.type === 'k' ? 100 : PIECE_VALUE[t.type]);
   targets.sort((a, b) => rank(b) - rank(a));
   return targets.length >= 2 ? targets : [];
+}
+
+/** Finale : peu de matériel hors pions et rois (26 points au plus, les deux camps réunis). */
+export function isEndgame(fen: string): boolean {
+  let material = 0;
+  for (const row of new Chess(fen).board()) {
+    for (const p of row) if (p && p.type !== 'p' && p.type !== 'k') material += PIECE_VALUE[p.type];
+  }
+  return material <= 26;
+}
+
+/** Clouage ou enfilade : pièce de devant, pièce de derrière, sur la ligne de la pièce qui joue. */
+export interface LineTactic {
+  kind: 'pin' | 'skewer';
+  front: ForkTarget;
+  back: ForkTarget;
+}
+
+const ROOK_DIRS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+const BISHOP_DIRS = [
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+] as const;
+
+const squareAt = (file: number, rank: number) =>
+  file >= 0 && file < 8 && rank >= 0 && rank < 8
+    ? `${String.fromCharCode(97 + file)}${rank + 1}`
+    : null;
+
+/**
+ * Clouages et enfilades créés par le coup `uci` joué depuis `fen` : la pièce de ligne (fou,
+ * tour, dame) qui vient de jouer vise une pièce adverse derrière laquelle se trouve une autre
+ * pièce adverse.
+ * - clouage : la pièce de devant (hors pion) vaut moins que celle de derrière (ou celle-ci est
+ *   le roi) ; elle ne peut pas bouger sans l'exposer ;
+ * - enfilade : la pièce de devant est le roi ou vaut plus que celle de derrière, qui tombe une
+ *   fois la première écartée (elle est sans défense, ou vaut plus que la pièce qui attaque).
+ * Comme pour les fourchettes, rien si la pièce qui joue peut être prise aussitôt avec profit, et
+ * rien si elle était déjà sur cette ligne (clouage préexistant). Tri : le plus fort d'abord.
+ */
+export function lineTactics(fen: string, uci: string): LineTactic[] {
+  const chess = new Chess(fen);
+  const move = playUci(chess, uci);
+  if (!move) return [];
+  const type = move.promotion ?? move.piece;
+  if (type !== 'b' && type !== 'r' && type !== 'q') return [];
+  const color = move.color;
+  const opponent = color === 'w' ? 'b' : 'w';
+  const moverValue = PIECE_VALUE[type];
+  const defended = chess.attackers(move.to, color).length > 0;
+  for (const square of chess.attackers(move.to, opponent)) {
+    const t = chess.get(square)?.type;
+    if (!t) continue;
+    if (!defended || (t !== 'k' && PIECE_VALUE[t] < moverValue)) return [];
+  }
+  const dirs = [
+    ...(type === 'b' ? [] : ROOK_DIRS),
+    ...(type === 'r' ? [] : BISHOP_DIRS),
+  ] as readonly (readonly [number, number])[];
+  const toFile = move.to.charCodeAt(0) - 97;
+  const toRank = Number(move.to[1]) - 1;
+  const fromFile = move.from.charCodeAt(0) - 97;
+  const fromRank = Number(move.from[1]) - 1;
+  const found: LineTactic[] = [];
+  for (const [df, dr] of dirs) {
+    // Déjà sur cette ligne, du côté opposé : la tactique existait avant le coup.
+    const dx = fromFile - toFile;
+    const dy = fromRank - toRank;
+    if (
+      (dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy)) &&
+      Math.sign(dx) === -df &&
+      Math.sign(dy) === -dr
+    )
+      continue;
+    const pieces: ForkTarget[] = [];
+    for (let k = 1; pieces.length < 2; k++) {
+      const square = squareAt(toFile + df * k, toRank + dr * k);
+      if (!square) break;
+      const piece = chess.get(square as Square);
+      if (!piece) continue;
+      if (piece.color !== opponent) break;
+      pieces.push({ type: piece.type, square });
+    }
+    const [front, back] = pieces;
+    if (!front || !back) continue;
+    const frontValue = front.type === 'k' ? 100 : PIECE_VALUE[front.type];
+    const backValue = back.type === 'k' ? 100 : PIECE_VALUE[back.type];
+    if (front.type !== 'p' && frontValue < backValue && back.type !== 'p') {
+      found.push({ kind: 'pin', front, back });
+    } else if (frontValue > backValue && back.type !== 'p') {
+      // La pièce de devant s'écarte : elle ne compte pas parmi les défenseurs.
+      const backDefended = chess
+        .attackers(back.square as Square, opponent)
+        .some((s) => s !== front.square);
+      if (!backDefended || PIECE_VALUE[back.type] > moverValue) {
+        found.push({ kind: 'skewer', front, back });
+      }
+    }
+  }
+  const worth = (t: LineTactic) =>
+    t.kind === 'pin'
+      ? t.back.type === 'k'
+        ? 100
+        : PIECE_VALUE[t.back.type]
+      : PIECE_VALUE[t.back.type];
+  return found.sort((a, b) => worth(b) - worth(a));
 }

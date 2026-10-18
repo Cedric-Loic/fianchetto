@@ -80,6 +80,15 @@ function reviewSummary(review: GameReview): ReviewSummary {
   };
 }
 
+/** Révision d'une ligne du répertoire d'ouvertures. */
+export interface OpeningProgressRow {
+  lineId: string;
+  step: number;
+  dueAt: number;
+  successes: number;
+  failures: number;
+}
+
 /** Séances comptées dans les minutes d'entraînement du coach. */
 export type ActivityKind = 'lesson' | 'analysis';
 
@@ -193,6 +202,17 @@ export class GameStore {
         successes  INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (user_id, endgame_id)
+      );
+      -- Lot 4d : répertoire d'ouvertures en répétition espacée (étape et échéance par ligne).
+      CREATE TABLE IF NOT EXISTS opening_progress (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        line_id    TEXT NOT NULL,
+        step       INTEGER NOT NULL,
+        due_at     INTEGER NOT NULL,
+        successes  INTEGER NOT NULL,
+        failures   INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, line_id)
       );
       -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
       INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
@@ -426,6 +446,45 @@ export class GameStore {
            successes = successes + excluded.successes, updated_at = excluded.updated_at`,
       )
       .run(userId, endgameId, success ? 1 : 0, Date.now());
+  }
+
+  // --- Répertoire d'ouvertures (lot 4d) ------------------------------------------------------
+
+  /** État de révision des lignes déjà travaillées. */
+  openingProgress(userId: string): OpeningProgressRow[] {
+    return this.#db
+      .prepare(
+        `SELECT line_id AS lineId, step, due_at AS dueAt, successes, failures
+         FROM opening_progress WHERE user_id = ?`,
+      )
+      .all(userId) as OpeningProgressRow[];
+  }
+
+  /** Enregistre une révision : nouvelle étape et échéance, réussite ou échec. */
+  saveOpeningReview(
+    userId: string,
+    lineId: string,
+    schedule: { step: number; dueAt: number },
+    success: boolean,
+  ): void {
+    this.#db
+      .prepare(
+        `INSERT INTO opening_progress (user_id, line_id, step, due_at, successes, failures,
+           updated_at)
+         VALUES (@userId, @lineId, @step, @dueAt, @ok, @ko, @now)
+         ON CONFLICT(user_id, line_id) DO UPDATE SET step = excluded.step,
+           due_at = excluded.due_at, successes = successes + excluded.successes,
+           failures = failures + excluded.failures, updated_at = excluded.updated_at`,
+      )
+      .run({
+        userId,
+        lineId,
+        step: schedule.step,
+        dueAt: schedule.dueAt,
+        ok: success ? 1 : 0,
+        ko: success ? 0 : 1,
+        now: Date.now(),
+      });
   }
 
   // --- Séances d'entraînement (minutes du coach, étape 13) ----------------------------------

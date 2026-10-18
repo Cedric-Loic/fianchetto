@@ -175,5 +175,10 @@ export const PUZZLE_THEME_LABELS: Readonly<Record<string, string>> = {
   'material-loss': 'Perte de matériel',
   'missed-fork': 'Fourchette manquée',
   'missed-material': 'Gain de matériel manqué',
+  'allowed-pin': 'Clouage permis',
+  'missed-pin': 'Clouage manqué',
+  'allowed-skewer': 'Enfilade permise',
+  'missed-skewer': 'Enfilade manquée',
+  'endgame-conversion': 'Finale mal convertie',
   generic: 'Meilleur coup à trouver',
 };
