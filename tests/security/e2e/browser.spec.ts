@@ -17,9 +17,24 @@ async function clickSquare(page: Page, square: string) {
   await page.mouse.click(box.x + (x + 0.5) * size, box.y + (y + 0.5) * size);
 }
 
+/**
+ * Deuxième coup des Blancs après 1. e4 : d2-d4 si possible, sinon une parade à l'échec de la
+ * dame secrète (Fe2 contre Dxe4+, Rxf2 contre Dxf2+, Fxd2 contre Dxd2+).
+ */
+const CANDIDATES = [
+  ['d2', 'd4'],
+  ['g1', 'f3'],
+  ['f1', 'e2'],
+  ['e1', 'f2'],
+  ['c1', 'd2'],
+  ['d1', 'e2'],
+  ['b1', 'd2'],
+] as const;
+
 test('frames WebSocket, stockage navigateur et rafraîchissement : aucune fuite', async ({
   page,
 }) => {
+  test.setTimeout(90_000); // jusqu'à sept essais de 5 s pour le deuxième coup
   const frames: string[] = [];
   page.on('websocket', (ws) => ws.on('framereceived', (f) => frames.push(String(f.payload))));
 
@@ -46,8 +61,19 @@ test('frames WebSocket, stockage navigateur et rafraîchissement : aucune fuite'
   // Rafraîchissement en pleine partie : la partie reprend, toujours sans fuite.
   await page.reload();
   await expect(moves).toHaveCount(2);
-  await clickSquare(page, 'd2');
-  await clickSquare(page, 'd4');
+  // La dame secrète du bot peut, dès son premier coup, donner échec (Dxe4+, Dxf2+, Dxd2+) ou
+  // clouer d2 (Da5, Db4) : d2-d4 n'est alors pas légal. On essaie des coups dans l'ordre jusqu'à
+  // ce que l'un soit accepté ; cette liste couvre toutes les réponses possibles du bot.
+  for (const [from, to] of CANDIDATES) {
+    await clickSquare(page, from);
+    await clickSquare(page, to);
+    try {
+      await expect(moves).toHaveCount(4, { timeout: 5_000 });
+      break;
+    } catch {
+      // Coup refusé (sans motif) : on passe au suivant.
+    }
+  }
   await expect(moves).toHaveCount(4, { timeout: 20_000 });
 
   // Stockage navigateur pendant la partie : uniquement les préférences d'affichage.
@@ -62,8 +88,8 @@ test('frames WebSocket, stockage navigateur et rafraîchissement : aucune fuite'
   expect(storage.idb).toEqual([]);
   expect(storage.cookies).toBe(''); // cookie de session httpOnly : illisible en JS
 
-  page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: '⚑ Abandonner' }).click();
+  await page.getByTestId('resign').click();
+  await page.getByTestId('confirm-resign').click();
   await expect(page.getByTestId('end-modal')).toBeVisible();
 
   const messages = frames.map((f) => JSON.parse(f) as ServerMessage);
