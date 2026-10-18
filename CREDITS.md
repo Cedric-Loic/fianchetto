@@ -12,3 +12,5 @@
 - Aucun asset, logo, police ni son de chess.com n'est utilisé.
 - **Stockfish 19** (paquet npm `stockfish`, version WASM par Nathan Rugg) : moteur du bot et de
   l'analyse. Licence GPLv3. Installé comme dépendance, non redistribué.
+- **Logo Fianchetto** (fou sur la grande diagonale) et favicon : dessin original réalisé pour le
+  projet, sans élément tiers.
