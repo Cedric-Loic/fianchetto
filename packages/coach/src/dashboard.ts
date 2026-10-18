@@ -1,6 +1,9 @@
 import { Chess } from 'chess.js';
 import {
+  DAILY_MINUTES_GOAL,
+  DAILY_PUZZLE_GOAL,
   PUZZLE_THEME_FOR_KIND,
+  WEEKLY_MINUTES_TARGET,
   PUZZLE_THEME_LABELS,
   type CoachDashboard,
   type Color,
@@ -12,6 +15,14 @@ import {
   type Target,
   type WeeklyTask,
 } from '@sq/shared';
+import {
+  eloTarget,
+  guardPolicy,
+  monthVerdict,
+  suggestBotLevel,
+  themeOfDay,
+  type BotResult,
+} from './regularity.js';
 
 /*
  * Tableau de bord du coach (étape 11), calculé à partir de données déjà agrégées : logique pure,
@@ -34,12 +45,21 @@ export interface DashboardGame {
   timeClass: TimeClass | null;
   /** Elo du joueur au moment de la partie (en-têtes PGN), si connu. */
   userElo: number | null;
+  /** Durée réelle de la partie (ms), si connue (étape 13, optionnel). */
+  durationMs?: number | null;
 }
 
 export interface DashboardInput {
   now: Date;
   games: DashboardGame[];
-  puzzleAttempts: { at: number; success: boolean; ratingAfter: number | null; themes: string }[];
+  puzzleAttempts: {
+    at: number;
+    success: boolean;
+    ratingAfter: number | null;
+    themes: string;
+    /** Temps passé sur le puzzle (ms), si connu (étape 13, optionnel). */
+    durationMs?: number | null;
+  }[];
   puzzleRating: number;
   lessons: {
     id: string;
@@ -51,6 +71,111 @@ export interface DashboardInput {
   classicRatings: { date: string; rating: number }[];
   duePuzzles: number;
   ownPuzzles: number;
+  /*
+   * Étape 13 — entrées optionnelles (repli documenté sur `estimateActivity` si absentes).
+   */
+  /** Instants (ms) de chaque séance de leçon ; à défaut, `lessons[].updatedAt`. */
+  lessonSessions?: number[];
+  /** Instants (ms) où le joueur a ouvert une revue ou une analyse ; à défaut, `reviewedAt`. */
+  analysisSessions?: number[];
+  /** Résultats des parties classiques contre le bot (niveau suggéré). */
+  botResults?: BotResult[];
+}
+
+/** Minutes estimées par activité quand la durée réelle n'est pas connue. */
+export const ACTIVITY_MINUTES = {
+  puzzle: 1.5,
+  /** Partie lente sans durée connue (15+10 ou sans pendule) ; correspondance : 10. */
+  slowGame: 30,
+  dailyGame: 10,
+  analysis: 10,
+  lesson: 20,
+} as const;
+/** Analyses comptées au plus par jour quand seule la date de revue est connue (analyses en lot). */
+const MAX_FALLBACK_ANALYSES_PER_DAY = 2;
+
+/**
+ * Activité d'entraînement par jour (clé « AAAA-MM-JJ », heure locale) : minutes estimées et
+ * nombre de puzzles. Estimation :
+ * - puzzle : durée réelle (plafonnée à 10 min) sinon 1,5 min ;
+ * - partie lente (`slow`) : durée réelle (plafonnée à 2 h) sinon 30 min (10 min en correspondance) ;
+ *   le blitz et le bullet ne comptent pas (facultatifs dans le plan) ;
+ * - analyse : 10 min par séance (`analysisSessions`) ; à défaut, 10 min par revue terminée, au
+ *   plus 2 par jour (une analyse en lot ne vaut pas des heures d'étude) ;
+ * - leçon : 20 min par séance (`lessonSessions`) ; à défaut, à la date de dernière mise à jour.
+ */
+export function estimateActivity(
+  input: DashboardInput,
+): Map<string, { minutes: number; puzzles: number }> {
+  const days = new Map<string, { minutes: number; puzzles: number }>();
+  const add = (day: string, minutes: number, puzzles = 0) => {
+    const d = days.get(day) ?? { minutes: 0, puzzles: 0 };
+    d.minutes += minutes;
+    d.puzzles += puzzles;
+    days.set(day, d);
+  };
+  const real = (ms: number | null | undefined, capMinutes: number) =>
+    ms != null && ms > 0 ? Math.min(capMinutes, ms / 60_000) : null;
+  for (const a of input.puzzleAttempts) {
+    add(iso(new Date(a.at)), real(a.durationMs, 10) ?? ACTIVITY_MINUTES.puzzle, 1);
+  }
+  for (const g of input.games) {
+    if (!g.slow) continue;
+    const fallback =
+      g.timeClass === 'daily' ? ACTIVITY_MINUTES.dailyGame : ACTIVITY_MINUTES.slowGame;
+    add(g.date, real(g.durationMs, 120) ?? fallback);
+  }
+  if (input.analysisSessions) {
+    for (const at of input.analysisSessions) add(iso(new Date(at)), ACTIVITY_MINUTES.analysis);
+  } else {
+    const perDay = new Map<string, number>();
+    for (const g of input.games) {
+      if (g.reviewedAt === null) continue;
+      const day = iso(new Date(g.reviewedAt));
+      const n = perDay.get(day) ?? 0;
+      if (n >= MAX_FALLBACK_ANALYSES_PER_DAY) continue;
+      perDay.set(day, n + 1);
+      add(day, ACTIVITY_MINUTES.analysis);
+    }
+  }
+  const lessonTimes =
+    input.lessonSessions ??
+    input.lessons.flatMap((l) => (l.updatedAt === null ? [] : [l.updatedAt]));
+  for (const at of lessonTimes) add(iso(new Date(at)), ACTIVITY_MINUTES.lesson);
+  return days;
+}
+
+/** Jour validé : assez de puzzles, ou assez de minutes d'entraînement. */
+const dayDone = (d: { minutes: number; puzzles: number } | undefined) =>
+  !!d && (d.puzzles >= DAILY_PUZZLE_GOAL || d.minutes >= DAILY_MINUTES_GOAL);
+
+/** Numéro de jour d'une date « AAAA-MM-JJ » (pour compter des jours consécutifs). */
+const dayNumber = (day: string) => {
+  const [y, m, d] = day.split('-').map(Number);
+  return Math.round(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1) / 86_400_000);
+};
+
+/** Série en cours (aujourd'hui compris s'il est validé, sinon jusqu'à hier) et meilleure série. */
+export function computeStreak(
+  activity: Map<string, { minutes: number; puzzles: number }>,
+  now: Date,
+): { current: number; best: number; todayDone: boolean } {
+  const done = new Set(
+    [...activity.entries()].filter(([, d]) => dayDone(d)).map(([day]) => dayNumber(day)),
+  );
+  const today = dayNumber(iso(now));
+  const todayDone = done.has(today);
+  let current = 0;
+  for (let day = todayDone ? today : today - 1; done.has(day); day--) current++;
+  let best = 0;
+  let run = 0;
+  let previous = Number.NaN;
+  for (const day of [...done].filter((d) => d <= today).sort((a, b) => a - b)) {
+    run = day === previous + 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+    previous = day;
+  }
+  return { current, best: Math.max(best, current), todayDone };
 }
 
 const PHASES = [
@@ -345,6 +470,21 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
     },
   ];
 
+  // Régularité (étape 13) : activité par jour, cadence chess.com suivie pour l'objectif Elo.
+  const activity = estimateActivity(input);
+  const firstActiveDay = [...activity.keys()].sort()[0] ?? null;
+  const cadence: 'rapid' | 'blitz' = input.games.some(
+    (g) => g.timeClass === 'rapid' && g.userElo !== null,
+  )
+    ? 'rapid'
+    : 'blitz';
+  const firstMeasured = input.games
+    .filter((g) => g.timeClass === cadence && g.userElo !== null)
+    .map((g) => g.date.slice(0, 7))
+    .sort()[0];
+  const monthIndex = (key: string) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7));
+  const todayIso = iso(now);
+
   // Bilan des 6 derniers mois.
   const months: MonthStats[] = [];
   for (let k = 5; k >= 0; k--) {
@@ -363,6 +503,33 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         .filter((g) => g.timeClass === tc && g.userElo !== null && g.date.startsWith(key))
         .sort((x, y) => x.date.localeCompare(y.date))
         .at(-1)?.userElo ?? null;
+    const minutes = [...activity.entries()]
+      .filter(([day]) => day.startsWith(key))
+      .reduce((sum, [, a]) => sum + a.minutes, 0);
+    const targetElo =
+      firstMeasured && key >= firstMeasured
+        ? eloTarget(cadence, monthIndex(key) - monthIndex(firstMeasured))
+        : null;
+    const verdict = monthVerdict(lastElo(cadence), targetElo);
+    // Volume hebdomadaire moyen sur les jours écoulés du mois (depuis la première activité).
+    const firstDay = firstActiveDay && firstActiveDay > `${key}-01` ? firstActiveDay : `${key}-01`;
+    const lastDay = todayIso < iso(new Date(endMs - 1)) ? todayIso : iso(new Date(endMs - 1));
+    const elapsed = dayNumber(lastDay) - dayNumber(firstDay) + 1;
+    let advice: string | null = null;
+    if (firstActiveDay && firstActiveDay <= lastDay) {
+      if (elapsed >= 7 && (minutes * 7) / elapsed < 120) {
+        advice =
+          'Moins de 2 h par semaine : passe au plan minimal (puzzles du jour et une partie lente analysée par semaine).';
+      } else if (verdict === 'behind') {
+        advice =
+          'En retard sur l’objectif : priorité aux puzzles de tes thèmes faibles et à l’analyse de chaque partie lente.';
+      } else if (verdict === 'ahead') {
+        advice =
+          'En avance sur l’objectif : joue tes parties lentes contre un bot d’un cran plus fort.';
+      } else if (verdict === 'on-track') {
+        advice = 'Dans les temps : garde ce rythme.';
+      }
+    }
     months.push({
       month: key,
       games: inMonth.length,
@@ -375,6 +542,10 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
       ).length,
       chessComRapid: lastElo('rapid'),
       chessComBlitz: lastElo('blitz'),
+      minutes: Math.round(minutes),
+      targetElo,
+      verdict,
+      advice,
     });
   }
 
@@ -477,6 +648,13 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
     });
   }
 
+  // Série de jours, minutes de la semaine, verrou du blitz.
+  const today = activity.get(todayIso) ?? { minutes: 0, puzzles: 0 };
+  const streak = computeStreak(activity, now);
+  const weekMinutes = [...activity.entries()]
+    .filter(([day]) => day >= startIso && day <= todayIso)
+    .reduce((sum, [, a]) => sum + a.minutes, 0);
+
   return {
     phase: {
       current,
@@ -503,5 +681,18 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
     months,
     targets,
     recommendations: recommendations.slice(0, 5),
+    themeOfDay: themeOfDay({ phase: current, weakThemes, date: now }),
+    streak: {
+      ...streak,
+      todayPuzzles: today.puzzles,
+      todayMinutes: Math.round(today.minutes),
+    },
+    minutes: { week: Math.round(weekMinutes), target: WEEKLY_MINUTES_TARGET },
+    blitzLocked: !streak.todayDone,
+    blitzLockReason: streak.todayDone
+      ? null
+      : `Pas de blitz avant les puzzles du jour : ${Math.min(today.puzzles, DAILY_PUZZLE_GOAL)} / ${DAILY_PUZZLE_GOAL} puzzles (ou ${DAILY_MINUTES_GOAL} min d’entraînement).`,
+    guard: guardPolicy(current),
+    suggestedBotLevel: suggestBotLevel(input.botResults ?? []),
   };
 }

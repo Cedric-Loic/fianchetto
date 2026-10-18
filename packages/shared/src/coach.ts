@@ -33,6 +33,22 @@ export const SeriesSchema = z.object({
 });
 export type Series = z.infer<typeof SeriesSchema>;
 
+/* Étape 13 — Régularité : seuils partagés par le serveur, le coach et l'interface. */
+
+/** Puzzles à faire dans la journée pour la valider (série de jours, verrou du blitz). */
+export const DAILY_PUZZLE_GOAL = 10;
+/** Ou bien : minutes d'entraînement dans la journée pour la valider. */
+export const DAILY_MINUTES_GOAL = 15;
+/** Objectif hebdomadaire d'entraînement (semaine type du plan : 3 h). */
+export const WEEKLY_MINUTES_TARGET = 180;
+
+export const MonthVerdictSchema = z.enum(['ahead', 'on-track', 'behind']);
+export type MonthVerdict = z.infer<typeof MonthVerdictSchema>;
+
+/** Garde-fou « Es-tu sûr ? » : toujours (phase 1), une partie sur deux (phase 2), sinon coupé. */
+export const GuardPolicySchema = z.enum(['always', 'alternate', 'off']);
+export type GuardPolicy = z.infer<typeof GuardPolicySchema>;
+
 export const MonthStatsSchema = z.object({
   /** « 2026-10 ». */
   month: z.string(),
@@ -44,6 +60,14 @@ export const MonthStatsSchema = z.object({
   lessons: z.number().int(),
   chessComRapid: z.number().int().nullable(),
   chessComBlitz: z.number().int().nullable(),
+  /** Minutes d'entraînement estimées sur le mois (voir `buildDashboard`). */
+  minutes: z.number().int(),
+  /** Elo chess.com visé ce mois-ci (cadence suivie : Rapide sinon Blitz), `null` avant la 1re mesure. */
+  targetElo: z.number().int().nullable(),
+  /** Elo du mois comparé à l'objectif interpolé ; `null` si pas d'Elo ce mois-ci. */
+  verdict: MonthVerdictSchema.nullable(),
+  /** Ajustement conseillé du plan pour ce mois (une phrase), `null` si rien à signaler. */
+  advice: z.string().nullable(),
 });
 export type MonthStats = z.infer<typeof MonthStatsSchema>;
 
@@ -96,5 +120,23 @@ export const CoachDashboardSchema = z.object({
   months: z.array(MonthStatsSchema),
   targets: z.array(TargetSchema),
   recommendations: z.array(RecommendationSchema),
+  /** Thème de puzzles du jour (phase courante, pondéré vers les thèmes faibles). */
+  themeOfDay: z.string(),
+  /** Série de jours validés (`DAILY_PUZZLE_GOAL` puzzles ou `DAILY_MINUTES_GOAL` min). */
+  streak: z.object({
+    current: z.number().int(),
+    best: z.number().int(),
+    todayDone: z.boolean(),
+    todayPuzzles: z.number().int(),
+    todayMinutes: z.number().int(),
+  }),
+  /** Minutes d'entraînement estimées depuis lundi, et objectif (`WEEKLY_MINUTES_TARGET`). */
+  minutes: z.object({ week: z.number().int(), target: z.number().int() }),
+  /** « Pas de blitz avant les puzzles du jour » : vrai tant que la journée n'est pas validée. */
+  blitzLocked: z.boolean(),
+  blitzLockReason: z.string().nullable(),
+  guard: GuardPolicySchema,
+  /** Niveau du bot classique conseillé (score glissant visé : 40 à 60 %), `null` sans partie. */
+  suggestedBotLevel: z.number().int().min(1).max(5).nullable(),
 });
 export type CoachDashboard = z.infer<typeof CoachDashboardSchema>;
