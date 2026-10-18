@@ -91,7 +91,6 @@
   --peek-active: #6b5a24;
   --code-bg: #000000;
   --chart-grid: #3a3734;
-  --logo-square: #34312d;
 
   /* Espacements, rayons, ombres. */
   --space-1: 4px;
@@ -394,24 +393,23 @@ button:disabled {
 
 /* --- Logo --- */
 .logo-bg {
-  fill: var(--surface-1);
-}
-.logo-squares {
-  fill: var(--logo-square);
+  fill: var(--logo-tile);
 }
 .logo-piece {
   fill: var(--accent);
 }
-.logo-glow {
-  stop-color: var(--accent);
-}
+/* La découpe a toujours la couleur exacte du fond de tuile. */
 .logo-cut {
-  stroke: var(--surface-1);
+  stroke: var(--logo-tile);
 }
-.nav-logo .logo-bg {
-  fill: var(--surface-2);
+.logo-diag {
+  stroke: var(--accent);
+}
+.nav-logo .logo-icon {
+  --logo-tile: var(--surface-2);
 }
 .logo-icon {
+  --logo-tile: var(--surface-0);
   display: block;
   flex-shrink: 0;
 }
