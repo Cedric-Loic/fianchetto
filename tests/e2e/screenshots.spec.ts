@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Captures d'écran de contrôle visuel (bureau 1366 × 768 et téléphone 390 × 844) : accueil,
- * partie, revue, échiquier d'analyse, puzzles, coach, leçons. Lancé seulement à la demande :
+ * partie, revue (et revue guidée), échiquier d'analyse, puzzles, coach, leçons. Lancé seulement à la demande :
  *   FIANCHETTO_SHOTS=/chemin/du/dossier pnpm test:e2e tests/e2e/screenshots.spec.ts
  */
 const OUT = process.env.FIANCHETTO_SHOTS;
@@ -100,6 +100,11 @@ test('captures d’écran (bureau et téléphone)', async ({ page }) => {
       await ready();
       await shot(`${name}-${label}`);
       if (name !== 'partie') await shot(`${name}-${label}-complet`, true);
+      if (name === 'revue') {
+        await page.getByTestId('start-guided').click();
+        await expect(page.getByTestId('guided-moment')).toBeVisible();
+        await shot(`revue-guidee-${label}`);
+      }
     }
     if (label === 'mobile') {
       await page.goto('/');

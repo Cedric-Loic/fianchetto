@@ -24,8 +24,8 @@ export function Logo({ size = 32, withText = false, className }: LogoProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <rect className="logo-bg" width="64" height="64" rx="15" fill="#1f1d1b" />
-      <g className="logo-piece" fill="#81b64c">
+      <rect className="logo-bg" width="64" height="64" rx="15" fill="#0b1324" />
+      <g className="logo-piece" fill="#c9a55c">
         <circle cx="32" cy="12.5" r="4.2" />
         <path d="M32 17.2c-7.6 6.4-11 12.6-11 18.2 0 4 2.4 7 5.6 8.6h10.8c3.2-1.6 5.6-4.6 5.6-8.6 0-5.6-3.4-11.8-11-18.2z" />
         <rect x="23.5" y="45.6" width="17" height="3.6" rx="1.8" />
@@ -34,14 +34,14 @@ export function Logo({ size = 32, withText = false, className }: LogoProps) {
       <path
         className="logo-cut"
         d="M8 56L56 8"
-        stroke="#1f1d1b"
+        stroke="#0b1324"
         strokeWidth="4.2"
         strokeLinecap="round"
       />
       <path
         className="logo-diag"
         d="M9.5 54.5l8-8M46.5 17.5l8-8"
-        stroke="#81b64c"
+        stroke="#c9a55c"
         strokeWidth="2.6"
         strokeLinecap="round"
         opacity="0.55"

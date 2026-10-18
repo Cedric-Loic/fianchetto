@@ -7,7 +7,7 @@ import { create } from 'zustand';
  */
 
 export const BOARD_THEMES = {
-  vert: { label: 'Vert', light: '#eeeed2', dark: '#769656' },
+  marine: { label: 'Marine', light: '#e8e4d8', dark: '#5c7393' },
   bois: { label: 'Bois', light: '#f0d9b5', dark: '#b58863' },
   bleu: { label: 'Bleu', light: '#dee3e6', dark: '#8ca2ad' },
   gris: { label: 'Gris', light: '#e0e0e0', dark: '#9e9e9e' },
@@ -17,7 +17,7 @@ export type BoardTheme = keyof typeof BOARD_THEMES;
 export const PIECE_SETS = { cburnett: 'Classique', merida: 'Merida', alpha: 'Alpha' } as const;
 export type PieceSet = keyof typeof PIECE_SETS;
 
-interface Settings {
+export interface Settings {
   board: BoardTheme;
   pieces: PieceSet;
   sound: boolean;
@@ -37,7 +37,7 @@ interface Settings {
 
 const KEY = 'sq-settings';
 const DEFAULTS: Settings = {
-  board: 'vert',
+  board: 'marine',
   pieces: 'cburnett',
   sound: true,
   autoFlip: false,
@@ -48,13 +48,19 @@ const DEFAULTS: Settings = {
   engine: false,
 };
 const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
+/** Thème d'échiquier enregistré : l'ancien « vert » (retiré) ou une valeur inconnue devient « marine ». */
+export const boardTheme = (value: unknown): BoardTheme =>
+  typeof value === 'string' && Object.hasOwn(BOARD_THEMES, value)
+    ? (value as BoardTheme)
+    : DEFAULTS.board;
 
-function load(): Settings {
+/** Lit les préférences enregistrées (valeurs invalides remplacées par les valeurs par défaut). */
+export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<Settings>) : {};
     return {
-      board: parsed.board && parsed.board in BOARD_THEMES ? parsed.board : DEFAULTS.board,
+      board: boardTheme(parsed.board),
       pieces: parsed.pieces && parsed.pieces in PIECE_SETS ? parsed.pieces : DEFAULTS.pieces,
       sound: bool(parsed.sound, DEFAULTS.sound),
       autoFlip: bool(parsed.autoFlip, DEFAULTS.autoFlip),
@@ -74,7 +80,7 @@ function load(): Settings {
 
 export const useSettings = create<Settings & { update: (patch: Partial<Settings>) => void }>(
   (set, get) => ({
-    ...load(),
+    ...loadSettings(),
     update(patch) {
       set(patch);
       const {
