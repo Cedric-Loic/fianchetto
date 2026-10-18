@@ -1,4 +1,5 @@
 import type { PublicMove } from '@sq/shared';
+import { useSan } from '../lib/notation';
 
 /** Liste des coups sur deux colonnes (notation publique) ; clic = aller à la position. */
 export function MoveList(props: {
@@ -8,6 +9,7 @@ export function MoveList(props: {
   cursor: number;
   onSelect: (ply: number) => void;
 }) {
+  const san = useSan();
   const rows = [];
   // Partie commencée par les Noirs (entraînement depuis une position) : case blanche vide.
   const offset = props.moves[0]?.color === 'b' ? 1 : 0;
@@ -24,7 +26,7 @@ export function MoveList(props: {
               className={`move${props.cursor === m.ply ? ' current' : ''}`}
               onClick={() => props.onSelect(m.ply)}
             >
-              {props.labels?.[m.ply - 1] ?? m.san}
+              {san(props.labels?.[m.ply - 1] ?? m.san)}
             </button>
           ) : (
             <span key="empty" className="move" />

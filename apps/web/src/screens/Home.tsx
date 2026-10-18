@@ -7,11 +7,19 @@ import {
   type TimeControlId,
   type Variant,
 } from '@sq/shared';
-import { api } from '../lib/api';
+import { api, summarizePgn, type PgnSummary } from '../lib/api';
 import { useSession } from '../lib/session';
 import { pieceUrl, useSettings } from '../lib/settings';
 import { Button } from '../ui/Button';
-import { IconBook, IconBulb, IconChart, IconPuzzle, IconTarget } from '../ui/icons';
+import {
+  IconBook,
+  IconBulb,
+  IconChart,
+  IconPlay,
+  IconPuzzle,
+  IconTarget,
+  IconUser,
+} from '../ui/icons';
 import { Logo } from '../ui/Logo';
 import { Tabs } from '../ui/Tabs';
 import { VARIANT_LABEL } from './labels';
@@ -94,6 +102,62 @@ function CoachBanner() {
   );
 }
 
+/**
+ * Carte « Partie en cours » : adversaire, variante et nombre de coups joués, lus dans le PGN
+ * public de la partie ; à défaut, simple invitation à reprendre.
+ */
+function ResumeCard(props: { gameId: string; username: string; onResume: () => void }) {
+  const [summary, setSummary] = useState<PgnSummary | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void api.gamePgn(props.gameId).then((pgn) => {
+      if (!cancelled && pgn) setSummary(summarizePgn(pgn));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [props.gameId]);
+  const opponent = !summary
+    ? null
+    : summary.white === props.username
+      ? summary.black
+      : summary.black === props.username
+        ? summary.white
+        : `${summary.white} – ${summary.black}`;
+  const moves = summary ? Math.ceil(summary.plies / 2) : 0;
+  return (
+    <section className="panel banner resume" data-testid="resume-card" aria-label="Partie en cours">
+      <span className="banner-icon">
+        <IconUser size={28} />
+      </span>
+      <span className="banner-body">
+        <span className="banner-title">Partie en cours</span>
+        {opponent ? (
+          <>
+            <span className="resume-opponent" data-testid="resume-opponent">
+              contre {opponent}
+            </span>
+            <span className="resume-meta">
+              <span>{summary && VARIANT_LABEL[summary.variant]}</span>
+              <span data-testid="resume-moves">
+                {moves === 0
+                  ? 'Aucun coup joué'
+                  : `${moves} coup${moves > 1 ? 's' : ''} joué${moves > 1 ? 's' : ''}`}
+              </span>
+            </span>
+          </>
+        ) : (
+          <span>Une partie t'attend.</span>
+        )}
+      </span>
+      <Button variant="primary" onClick={props.onResume}>
+        <IconPlay size={18} />
+        Reprendre
+      </Button>
+    </section>
+  );
+}
+
 /** Accès rapides vers les écrans de progression. */
 const QUICK_LINKS = [
   {
@@ -168,16 +232,13 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
         <p className="tagline">Ta plateforme d'échecs personnelle.</p>
       </header>
 
-      {active && (
-        <div className="panel banner resume">
-          <span className="banner-body">
-            <span className="banner-title">Partie en cours</span>
-            <span>Une partie t'attend.</span>
-          </span>
-          <Button variant="primary" onClick={() => onStart(active)}>
-            Reprendre
-          </Button>
-        </div>
+      {active && user && (
+        <ResumeCard
+          key={active}
+          gameId={active}
+          username={user.username}
+          onResume={() => onStart(active)}
+        />
       )}
       {user && <CoachBanner key={user.username} />}
 

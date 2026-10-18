@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { UserPublic } from '@sq/shared';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
-import { SettingsMenu } from '../game/SettingsMenu';
+import { SettingsMenu, SettingsPanel } from '../game/SettingsMenu';
 import { Logo } from './Logo';
-import { IconMenu } from './icons';
+import { IconLogout, IconMenu, IconSettings, IconUser } from './icons';
 
 /** Rubrique de la barre de navigation à surligner (selon la page affichée). */
 export type NavSection =
@@ -69,33 +70,120 @@ export function NavBar({ section, hash }: { section: NavSection; hash: string })
           ))}
         </div>
         <div className="nav-account">
-          <SettingsMenu />
           {user ? (
+            <AccountMenu
+              user={user}
+              current={hash === `#/profile/${user.username}`}
+              onNavigate={close}
+              onLogout={() => void api.logout().then(() => setUser(null))}
+            />
+          ) : (
             <>
+              <SettingsMenu />
               <a
-                href={`#/profile/${user.username}`}
+                href="#/login"
                 className="nav-link"
-                aria-current={hash === `#/profile/${user.username}` ? 'page' : undefined}
-                data-testid="nav-user"
+                aria-current={current('login')}
                 onClick={close}
               >
-                {user.username}
+                Connexion
               </a>
-              <button
-                type="button"
-                className="btn btn-link btn-s"
-                onClick={() => void api.logout().then(() => setUser(null))}
-              >
-                Déconnexion
-              </button>
             </>
-          ) : (
-            <a href="#/login" className="nav-link" aria-current={current('login')} onClick={close}>
-              Connexion
-            </a>
           )}
         </div>
       </div>
     </nav>
+  );
+}
+
+/**
+ * Menu du compte : avatar et pseudo ; au clic, profil, réglages et déconnexion. Se referme au
+ * clic ailleurs et sur Échap.
+ */
+function AccountMenu(props: {
+  user: UserPublic;
+  current: boolean;
+  onNavigate: () => void;
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState<'menu' | 'settings' | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const { username } = props.user;
+
+  useEffect(() => {
+    if (open !== 'menu') return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(null);
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="account-menu" ref={ref}>
+      <button
+        type="button"
+        className="account-button"
+        aria-haspopup="menu"
+        aria-expanded={open === 'menu'}
+        data-testid="nav-user"
+        onClick={() => setOpen(open === 'menu' ? null : 'menu')}
+      >
+        <span className="account-avatar" aria-hidden="true">
+          {username.slice(0, 1)}
+        </span>
+        {username}
+      </button>
+      {open === 'menu' && (
+        <div className="account-dropdown" role="menu" aria-label="Compte">
+          <span className="account-name">
+            Connecté : <strong>{username}</strong>
+          </span>
+          <a
+            role="menuitem"
+            href={`#/profile/${username}`}
+            className="account-item"
+            aria-current={props.current ? 'page' : undefined}
+            data-testid="nav-profile"
+            onClick={() => {
+              setOpen(null);
+              props.onNavigate();
+            }}
+          >
+            <IconUser size={18} />
+            Mon profil
+          </a>
+          <button
+            type="button"
+            role="menuitem"
+            className="account-item"
+            data-testid="settings"
+            onClick={() => setOpen('settings')}
+          >
+            <IconSettings size={18} />
+            Réglages
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="account-item"
+            data-testid="logout"
+            onClick={() => {
+              setOpen(null);
+              props.onLogout();
+            }}
+          >
+            <IconLogout size={18} />
+            Déconnexion
+          </button>
+        </div>
+      )}
+      {open === 'settings' && <SettingsPanel onClose={() => setOpen(null)} />}
+    </div>
   );
 }

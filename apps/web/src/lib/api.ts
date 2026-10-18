@@ -80,6 +80,43 @@ export async function request<T>(
   }
 }
 
+/** Texte brut (PGN…) ; `null` en cas d'erreur HTTP ou réseau. */
+async function text(path: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(path, { credentials: 'same-origin', signal: controller.signal });
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Résumé public d'une partie tiré de son PGN (notation publique pendant la partie). */
+export interface PgnSummary {
+  white: string;
+  black: string;
+  variant: Variant;
+  /** Nombre de demi-coups joués. */
+  plies: number;
+}
+
+export function summarizePgn(pgn: string): PgnSummary {
+  const tag = (name: string) => new RegExp(`^\\[${name} "([^"]*)"\\]`, 'm').exec(pgn)?.[1] ?? '';
+  const body = pgn.replace(/^\[.*\]$/gm, '').trim();
+  const plies = body
+    .split(/\s+/)
+    .filter((t) => t && !/^\d+\.+$/.test(t) && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)).length;
+  return {
+    white: tag('White'),
+    black: tag('Black'),
+    variant: tag('Event').includes('Secret Queen') ? 'secret-queen' : 'classic',
+    plies,
+  };
+}
+
 export const SERVER_UNREACHABLE = 'Serveur injoignable.';
 
 /** Message d'échec du chargement d'une revue (statut 0 : le serveur n'a pas répondu). */
@@ -113,6 +150,8 @@ export const api = {
   profile: (username: string) =>
     call<ProfileResponse>('GET', `/api/profile/${encodeURIComponent(username)}`),
   activeGame: () => call<{ gameId: string | null }>('GET', '/api/games/active'),
+  /** PGN d'une partie : vue publique pendant la partie (carte « Partie en cours »). */
+  gamePgn: (id: string) => text(`/api/games/${encodeURIComponent(id)}/pgn`),
   createGame: (body: unknown) => call<{ gameId: string }>('POST', '/api/games', body),
   // Entraînement.
   hint: (gameId: string, level: number) =>

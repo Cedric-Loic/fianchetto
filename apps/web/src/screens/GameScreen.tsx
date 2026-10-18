@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   GENERIC_ILLEGAL_MOVE_MESSAGE,
   type Color,
-  type GameResult,
   type HintResponse,
   type Square,
   type ViewerGameState,
@@ -18,15 +17,29 @@ import { publicPositionAt } from '../lib/position';
 import { piecesFromFen } from '../lib/fen';
 import { useGame } from '../lib/store';
 import { useSession } from '../lib/session';
-import { REASONS, SIDE, VARIANT_LABEL } from './labels';
+import { SIDE, VARIANT_LABEL } from './labels';
 import { useSettings } from '../lib/settings';
+import { useSan } from '../lib/notation';
+import { EndDialog } from '../game/EndDialog';
+import { moveAnnouncement } from '../game/outcome';
+import { GameActions, ResignDialog } from '../game/GameActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-
-function resultText(result: GameResult, state: ViewerGameState): string {
-  if (result.winner === null) return `Partie nulle ${REASONS[result.reason]}`;
-  return `${state.players[result.winner].name} (${SIDE[result.winner]}) gagne ${REASONS[result.reason]}`;
-}
+import { Dialog } from '../ui/Dialog';
+import {
+  IconBulb,
+  IconChart,
+  IconClose,
+  IconDownload,
+  IconExpand,
+  IconFirst,
+  IconFlip,
+  IconLast,
+  IconNext,
+  IconPrev,
+  IconRetry,
+  IconUndo,
+} from '../ui/icons';
 
 /**
  * Écran de partie (classique ou Secret Queen, à deux ou contre le bot) : plateau, barres joueur,
@@ -44,6 +57,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   // Position consultée dans l'historique ; oubliée dès qu'un nouveau coup arrive.
   const [nav, setNav] = useState<{ ply: number; base: number } | null>(null);
   const [showEnd, setShowEnd] = useState(true);
+  const [confirmResign, setConfirmResign] = useState(false);
+  const justEnded = useGame((s) => s.lastCause?.kind === 'game-ended');
+  const san = useSan();
   // Premoves (mode bot, pas à deux sur l'écran) : file de coups préparés pendant le tour du bot.
   // Un refus (premove devenu illégal) change le compteur de refus et annule toute la file.
   const premoveOn = useSettings((s) => s.premoves);
@@ -244,8 +260,68 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     />
   );
 
+  const announce = lastMove && live ? moveAnnouncement(lastMove, shownPly, san) : '';
+  const toastRegion = (
+    <div className="toast-region" role="status" aria-live="polite">
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+  const actions = (compact: boolean) => (
+    <GameActions
+      state={state}
+      actor={actor}
+      compact={compact}
+      onResign={() => setConfirmResign(true)}
+    />
+  );
+  const overlays = (
+    <>
+      {/* Annonce du dernier coup pour les lecteurs d'écran. */}
+      <p className="sr-only" aria-live="polite" data-testid="move-announce">
+        {announce}
+      </p>
+      {confirmResign && !ended && (
+        <ResignDialog state={state} actor={actor} onCancel={() => setConfirmResign(false)} />
+      )}
+      {guard && guard.ply === plyCount && (
+        <Dialog
+          title="Es-tu sûr ?"
+          onClose={() => setGuard(null)}
+          testId="guard"
+          initialFocus="[data-autofocus]"
+        >
+          <p>{guard.warning}</p>
+          <div className="actions">
+            <Button variant="primary" data-autofocus onClick={() => setGuard(null)}>
+              Je cherche un autre coup
+            </Button>
+            <Button
+              onClick={() => {
+                setGuard(null);
+                commit(guard.move);
+              }}
+            >
+              Jouer quand même
+            </Button>
+          </div>
+        </Dialog>
+      )}
+      {ended && board.result && (classic || board.reveal) && showEnd && (
+        <EndDialog
+          state={state}
+          result={board.result}
+          ratingAfter={user ? user.ratings[state.variant].rating : null}
+          justEnded={justEnded}
+          onClose={() => setShowEnd(false)}
+          onLeave={onLeave}
+        />
+      )}
+    </>
+  );
+
   if (focus) {
-    // Mode concentration : l'échiquier seul (et les pendules si la partie en a).
+    // Mode concentration : l'échiquier seul (et les pendules si la partie en a), avec une barre
+    // discrète d'actions sous le plateau.
     const slimClock = (color: Color) =>
       state.clock && (
         <div className="focus-clock">
@@ -258,21 +334,43 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         <button
           className="focus-close"
           title="Quitter le mode concentration (Échap)"
+          aria-label="Quitter le mode concentration"
           onClick={exitFocus}
         >
-          ✕
+          <IconClose size={22} />
         </button>
         <div className="focus-board">
           {slimClock(top)}
           <div className="board-wrap">
             {boardElement}
-            {toast && <div className="toast">{toast}</div>}
+            {toastRegion}
           </div>
           {slimClock(bottom)}
+          <div className="focus-actions" data-testid="focus-actions">
+            {ended ? (
+              <div className="focus-actions-buttons">
+                <Button size="s" variant="ghost" onClick={() => setShowEnd(true)}>
+                  Résultat
+                </Button>
+                <Button size="s" variant="ghost" onClick={exitFocus}>
+                  Quitter le mode concentration
+                </Button>
+              </div>
+            ) : (
+              actions(true)
+            )}
+          </div>
         </div>
+        {overlays}
       </div>
     );
   }
+
+  const turnText = ended
+    ? 'Partie terminée'
+    : isBot
+      ? `${board.turn === me ? 'À toi de jouer' : 'Le bot réfléchit…'}${board.inCheck ? ' — échec !' : ''}`
+      : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`;
 
   return (
     <div className="game">
@@ -280,49 +378,65 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         {bar(top)}
         <div className="board-wrap">
           {boardElement}
-          {toast && <div className="toast">{toast}</div>}
+          {toastRegion}
         </div>
         {bar(bottom)}
       </div>
 
       <aside className="panel side-panel">
-        <div className="turn-banner">
-          {ended
-            ? 'Partie terminée'
-            : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`}
+        <div className="turn-banner" data-testid="turn-banner">
+          {turnText}
           <Badge>{VARIANT_LABEL[state.variant]}</Badge>
           {state.rated && <Badge tone="accent">Classée</Badge>}
           {state.training && <Badge tone="info">Entraînement</Badge>}
         </div>
         <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />
         <div className="nav">
-          <button title="Début" onClick={() => setCursor(0)}>
-            ⏮
+          <button title="Début" aria-label="Début" onClick={() => setCursor(0)}>
+            <IconFirst size={20} />
           </button>
-          <button title="Précédent" onClick={() => setCursor(Math.max(0, shownPly - 1))}>
-            ◀
+          <button
+            title="Précédent"
+            aria-label="Précédent"
+            onClick={() => setCursor(Math.max(0, shownPly - 1))}
+          >
+            <IconPrev size={20} />
           </button>
-          <button title="Suivant" onClick={() => setCursor(Math.min(plyCount, shownPly + 1))}>
-            ▶
+          <button
+            title="Suivant"
+            aria-label="Suivant"
+            onClick={() => setCursor(Math.min(plyCount, shownPly + 1))}
+          >
+            <IconNext size={20} />
           </button>
-          <button title="Fin" onClick={() => setCursor(null)}>
-            ⏭
+          <button title="Fin" aria-label="Fin" onClick={() => setCursor(null)}>
+            <IconLast size={20} />
           </button>
-          <button title="Mode concentration" data-testid="focus-button" onClick={enterFocus}>
-            ⛶
+          <button
+            title="Mode concentration"
+            aria-label="Mode concentration"
+            data-testid="focus-button"
+            onClick={enterFocus}
+          >
+            <IconExpand size={20} />
           </button>
-          <button title="Retourner le plateau" onClick={() => setOrientation(top)}>
-            ⇅
+          <button
+            title="Retourner le plateau"
+            aria-label="Retourner le plateau"
+            onClick={() => setOrientation(top)}
+          >
+            <IconFlip size={20} />
           </button>
         </div>
 
         {!ended && state.training && (
           <div className="training" data-testid="training-panel">
             <div className="actions">
-              <button onClick={askHint} disabled={board.turn !== me} data-testid="hint">
-                💡 {currentHint ? (currentHint.level < 3 ? 'Indice suivant' : 'Indice') : 'Indice'}
-              </button>
-              <button
+              <Button onClick={askHint} disabled={board.turn !== me} data-testid="hint">
+                <IconBulb size={18} />
+                {currentHint && currentHint.level < 3 ? 'Indice suivant' : 'Indice'}
+              </Button>
+              <Button
                 onClick={() => {
                   // Le coup affiché en attente et les premoves n'ont plus lieu d'être.
                   setPending(null);
@@ -332,8 +446,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
                 disabled={plyCount === 0}
                 data-testid="takeback"
               >
-                ↶ Reprendre le coup
-              </button>
+                <IconUndo size={18} />
+                Reprendre le coup
+              </Button>
             </div>
             {currentHint && (
               <p className="hint-text" data-testid="hint-text">
@@ -356,39 +471,13 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
                 Voir ma dame secrète ({SIDE[board.turn]}) — maintenir
               </button>
             )}
-            {state.drawOffer !== null && isBot ? (
-              <div className="draw-offer">Nulle proposée, en attente de la réponse…</div>
-            ) : state.drawOffer !== null ? (
-              <div className="draw-offer">
-                <p>
-                  {state.players[state.drawOffer].name} propose la nulle.{' '}
-                  {state.players[state.drawOffer === 'w' ? 'b' : 'w'].name} :
-                </p>
-                <button onClick={() => send({ type: 'answer-draw', accept: true })}>
-                  Accepter
-                </button>
-                <button onClick={() => send({ type: 'answer-draw', accept: false })}>
-                  Refuser
-                </button>
-              </div>
-            ) : (
-              <div className="actions">
-                <button onClick={() => send({ type: 'offer-draw', color: actor })}>½ Nulle</button>
-                <button
-                  onClick={() =>
-                    window.confirm(`${state.players[actor].name} abandonne ?`) &&
-                    send({ type: 'resign', color: actor })
-                  }
-                >
-                  ⚑ Abandonner
-                </button>
-              </div>
-            )}
+            {actions(false)}
           </>
         )}
         {ended && (
           <div className="actions">
             <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
+              <IconRetry size={18} />
               Revanche
             </Button>
             <Button onClick={onLeave}>Nouvelle partie</Button>
@@ -397,72 +486,17 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         {ended && (
           <div className="actions">
             <Button href={`#/review/${state.gameId}`} data-testid="review-link">
-              📊 Revue de la partie
+              <IconChart size={18} />
+              Revue de la partie
             </Button>
             <Button href={`/api/games/${state.gameId}/pgn`} download="partie.pgn">
-              ⬇ PGN
+              <IconDownload size={18} />
+              PGN
             </Button>
           </div>
         )}
       </aside>
-
-      {guard && guard.ply === plyCount && (
-        <div className="modal-backdrop">
-          <div className="modal" data-testid="guard">
-            <h2>Es-tu sûr ?</h2>
-            <p>{guard.warning}</p>
-            <div className="actions">
-              <Button variant="primary" onClick={() => setGuard(null)}>
-                Je cherche un autre coup
-              </Button>
-              <Button
-                onClick={() => {
-                  setGuard(null);
-                  commit(guard.move);
-                }}
-              >
-                Jouer quand même
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {ended && board.result && (classic || board.reveal) && showEnd && (
-        <div className="modal-backdrop" onClick={() => setShowEnd(false)}>
-          <div className="modal" data-testid="end-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{resultText(board.result, state)}</h2>
-            {state.rated && me && user && state.players[me].rating !== null && (
-              <p className="elo-change" data-testid="elo-change">
-                Elo {VARIANT_LABEL[state.variant]} : {state.players[me].rating} →{' '}
-                <strong>{user.ratings[state.variant].rating}</strong>
-              </p>
-            )}
-            {board.reveal && <h3>Les dames secrètes</h3>}
-            {(['w', 'b'] as const).map((c) => {
-              const s = board.reveal?.secrets[c];
-              if (!s) return null;
-              return (
-                <p key={c} data-testid={`reveal-${c}`}>
-                  {state.players[c].name} ({SIDE[c]}) : le pion de{' '}
-                  <strong>{s.initialSquare}</strong>
-                  {s.finalSquare
-                    ? `, aujourd'hui en ${s.finalSquare}`
-                    : ', capturé en cours de partie'}
-                </p>
-              );
-            })}
-            <div className="actions">
-              <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
-                Revanche
-              </Button>
-              <Button href={`#/review/${state.gameId}`}>📊 Revue de la partie</Button>
-              <Button onClick={() => setShowEnd(false)}>Voir le plateau</Button>
-              <Button onClick={onLeave}>Nouvelle partie</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {overlays}
     </div>
   );
 }

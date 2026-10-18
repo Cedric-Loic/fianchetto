@@ -33,6 +33,8 @@ export interface Settings {
   premoves: boolean;
   /** Analyse : moteur en direct (désactivé par défaut). */
   engine: boolean;
+  /** Coups affichés en notation française (C, F, T, D, R) au lieu de l'anglaise. */
+  frenchNotation: boolean;
 }
 
 const KEY = 'sq-settings';
@@ -46,6 +48,7 @@ const DEFAULTS: Settings = {
   trainingGuard: true,
   premoves: true,
   engine: false,
+  frenchNotation: false,
 };
 const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
 /** Thème d'échiquier enregistré : l'ancien « vert » (retiré) ou une valeur inconnue devient « marine ». */
@@ -68,6 +71,7 @@ export function loadSettings(): Settings {
       trainingGuard: bool(parsed.trainingGuard, DEFAULTS.trainingGuard),
       premoves: bool(parsed.premoves, DEFAULTS.premoves),
       engine: bool(parsed.engine, DEFAULTS.engine),
+      frenchNotation: bool(parsed.frenchNotation, DEFAULTS.frenchNotation),
       chessComUsername:
         typeof parsed.chessComUsername === 'string'
           ? parsed.chessComUsername.slice(0, 40)
@@ -93,6 +97,7 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
         trainingGuard,
         premoves,
         engine,
+        frenchNotation,
       } = get();
       try {
         localStorage.setItem(
@@ -107,6 +112,7 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
             trainingGuard,
             premoves,
             engine,
+            frenchNotation,
           }),
         );
       } catch {

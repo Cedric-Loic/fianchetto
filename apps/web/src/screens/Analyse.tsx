@@ -8,6 +8,7 @@ import { api, type Result } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
 import { Button } from '../ui/Button';
+import { IconChart, IconClose, IconHourglass } from '../ui/icons';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
@@ -50,7 +51,7 @@ function Baseline({ games }: { games: ImportedGameSummary[] }) {
   const stats = games.flatMap((g) => (g.stats ? [g.stats] : []));
   if (stats.length === 0) {
     return (
-      <EmptyState icon="📈" title="Point de départ pas encore mesuré">
+      <EmptyState icon={<IconChart size={40} />} title="Point de départ pas encore mesuré">
         Analyse tes parties importées pour mesurer ta précision, tes gaffes par partie…
       </EmptyState>
     );
@@ -365,7 +366,10 @@ function Imports() {
                           )}
                         </a>
                       ) : g.review === 'queued' || g.review === 'running' ? (
-                        <span className="muted">⏳ en cours</span>
+                        <span className="muted icon-link">
+                          <IconHourglass size={16} />
+                          en cours
+                        </span>
                       ) : (
                         <a href={`#/review/${g.id}`}>Analyser</a>
                       )}
@@ -380,7 +384,7 @@ function Imports() {
                           void api.deleteImport(g.id).then(() => setRefresh((r) => r + 1))
                         }
                       >
-                        ✕
+                        <IconClose size={16} />
                       </Button>
                     </td>
                   </tr>

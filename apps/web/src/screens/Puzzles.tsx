@@ -16,6 +16,8 @@ import { api } from '../lib/api';
 import { carryIds, piecesFromFen } from '../lib/fen';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
+import { playSound } from '../lib/sound';
+import { useStreak } from '../lib/streak';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
 import { Badge } from '../ui/Badge';
@@ -23,6 +25,8 @@ import { Button } from '../ui/Button';
 import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
+import { IconBulb, IconNext } from '../ui/icons';
+import { RatingDelta, StreakBadge } from '../ui/StreakBadge';
 
 type Phase = 'loading' | 'playing' | 'solved' | 'failed' | 'empty' | 'no-bank';
 
@@ -66,6 +70,13 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
   const [ratingChange, setRatingChange] = useState<{ before: number; after: number } | null>(null);
   const [hint, setHint] = useState<Square | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Éclair sur la case d'arrivée de mon coup : bon (vert) ou faux (rouge). */
+  const [flash, setFlash] = useState<{
+    square: Square;
+    tone: 'success' | 'error';
+    id: number;
+  } | null>(null);
+  const record = useStreak((s) => s.record);
   /** Mon coup envoyé, affiché tout de suite en attendant la réponse du serveur. */
   const [pending, setPending] = useState<LocalMove | null>(null);
   // Premoves pendant la réponse adverse : file vidée à chaque nouveau puzzle et à la fin du
@@ -146,7 +157,15 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
     }
     const [mine, reply] = res.steps;
     if (mine) apply(mine);
-    if (res.status === 'failed') {
+    const failed = res.status === 'failed';
+    setFlash((f) => ({
+      square: move.to,
+      tone: failed ? 'error' : 'success',
+      id: (f?.id ?? 0) + 1,
+    }));
+    if (failed) {
+      playSound('failure');
+      record(false);
       setSolution(res.solution);
       setRatingChange(res.rating);
       setPhase('failed');
@@ -157,6 +176,8 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
     const finish = () => {
       setLegal(res.legalMoves);
       if (res.status === 'solved') {
+        playSound('success');
+        record(true);
         setRatingChange(res.rating);
         setPhase('solved');
       }
@@ -203,7 +224,6 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
   const ended = phase === 'solved' || phase === 'failed';
   const color = attempt?.color ?? 'w';
   const themeOfDay = stats?.themeOfDay ?? 'fork';
-  const delta = ratingChange ? ratingChange.after - ratingChange.before : null;
 
   return (
     <div className="game puzzles">
@@ -220,6 +240,7 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
             legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
             lastMove={lastMove}
             highlighted={hint}
+            flash={flash}
             onMove={(from, to, promotion) =>
               void onMove(promotion ? { from, to, promotion } : { from, to })
             }
@@ -236,12 +257,16 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
             </Badge>
           )}
         </div>
-        {stats && (
-          <p className="muted">
-            {stats.solved} réussis sur {stats.attempts}
-          </p>
-        )}
+        <div className="puzzle-stats-row">
+          {stats && (
+            <span className="muted">
+              {stats.solved} réussis sur {stats.attempts}
+            </span>
+          )}
+          <StreakBadge />
+        </div>
         <Tabs
+          className="tabs-scroll"
           label="Type de puzzles"
           value={mode}
           onChange={setMode}
@@ -295,13 +320,19 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
           )}
           {phase === 'solved' && (
             <p className="win">
-              ✓ Réussi !{delta !== null && ` Classement ${delta >= 0 ? '+' : ''}${delta}`}
+              ✓ Réussi !{' '}
+              {ratingChange && (
+                <RatingDelta before={ratingChange.before} after={ratingChange.after} />
+              )}
             </p>
           )}
           {phase === 'failed' && (
             <p className="loss">
-              ✗ Ce n'est pas le bon coup.
-              {delta !== null && ` Classement ${delta}`} Ce puzzle reviendra dans tes révisions.
+              ✗ Ce n'est pas le bon coup.{' '}
+              {ratingChange && (
+                <RatingDelta before={ratingChange.before} after={ratingChange.after} />
+              )}{' '}
+              Ce puzzle reviendra dans tes révisions.
             </p>
           )}
           {ended && attempt && (
@@ -329,8 +360,9 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
 
         <div className="actions">
           {phase === 'playing' && (
-            <Button onClick={askHint} disabled={busy}>
-              💡 Indice
+            <Button variant="outline" onClick={askHint} disabled={busy} data-testid="puzzle-hint">
+              <IconBulb size={18} />
+              Indice
             </Button>
           )}
           {phase === 'failed' && solution && solution.length > 0 && (
@@ -340,7 +372,7 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
           )}
           {(ended || phase === 'playing') && (
             <Button
-              variant={ended ? 'primary' : 'secondary'}
+              variant={ended ? 'primary' : 'outline'}
               data-testid="next-puzzle"
               disabled={busy}
               onClick={() => {
@@ -348,7 +380,8 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
                 setRound((r) => r + 1);
               }}
             >
-              {ended ? 'Puzzle suivant ▶' : 'Passer'}
+              {ended ? 'Puzzle suivant' : 'Passer'}
+              <IconNext size={18} />
             </Button>
           )}
         </div>

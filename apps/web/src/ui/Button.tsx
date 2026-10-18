@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'link' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'link' | 'danger';
 export type ButtonSize = 's' | 'm' | 'l';
 
 interface CommonProps {
@@ -35,7 +35,7 @@ function buttonClass(p: CommonProps): string {
 }
 
 /**
- * Bouton commun : primaire, secondaire, discret, lien ou danger, en trois tailles. Avec `href`,
+ * Bouton commun : primaire, secondaire, contour or, discret, lien ou danger, en trois tailles. Avec `href`,
  * il est rendu comme un lien `<a>` (navigation par le hash, téléchargement…).
  */
 export function Button(props: ButtonProps) {

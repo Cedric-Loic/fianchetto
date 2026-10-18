@@ -41,8 +41,9 @@ test('compte, partie classée contre le bot, Elo mis à jour', async ({ page }) 
     timeout: 20_000,
   });
 
-  page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: '⚑ Abandonner' }).click();
+  await page.getByTestId('resign').click();
+  await expect(page.getByRole('dialog', { name: 'Abandonner la partie ?' })).toBeVisible();
+  await page.getByTestId('confirm-resign').click();
   const modal = page.getByTestId('end-modal');
   await expect(modal).toContainText('gagne par abandon');
   await expect(page.getByTestId('elo-change')).toContainText('Elo Secret Queen : 1200 →');

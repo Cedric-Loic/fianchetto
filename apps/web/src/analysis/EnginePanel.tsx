@@ -1,5 +1,6 @@
 import type { EngineLine } from '@sq/shared';
 import { engineEvalLabel } from '../lib/eval';
+import { useSan } from '../lib/notation';
 import { Button } from '../ui/Button';
 import { fullmoveOf, turnOf } from './tree';
 import type { EngineState } from './useEngine';
@@ -40,6 +41,7 @@ export function EnginePanel(props: {
   threat?: ThreatOption;
 }) {
   const { engine, enabled, threat } = props;
+  const san = useSan();
   const threatSan = engine.threat?.sanPv[0];
   const line = (l: EngineLine) => (
     <div
@@ -64,7 +66,7 @@ export function EnginePanel(props: {
               className="engine-move"
               onClick={() => props.onPlay(l.pv.slice(0, i + 1))}
             >
-              {m.san}
+              {san(m.san)}
             </button>
           </span>
         ))}
@@ -136,7 +138,7 @@ export function EnginePanel(props: {
             <span className="muted">Roi en échec : pas de menace à calculer.</span>
           ) : threatSan ? (
             <>
-              Menace : <strong>{threatSan}</strong>
+              Menace : <strong>{san(threatSan)}</strong>
             </>
           ) : (
             <span className="muted">

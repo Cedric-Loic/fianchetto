@@ -14,11 +14,15 @@ import { api } from '../lib/api';
 import { carryIds, piecesFromFen } from '../lib/fen';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
+import { playSound } from '../lib/sound';
+import { useStreak } from '../lib/streak';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
 import { Button } from '../ui/Button';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
+import { IconBook, IconNext } from '../ui/icons';
+import { StreakBadge } from '../ui/StreakBadge';
 
 const PHASES: Record<number, string> = {
   1: 'Phase 1 · Ne plus rien donner',
@@ -72,7 +76,7 @@ export function Lessons() {
           Une leçon est validée quand 80 % de ses exercices sont réussis du premier coup.
         </p>
         {lessons.length === 0 && (
-          <EmptyState icon="📖" title="Aucune leçon disponible">
+          <EmptyState icon={<IconBook size={40} />} title="Aucune leçon disponible">
             Le serveur n'a renvoyé aucune leçon.
           </EmptyState>
         )}
@@ -126,6 +130,13 @@ function ExerciseBoard(props: {
   const [progress, setProgress] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Éclair sur la case d'arrivée de mon coup : bon (vert) ou faux (rouge). */
+  const [flash, setFlash] = useState<{
+    square: Square;
+    tone: 'success' | 'error';
+    id: number;
+  } | null>(null);
+  const record = useStreak((s) => s.record);
   /** Mon coup envoyé, affiché tout de suite en attendant la réponse du serveur. */
   const [pending, setPending] = useState<LocalMove | null>(null);
   // Premoves pendant la réponse adverse, oubliés dès que l'exercice est terminé.
@@ -162,7 +173,15 @@ function ExerciseBoard(props: {
       setBusy(false);
       return;
     }
+    const failed = res.status === 'failed';
+    setFlash((f) => ({
+      square: move.to,
+      tone: failed ? 'error' : 'success',
+      id: (f?.id ?? 0) + 1,
+    }));
     if (res.status === 'failed') {
+      playSound('failure');
+      record(false);
       setExplanation(res.explanation);
       setPhase('failed');
       // Solution jouée automatiquement, coup par coup.
@@ -177,6 +196,8 @@ function ExerciseBoard(props: {
       setLegal(res.legalMoves);
       setStep((s) => s + 2);
       if (res.status === 'solved') {
+        playSound('success');
+        record(true);
         setExplanation(res.explanation);
         setPhase('solved');
         props.onDone(true);
@@ -216,6 +237,7 @@ function ExerciseBoard(props: {
           onCancelPremove={queue.clear}
           legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
           lastMove={lastMove}
+          flash={flash}
           onMove={(from, to, promotion) =>
             void onMove(promotion ? { from, to, promotion } : { from, to })
           }
@@ -256,7 +278,7 @@ export function LessonPage({ id }: { id: string }) {
       <div className="page">
         <div className="panel page-panel">
           <EmptyState
-            icon="📖"
+            icon={<IconBook size={40} />}
             title="Leçon introuvable"
             action={<Button href="#/lessons">Toutes les leçons</Button>}
           />
@@ -320,7 +342,10 @@ export function LessonPage({ id }: { id: string }) {
       </div>
 
       <div className="panel page-panel" data-testid="exercises">
-        <h2>Exercices</h2>
+        <div className="puzzle-stats-row">
+          <h2>Exercices</h2>
+          <StreakBadge />
+        </div>
         {current === null && (
           <>
             <p className="muted">
@@ -350,7 +375,8 @@ export function LessonPage({ id }: { id: string }) {
                 onClick={() => setCurrent(current + 1)}
                 data-testid="next-exercise"
               >
-                {current + 1 < total ? 'Exercice suivant ▶' : 'Voir le bilan'}
+                {current + 1 < total ? 'Exercice suivant' : 'Voir le bilan'}
+                <IconNext size={18} />
               </Button>
             )}
           </>

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import type { MoveClass } from '@sq/shared';
 import { CLASS_SYMBOL, classCss } from '../lib/classes';
+import { useSan } from '../lib/notation';
 import { Button } from '../ui/Button';
+import { IconClose, IconUp } from '../ui/icons';
 import type { AnalysisTree } from './tree';
 
 /** Classes signalées par un symbole dans la liste (les autres n'encombrent pas la lecture). */
@@ -28,6 +30,7 @@ export interface MoveTreeProps {
  */
 export function MoveTree(props: MoveTreeProps) {
   const { tree, current } = props;
+  const san = useSan();
 
   const moveButton = (id: string, extra = '') => {
     const node = tree.get(id);
@@ -44,7 +47,7 @@ export function MoveTree(props: MoveTreeProps) {
           props.onSelect(id);
         }}
       >
-        {node.san}
+        {san(node.san ?? '')}
         {cls && SHOWN.includes(cls) && (
           <span className={`class-symbol ${classCss(cls)}`}> {CLASS_SYMBOL[cls]}</span>
         )}
@@ -150,12 +153,14 @@ export function MoveTree(props: MoveTreeProps) {
               data-testid="promote-variation"
               onClick={() => props.onPromote(current)}
             >
-              ↑ Promouvoir la variante
+              <IconUp size={16} />
+              Promouvoir la variante
             </Button>
           )}
           {canDelete && (
             <Button size="s" data-testid="delete-variation" onClick={() => props.onDelete(current)}>
-              ✕ Supprimer à partir d'ici
+              <IconClose size={16} />
+              Supprimer à partir d'ici
             </Button>
           )}
         </div>

@@ -58,6 +58,11 @@ export interface BoardProps {
    * Les cases accessibles à la pièce sélectionnée sont marquées. Toujours absent en Secret Queen.
    */
   legalMoves?: readonly Arrow[] | null;
+  /**
+   * Éclair bref sur une case (puzzles, leçons) : vert émeraude pour un bon coup, rouge pour un
+   * mauvais. `id` change à chaque éclair pour relancer l'animation.
+   */
+  flash?: { square: Square; tone: 'success' | 'error'; id: number } | null;
 }
 
 function squareXY(square: Square, orientation: Color): [number, number] {
@@ -380,6 +385,19 @@ export function Board(props: BoardProps) {
           />
         );
       })}
+      {props.flash &&
+        (() => {
+          const [x, y] = squareXY(props.flash.square, orientation);
+          return (
+            <div
+              key={`flash-${props.flash.id}`}
+              className={`square-flash ${props.flash.tone}`}
+              data-testid="square-flash"
+              data-tone={props.flash.tone}
+              style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
+            />
+          );
+        })()}
       {pieces.map((p) => {
         const [x, y] = squareXY(p.square, orientation);
         const dragging = drag?.id === p.id;

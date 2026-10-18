@@ -3,6 +3,7 @@ import { VARIANTS, type ProfileResponse } from '@sq/shared';
 import { api } from '../lib/api';
 import { REASON_SHORT, VARIANT_LABEL } from './labels';
 import { Button } from '../ui/Button';
+import { IconChart } from '../ui/icons';
 import { EmptyState } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 
@@ -109,8 +110,13 @@ export function Profile({ username }: { username: string }) {
                         {g.endedAt ? new Date(g.endedAt).toLocaleDateString('fr-FR') : ''}
                       </td>
                       <td>
-                        <a href={`#/review/${g.gameId}`} title="Revue de la partie">
-                          📊 Revue
+                        <a
+                          href={`#/review/${g.gameId}`}
+                          title="Revue de la partie"
+                          className="icon-link"
+                        >
+                          <IconChart size={16} />
+                          Revue
                         </a>
                       </td>
                     </tr>

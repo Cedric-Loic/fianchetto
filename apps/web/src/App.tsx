@@ -29,7 +29,7 @@ type Route =
   | { page: 'coach' }
   | { page: 'lessons' }
   | { page: 'lesson'; id: string }
-  | { page: 'review'; id: string }
+  | { page: 'review'; id: string; guided: boolean }
   | { page: 'game'; gameId: string };
 
 /** Routage par l'URL (`#/game/<id>`, `#/profile/<pseudo>`…) : survit au rafraîchissement. */
@@ -38,8 +38,9 @@ function parseHash(h: string): Route {
   if (m?.[1]) return { page: 'game', gameId: m[1] };
   m = /^#\/profile\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'profile', username: m[1] };
-  m = /^#\/review\/([\w-]+)$/.exec(h);
-  if (m?.[1]) return { page: 'review', id: m[1] };
+  // Revue, éventuellement lancée directement en mode guidé (#/review/<id>/guided).
+  m = /^#\/review\/([\w-]+)(\/guided)?$/.exec(h);
+  if (m?.[1]) return { page: 'review', id: m[1], guided: m[2] !== undefined };
   if (h === '#/analyse') return { page: 'analyse', tab: 'import', fen: null };
   // Échiquier d'analyse, éventuellement sur une position : #/analyse/board?fen=<FEN encodée>.
   m = /^#\/analyse\/board(?:\?fen=(.*))?$/.exec(h);
@@ -131,7 +132,8 @@ export function App() {
   } else if (route.page === 'coach') content = <Coach />;
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'lesson') content = <LessonPage key={route.id} id={route.id} />;
-  else if (route.page === 'review') content = <Review key={route.id} id={route.id} />;
+  else if (route.page === 'review')
+    content = <Review key={hash} id={route.id} guided={route.guided} />;
   else if (route.page === 'home') {
     content = <Home onStart={(id) => (location.hash = `#/game/${id}`)} />;
   } else if (!state) content = <Loading label="Connexion…" />;

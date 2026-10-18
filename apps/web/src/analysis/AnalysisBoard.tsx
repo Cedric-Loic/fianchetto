@@ -2,10 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { BoardArrow, Color, MoveClass, Square } from '@sq/shared';
 import { EvalBar } from '../game/Analysis';
 import { Board, type BoardMark } from '../game/Board';
-import { evalValue } from '../lib/eval';
+import { evalLabel, evalValue } from '../lib/eval';
 import { piecesFromFen } from '../lib/fen';
 import { useSettings } from '../lib/settings';
 import { playSound } from '../lib/sound';
+import { IconFirst, IconFlip, IconLast, IconNext, IconPrev } from '../ui/icons';
 import { EnginePanel } from './EnginePanel';
 import { MoveTree } from './MoveTree';
 import { morphPieces } from './pieces';
@@ -186,7 +187,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
 
   return (
     <div className="game review analysis-board" data-testid="analysis-board">
-      <EvalBar value={evalValue(evalShown)} />
+      <EvalBar value={evalValue(evalShown)} label={evalLabel(evalShown)} />
       <div className="board-column">
         {name(orientation === 'w' ? 'b' : 'w')}
         <div className="board-wrap">
@@ -233,20 +234,28 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
               locked={locked}
             />
             <div className="nav">
-              <button title="Début" onClick={() => go(tree.rootId)}>
-                ⏮
+              <button title="Début" aria-label="Début" onClick={() => go(tree.rootId)}>
+                <IconFirst size={20} />
               </button>
-              <button title="Précédent" onClick={() => go(tree.prev(current))}>
-                ◀
+              <button
+                title="Précédent"
+                aria-label="Précédent"
+                onClick={() => go(tree.prev(current))}
+              >
+                <IconPrev size={20} />
               </button>
-              <button title="Suivant" onClick={() => go(tree.next(current))}>
-                ▶
+              <button title="Suivant" aria-label="Suivant" onClick={() => go(tree.next(current))}>
+                <IconNext size={20} />
               </button>
-              <button title="Fin" onClick={() => go(tree.end(current))}>
-                ⏭
+              <button title="Fin" aria-label="Fin" onClick={() => go(tree.end(current))}>
+                <IconLast size={20} />
               </button>
-              <button title="Retourner le plateau (f)" onClick={() => setFlipped(!flipped)}>
-                ⇅
+              <button
+                title="Retourner le plateau (f)"
+                aria-label="Retourner le plateau"
+                onClick={() => setFlipped(!flipped)}
+              >
+                <IconFlip size={20} />
               </button>
             </div>
           </>

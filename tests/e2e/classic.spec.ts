@@ -84,8 +84,9 @@ test('classique contre le bot : partie classée, Elo classique séparé', async 
     timeout: 20_000,
   });
 
-  page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: '⚑ Abandonner' }).click();
+  await page.getByTestId('resign').click();
+  await expect(page.getByRole('dialog', { name: 'Abandonner la partie ?' })).toBeVisible();
+  await page.getByTestId('confirm-resign').click();
   await expect(page.getByTestId('elo-change')).toContainText('Elo Classique : 1200 →');
 
   await page.goto(`/#/profile/${username}`);

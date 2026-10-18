@@ -3,6 +3,7 @@ import { VARIANTS, type LeaderboardResponse, type Variant } from '@sq/shared';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
 import { Button } from '../ui/Button';
+import { IconWarning } from '../ui/icons';
 import { EmptyState } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
@@ -33,7 +34,7 @@ export function Leaderboard() {
           items={VARIANTS.map((v) => ({ id: v, label: VARIANT_LABEL[v] }))}
         />
         {failed && entries === null ? (
-          <EmptyState icon="⚠" title="Classement indisponible">
+          <EmptyState icon={<IconWarning size={40} />} title="Classement indisponible">
             Le serveur ne répond pas. Réessaie dans un instant.
           </EmptyState>
         ) : entries === null ? (

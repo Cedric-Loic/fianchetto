@@ -7,7 +7,9 @@ import {
   type ReviewMove,
 } from '@sq/shared';
 import { CLASS_LABEL, CLASS_SYMBOL, classCss } from '../lib/classes';
+import { useSan } from '../lib/notation';
 import { Button } from '../ui/Button';
+import { IconNext, IconPlay, IconPrev, IconRetry, IconTarget } from '../ui/icons';
 import { SIDE } from '../screens/labels';
 import {
   guidedSummary,
@@ -47,8 +49,8 @@ export function ExplainText(props: { text: string; onSquare: (square: string | n
   );
 }
 
-const moveLabel = (m: ReviewMove) =>
-  `${Math.ceil(m.ply / 2)}${m.color === 'w' ? '.' : '…'} ${m.san}`;
+const moveLabel = (m: ReviewMove, san: (s: string) => string) =>
+  `${Math.ceil(m.ply / 2)}${m.color === 'w' ? '.' : '…'} ${san(m.san)}`;
 const pct = (v: number) => `${Math.round(v)} %`;
 
 const TAG_TONE: Record<MomentTag, string> = {
@@ -73,6 +75,7 @@ interface MomentProps {
 /** Bulle du coach pour un moment clé : étiquettes, explication, probabilité de gain avant / après. */
 function CoachBubble(props: MomentProps) {
   const { move, tags } = props.moment;
+  const san = useSan();
   const text =
     move.explanation?.text ??
     (move.classification === 'best'
@@ -85,7 +88,7 @@ function CoachBubble(props: MomentProps) {
       </span>
       <div className="coach-bubble">
         <p className="coach-bubble-head">
-          <strong>{moveLabel(move)}</strong>{' '}
+          <strong>{moveLabel(move, san)}</strong>{' '}
           <span className="muted">
             ({props.names[move.color]}, {SIDE[move.color]})
           </span>
@@ -106,25 +109,27 @@ function CoachBubble(props: MomentProps) {
           <ExplainText text={text} onSquare={props.onSquare} />
         </p>
         <p className="win-swing" data-testid="win-swing">
-          Chances de gain : <strong>{pct(move.winBefore)}</strong> →{' '}
-          <strong className={move.winAfter < move.winBefore ? 'drop' : ''}>
+          Chances de gain : <strong className="pct">{pct(move.winBefore)}</strong> →{' '}
+          <strong className={`pct${move.winAfter < move.winBefore ? ' drop' : ''}`}>
             {pct(move.winAfter)}
           </strong>
         </p>
         {props.bestSan && move.classification !== 'best' && (
           <p className="muted">
-            Meilleur : <span className="best-move">{props.bestSan}</span>
+            Meilleur : <span className="best-move">{san(props.bestSan)}</span>
           </p>
         )}
         <div className="actions">
           {props.hasLine && (
             <Button size="s" data-testid="guided-line" onClick={props.onShowLine}>
-              ▶ Voir la ligne
+              <IconPlay size={16} />
+              Voir la ligne
             </Button>
           )}
           {props.mine && props.bestSan && move.classification !== 'best' && (
             <Button size="s" data-testid="guided-retry" onClick={props.onRetry}>
-              ↺ Réessayer
+              <IconRetry size={16} />
+              Réessayer
             </Button>
           )}
         </div>
@@ -173,7 +178,8 @@ export function GuidedPanel(props: GuidedPanelProps) {
         disabled={index === 0}
         onClick={() => props.onIndex(index - 1)}
       >
-        ◀ Précédent
+        <IconPrev size={18} />
+        Précédent
       </button>
       {!atEnd && (
         <button
@@ -182,7 +188,8 @@ export function GuidedPanel(props: GuidedPanelProps) {
           data-testid="guided-next"
           onClick={() => props.onIndex(index + 1)}
         >
-          {index + 1 < total ? 'Suivant ▶' : 'Bilan ▶'}
+          {index + 1 < total ? 'Suivant' : 'Bilan'}
+          <IconNext size={18} />
         </button>
       )}
     </div>
@@ -204,7 +211,7 @@ export function GuidedPanel(props: GuidedPanelProps) {
                 <span className="muted">
                   Précision{info.userColor ? '' : ` (${SIDE[a.color]})`}
                 </span>
-                <strong>{a.value === null ? '—' : `${a.value} %`}</strong>
+                <strong className="pct">{a.value === null ? '—' : `${a.value} %`}</strong>
               </span>
             ))}
             {(['blunder', 'mistake', 'inaccuracy'] as const).map((cls) => (
@@ -236,7 +243,8 @@ export function GuidedPanel(props: GuidedPanelProps) {
             title={info.userColor === null ? 'Camp inconnu dans cette partie' : undefined}
             onClick={props.onLearn}
           >
-            🎯 Apprends de tes erreurs
+            <IconTarget size={18} />
+            Apprends de tes erreurs
           </Button>
         </div>
         {nav}

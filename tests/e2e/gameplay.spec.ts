@@ -56,3 +56,33 @@ test('mode concentration : seul l’échiquier, croix pour revenir', async ({ pa
   await expect(page.getByTestId('move-list')).toBeVisible();
   await expect(page.locator('.nav-bar')).toHaveCount(1);
 });
+
+test('mode concentration : proposer nulle et abandonner sans quitter le plein écran', async ({
+  page,
+}) => {
+  await startHotseat(page);
+  await page.getByTestId('focus-button').click();
+  const bar = page.getByTestId('focus-actions');
+  await expect(bar.getByRole('button', { name: 'Proposer nulle' })).toBeVisible();
+
+  // Abandon : confirmation ; Échap l'annule sans quitter le mode concentration.
+  await bar.getByRole('button', { name: 'Abandonner' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Abandonner la partie ?' });
+  await expect(confirm).toBeVisible();
+  await expect(confirm.getByRole('button', { name: 'Continuer la partie' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByTestId('focus')).toBeVisible();
+
+  await bar.getByRole('button', { name: 'Abandonner' }).click();
+  await page.getByTestId('confirm-resign').click();
+  // Fin de partie (Secret Queen : révélation) affichée par-dessus le mode concentration.
+  const modal = page.getByRole('dialog', { name: /gagne par abandon/ });
+  await expect(modal).toBeVisible();
+  await expect(page.getByTestId('end-banner')).toContainText('Victoire des Noirs');
+  await expect(page.getByTestId('reveal-w')).toContainText('a2');
+  await expect(page.getByTestId('guided-review-link')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(modal).toHaveCount(0);
+  await expect(page.getByTestId('focus')).toBeVisible();
+});

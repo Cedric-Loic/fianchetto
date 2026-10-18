@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { IconClose } from '../ui/icons';
 
 /**
  * Bandeau d'un mode de la revue (revue guidée, « Apprends de tes erreurs ») : titre,
@@ -36,7 +37,8 @@ export function ModeBanner(props: {
         title="Quitter (Échap)"
         onClick={onExit}
       >
-        ✕ {props.exitLabel ?? 'Quitter'}
+        <IconClose size={16} />
+        {props.exitLabel ?? 'Quitter'}
       </button>
     </div>
   );

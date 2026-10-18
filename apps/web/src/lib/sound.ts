@@ -5,7 +5,17 @@ import { useSettings } from './settings';
  * de courtes impulsions filtrées qui évoquent le bois sur le bois.
  */
 
-export type SoundName = 'move' | 'capture' | 'check' | 'illegal' | 'start' | 'end' | 'lowtime';
+export type SoundName =
+  | 'move'
+  | 'capture'
+  | 'check'
+  | 'illegal'
+  | 'start'
+  | 'end'
+  | 'lowtime'
+  | 'victory'
+  | 'success'
+  | 'failure';
 
 let ctx: AudioContext | null = null;
 
@@ -38,8 +48,16 @@ function knock(ac: AudioContext, at: number, freq: number, gain: number, length 
 }
 
 /** Note brève (sinusoïde avec enveloppe), pour les annonces. */
-function tone(ac: AudioContext, at: number, freq: number, length: number, gain = 0.15) {
+function tone(
+  ac: AudioContext,
+  at: number,
+  freq: number,
+  length: number,
+  gain = 0.15,
+  type: OscillatorType = 'sine',
+) {
   const osc = ac.createOscillator();
+  osc.type = type;
   osc.frequency.value = freq;
   const g = ac.createGain();
   g.gain.setValueAtTime(0, at);
@@ -75,5 +93,22 @@ export function playSound(name: SoundName): void {
       return tone(ac, t + 0.24, 523, 0.35);
     case 'lowtime':
       return tone(ac, t, 1320, 0.08, 0.1);
+    case 'victory':
+      // Arpège majeur montant, puis accord tenu avec une octave scintillante.
+      tone(ac, t, 523, 0.18, 0.12);
+      tone(ac, t + 0.11, 659, 0.18, 0.12);
+      tone(ac, t + 0.22, 784, 0.2, 0.12);
+      tone(ac, t + 0.34, 1047, 0.7, 0.11);
+      tone(ac, t + 0.34, 784, 0.7, 0.06);
+      tone(ac, t + 0.34, 659, 0.7, 0.05);
+      return tone(ac, t + 0.5, 2093, 0.4, 0.03, 'triangle');
+    case 'success':
+      // Deux notes claires montantes (quinte).
+      tone(ac, t, 784, 0.14, 0.12);
+      return tone(ac, t + 0.09, 1175, 0.3, 0.11);
+    case 'failure':
+      // Deux notes graves descendantes, timbre plus sourd.
+      tone(ac, t, 330, 0.18, 0.12, 'triangle');
+      return tone(ac, t + 0.13, 247, 0.32, 0.12, 'triangle');
   }
 }

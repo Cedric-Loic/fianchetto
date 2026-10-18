@@ -7,7 +7,9 @@ import { api } from '../lib/api';
 import { CLASS_LABEL, CLASS_SYMBOL, classCss } from '../lib/classes';
 import { piecesFromFen } from '../lib/fen';
 import { playSound } from '../lib/sound';
+import { useSan } from '../lib/notation';
 import { Button } from '../ui/Button';
+import { IconBulb, IconNext, IconRetry } from '../ui/icons';
 import { ModeBanner } from './ModeBanner';
 
 /** Délai entre deux demi-coups de la réfutation, puis avant le retour à la position. */
@@ -41,6 +43,7 @@ export function LearnMistakes(props: {
   onExit: () => void;
 }) {
   const { review, moves } = props;
+  const san = useSan();
   const [index, setIndex] = useState(0);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const move = moves[index];
@@ -147,14 +150,14 @@ export function LearnMistakes(props: {
         record(tainted ? 'later' : 'first');
         const preferred =
           res.verdict === 'good' && best?.bestMoveSan && best.bestMoveSan !== res.san
-            ? ` Le moteur préférait ${best.bestMoveSan}.`
+            ? ` Le moteur préférait ${san(best.bestMoveSan)}.`
             : '';
-        setFeedback({ tone: 'ok', text: `✓ Bien joué : ${res.san}.${preferred}` });
+        setFeedback({ tone: 'ok', text: `✓ Bien joué : ${san(res.san)}.${preferred}` });
         return;
       }
       setTainted(true);
       setPhase('wrong');
-      setFeedback({ tone: 'bad', text: `✗ Pas mieux : ${res.san}. Regarde la réponse…` });
+      setFeedback({ tone: 'bad', text: `✗ Pas mieux : ${san(res.san)}. Regarde la réponse…` });
       const ids = tree.playLine(id, res.line.slice(0, REFUTATION_PLIES));
       ids.forEach((nodeId, i) => {
         later(
@@ -172,7 +175,7 @@ export function LearnMistakes(props: {
           setFen(startFen);
           setLastMove(null);
           setPhase('play');
-          setFeedback({ tone: 'bad', text: `✗ ${res.san} n'est pas mieux. Cherche encore.` });
+          setFeedback({ tone: 'bad', text: `✗ ${san(res.san)} n'est pas mieux. Cherche encore.` });
         },
         REFUTATION_STEP_MS * ids.length + REFUTATION_PAUSE_MS,
       );
@@ -217,7 +220,12 @@ export function LearnMistakes(props: {
             )}
           </div>
           <div className="actions">
-            {total > 0 && <Button onClick={restart}>↺ Recommencer</Button>}
+            {total > 0 && (
+              <Button onClick={restart}>
+                <IconRetry size={18} />
+                Recommencer
+              </Button>
+            )}
             <Button href="#/puzzles/mine">Mes erreurs</Button>
             <Button variant="primary" onClick={props.onExit}>
               Retour à la revue
@@ -281,14 +289,14 @@ export function LearnMistakes(props: {
           <p className="muted learn-context">
             Coup {moveNumber(move)} — tu as joué{' '}
             <strong>
-              {move.san} {CLASS_SYMBOL[move.classification]}
+              {san(move.san)} {CLASS_SYMBOL[move.classification]}
             </strong>{' '}
             <span className={`class-badge ${classCss(move.classification)}`}>
               {CLASS_LABEL[move.classification]}
             </span>
           </p>
           <p className="learn-prompt" data-testid="learn-prompt">
-            Trouve un meilleur coup que <strong>{move.san}</strong>
+            Trouve un meilleur coup que <strong>{san(move.san)}</strong>
             {move.color === 'w' ? ' (Blancs au trait)' : ' (Noirs au trait)'}.
           </p>
           {phase === 'checking' && <p className="muted">Vérification…</p>}
@@ -304,9 +312,9 @@ export function LearnMistakes(props: {
           )}
           {solution && solutionSan.length > 0 && (
             <p data-testid="learn-solution">
-              Solution : <strong className="best-move">{solutionSan[0]}</strong>
+              Solution : <strong className="best-move">{san(solutionSan[0] ?? '')}</strong>
               {solutionSan.length > 1 && (
-                <span className="muted"> puis {solutionSan.slice(1).join(' ')}</span>
+                <span className="muted"> puis {solutionSan.slice(1).map(san).join(' ')}</span>
               )}
             </p>
           )}
@@ -314,7 +322,8 @@ export function LearnMistakes(props: {
         <div className="actions">
           {phase === 'right' ? (
             <Button variant="primary" data-testid="learn-next" onClick={next}>
-              {index + 1 < total ? 'Suivant ▶' : 'Voir le score'}
+              {index + 1 < total ? 'Suivant' : 'Voir le score'}
+              {index + 1 < total && <IconNext size={18} />}
             </Button>
           ) : (
             <>
@@ -323,7 +332,8 @@ export function LearnMistakes(props: {
                 disabled={phase !== 'play' || hint || solution || !bestUci}
                 onClick={showHint}
               >
-                💡 Indice
+                <IconBulb size={18} />
+                Indice
               </Button>
               <Button
                 data-testid="learn-solution-button"
@@ -333,7 +343,8 @@ export function LearnMistakes(props: {
                 Voir la solution
               </Button>
               <Button data-testid="learn-skip" onClick={next}>
-                Passer ▶
+                Passer
+                <IconNext size={18} />
               </Button>
             </>
           )}

@@ -38,11 +38,18 @@ interface GameStore {
   reset: () => void;
 }
 
-/** Son associé à un événement public (échec > prise > coup). */
-function soundFor(cause: GameEvent | null): void {
+/**
+ * Son associé à un événement public (échec > prise > coup). Fin de partie : fanfare de victoire
+ * pour le vainqueur (à deux sur l'écran : dès qu'un camp gagne), sinon le son de fin.
+ */
+function soundFor(cause: GameEvent | null, viewer: ViewerGameState['viewer']): void {
   if (!cause) return;
   if (cause.kind === 'game-started') return playSound('start');
-  if (cause.kind === 'game-ended') return playSound('end');
+  if (cause.kind === 'game-ended') {
+    const winner = cause.result.winner;
+    const won = winner !== null && (viewer === 'public' || viewer === winner);
+    return playSound(won ? 'victory' : 'end');
+  }
   if (cause.kind !== 'move') return;
   if (cause.move.check) return playSound('check');
   playSound(cause.move.capture ? 'capture' : 'move');
@@ -63,7 +70,7 @@ export const useGame = create<GameStore>((set, get) => ({
   receive(message) {
     switch (message.type) {
       case 'snapshot': {
-        soundFor(message.cause);
+        soundFor(message.cause, message.state.viewer);
         const turn = message.state.board?.turn ?? null;
         const peek = get().peek;
         // Le marqueur disparaît au changement de trait, même si le bouton reste enfoncé.

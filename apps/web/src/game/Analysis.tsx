@@ -3,11 +3,19 @@ import type { CSSProperties } from 'react';
 import { classCss } from '../lib/classes';
 import { evalValue } from '../lib/eval';
 
-/** Barre d'évaluation verticale (blanc en bas). */
-export function EvalBar({ value }: { value: number }) {
+/**
+ * Barre d'évaluation verticale (blanc en bas). `label` : valeur chiffrée (« +1.2 », « #3 »),
+ * écrite du côté du camp qui a l'avantage.
+ */
+export function EvalBar({ value, label }: { value: number; label?: string }) {
   const white = 50 + 50 * Math.tanh(value / 400);
   return (
-    <div className="eval-bar" data-testid="eval-bar">
+    <div className={`eval-bar${label ? ' labelled' : ''}`} data-testid="eval-bar">
+      {label && (
+        <span className={`eval-label ${value >= 0 ? 'white' : 'black'}`} data-testid="eval-label">
+          {/^[01]-[01]$/.test(label) ? label : label.replace(/[+-]/, '')}
+        </span>
+      )}
       {/* Part des Blancs dans une variable : hauteur (barre verticale) ou largeur (écran étroit). */}
       <div className="white-part" style={{ '--white': `${white}%` } as CSSProperties} />
     </div>

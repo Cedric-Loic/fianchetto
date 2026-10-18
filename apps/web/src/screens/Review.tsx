@@ -18,6 +18,7 @@ import { CLASS_LABEL, CLASS_SYMBOL, classCss } from '../lib/classes';
 import { api, reviewFailureMessage, SERVER_UNREACHABLE } from '../lib/api';
 import { pollDelay, wait } from '../lib/poll';
 import { evalLabel } from '../lib/eval';
+import { useSan } from '../lib/notation';
 import { useSettings } from '../lib/settings';
 import { ExplainText, GuidedPanel } from '../review/GuidedReview';
 import { LearnMistakes } from '../review/LearnMistakes';
@@ -27,6 +28,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
+import { IconBack, IconPlay, IconRetry, IconTarget } from '../ui/icons';
 
 const ERRORS: readonly MoveClass[] = ['inaccuracy', 'mistake', 'blunder'];
 const SOURCE_LABEL = { local: 'Partie locale', pgn: 'Import PGN', chesscom: 'chess.com' } as const;
@@ -44,6 +46,7 @@ function CoachSummary(props: {
   color: Color;
   onSelect: (ply: number) => void;
 }) {
+  const san = useSan();
   const errors = props.moves.filter((m) => m.color === props.color && isError(m));
   const key = [...errors]
     .sort((a, b) => b.winBefore - b.winAfter - (a.winBefore - a.winAfter))
@@ -67,7 +70,7 @@ function CoachSummary(props: {
             <p key={m.ply} className="key-moment">
               <Button variant="link" onClick={() => props.onSelect(m.ply)}>
                 {Math.ceil(m.ply / 2)}
-                {m.color === 'w' ? '.' : '…'} {m.san} {CLASS_SYMBOL[m.classification]}
+                {m.color === 'w' ? '.' : '…'} {san(m.san)} {CLASS_SYMBOL[m.classification]}
               </Button>{' '}
               {m.explanation?.text}
             </p>
@@ -83,7 +86,7 @@ function CoachSummary(props: {
   );
 }
 
-export function Review({ id }: { id: string }) {
+export function Review({ id, guided = false }: { id: string; guided?: boolean }) {
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -185,7 +188,7 @@ export function Review({ id }: { id: string }) {
     );
   }
 
-  return <ReviewBoard reviewId={id} info={info} review={review} />;
+  return <ReviewBoard reviewId={id} info={info} review={review} guided={guided} />;
 }
 
 /** Délai entre deux coups de « Voir la ligne ». */
@@ -211,11 +214,15 @@ function ReviewBoard({
   reviewId,
   info,
   review,
+  guided,
 }: {
   reviewId: string;
   info: ReviewInfo;
   review: GameReview;
+  /** Revue ouverte directement en mode guidé (lien de la fin de partie). */
+  guided: boolean;
 }) {
+  const san = useSan();
   const ctl = useAnalysisTree(
     review.positions[0] ?? '',
     review.moves.map((m, i) => {
@@ -230,7 +237,9 @@ function ReviewBoard({
   /** Premier nœud de la variante créée par « Voir la ligne » (supprimée au retour). */
   const [tempLine, setTempLine] = useState<string | null>(null);
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
-  const [mode, setMode] = useState<ReviewMode>({ kind: 'free' });
+  const [mode, setMode] = useState<ReviewMode>(() =>
+    guided ? { kind: 'guided', index: 0 } : { kind: 'free' },
+  );
   /** Case citée dans une explication et survolée : surlignée sur le plateau. */
   const [hoverSquare, setHoverSquare] = useState<Square | null>(null);
   const moments = useMemo(() => keyMoments(review, info.userColor), [review, info.userColor]);
@@ -354,6 +363,15 @@ function ReviewBoard({
     setMode({ kind: 'guided', index });
   };
   const startGuided = () => showMoment(0);
+  // Ouverture en mode guidé : le plateau se place sur le premier moment clé.
+  const firstMomentPly = moments[0]?.ply ?? total;
+  useEffect(() => {
+    if (!guided) return;
+    const id = [tree.rootId, ...tree.initialLine][firstMomentPly];
+    if (id) ctl.select(id);
+    // Une seule fois, à l'ouverture.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const exitMode = useCallback(() => {
     setHoverSquare(null);
     setMode((m) => (m.kind === 'learn' ? m.back : { kind: 'free' }));
@@ -400,7 +418,7 @@ function ReviewBoard({
         <Badge>Variante</Badge>{' '}
         <strong>
           {label.number}
-          {label.color === 'w' ? '.' : '…'} {node.san}
+          {label.color === 'w' ? '.' : '…'} {san(node.san ?? '')}
         </strong>
       </p>
       <p className="muted">
@@ -408,7 +426,8 @@ function ReviewBoard({
         {!engineOn && ' Active le moteur pour l’évaluer.'}
       </p>
       <Button size="s" variant="primary" data-testid="back-to-game" onClick={backToGame}>
-        ↩ Revenir à la partie
+        <IconBack size={16} />
+        Revenir à la partie
       </Button>
     </div>
   ) : (
@@ -418,7 +437,7 @@ function ReviewBoard({
           <p>
             <strong>
               {Math.ceil(move.ply / 2)}
-              {move.color === 'w' ? '.' : '…'} {move.san}
+              {move.color === 'w' ? '.' : '…'} {san(move.san)}
             </strong>{' '}
             <span className={`class-badge ${classCss(move.classification)}`}>
               {CLASS_LABEL[move.classification]}
@@ -439,13 +458,15 @@ function ReviewBoard({
               data-testid="show-line"
               onClick={() => showLine(move, visual.line ?? [])}
             >
-              ▶ Voir la ligne
+              <IconPlay size={16} />
+              Voir la ligne
             </Button>
           )}
           {isError(move) && (info.userColor === null || move.color === info.userColor) && (
             <div className="replay">
               <Button size="s" data-testid="replay" onClick={() => void replay(move)}>
-                ↺ Rejouer d'ici contre le bot
+                <IconRetry size={16} />
+                Rejouer d'ici contre le bot
               </Button>
               <select
                 value={replayLevel}
@@ -465,7 +486,7 @@ function ReviewBoard({
             move.explanation?.kind !== 'generic' &&
             before?.bestMoveSan && (
               <p className="muted">
-                Meilleur : <span className="best-move">{before.bestMoveSan}</span>
+                Meilleur : <span className="best-move">{san(before.bestMoveSan)}</span>
               </p>
             )}
         </>
@@ -540,7 +561,8 @@ function ReviewBoard({
           )}
           <div className="mode-launch">
             <Button variant="primary" data-testid="start-guided" onClick={startGuided}>
-              ▶ Revue guidée
+              <IconPlay size={18} />
+              Revue guidée
             </Button>
             <Button
               data-testid="start-learn"
@@ -552,7 +574,8 @@ function ReviewBoard({
               }
               onClick={() => startLearn(learnMoves)}
             >
-              🎯 Apprends de tes erreurs
+              <IconTarget size={18} />
+              Apprends de tes erreurs
             </Button>
           </div>
           <div className="accuracy-row">{(['w', 'b'] as const).map(accuracyCard)}</div>
