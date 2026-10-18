@@ -47,6 +47,16 @@ export const EXPLANATION_KINDS = [
 export const ExplanationKindSchema = z.enum(EXPLANATION_KINDS);
 export type ExplanationKind = z.infer<typeof ExplanationKindSchema>;
 
+/** Thème de puzzles qui entraîne chaque type d'erreur (tableau de bord, revue guidée). */
+export const PUZZLE_THEME_FOR_KIND: Partial<Record<ExplanationKind, string>> = {
+  'hanging-piece': 'hangingPiece',
+  'missed-material': 'hangingPiece',
+  'allowed-fork': 'fork',
+  'missed-fork': 'fork',
+  'allowed-mate': 'mateIn2',
+  'missed-mate': 'mateIn2',
+};
+
 export const ExplanationSchema = z.object({
   kind: ExplanationKindSchema,
   text: z.string(),

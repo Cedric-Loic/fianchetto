@@ -1,5 +1,6 @@
 import { Chess } from 'chess.js';
 import {
+  PUZZLE_THEME_FOR_KIND,
   PUZZLE_THEME_LABELS,
   type CoachDashboard,
   type Color,
@@ -63,14 +64,7 @@ const PHASES = [
 ] as const;
 
 /** Thème de puzzle à travailler pour chaque type d'erreur. */
-const THEME_FOR_KIND: Record<string, string> = {
-  'hanging-piece': 'hangingPiece',
-  'missed-material': 'hangingPiece',
-  'allowed-fork': 'fork',
-  'missed-fork': 'fork',
-  'allowed-mate': 'mateIn2',
-  'missed-mate': 'mateIn2',
-};
+const THEME_FOR_KIND: Record<string, string | undefined> = PUZZLE_THEME_FOR_KIND;
 
 /** Thèmes de puzzles suivis pour repérer les faiblesses tactiques. */
 const TRACKED_THEMES = new Set([

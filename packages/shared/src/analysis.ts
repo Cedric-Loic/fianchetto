@@ -27,6 +27,8 @@ export const AnalysisEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('lines'), fen: z.string(), lines: z.array(EngineLineSchema) }),
   /** Recherche terminée (profondeur ou durée maximale atteinte, ou position finale). */
   z.object({ type: z.literal('done'), fen: z.string() }),
+  /** Recherche arrêtée par une autre demande (autre onglet) : le client peut la relancer. */
+  z.object({ type: z.literal('interrupted'), fen: z.string() }),
   z.object({ type: z.literal('error'), error: z.string() }),
 ]);
 export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
