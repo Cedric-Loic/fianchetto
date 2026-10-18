@@ -41,6 +41,11 @@ export interface AnalysisBoardProps {
   /** Contenu du panneau latéral, avant et après le moteur et la liste des coups. */
   panelTop?: ReactNode;
   panelBottom?: ReactNode;
+  /**
+   * Mode guidé (revue guidée) : plateau en lecture seule, sans moteur, arbre ni navigation au
+   * clavier ; la page pilote la position.
+   */
+  guided?: boolean;
 }
 
 const uciArrow = (uci: string, kind: BoardArrow['kind']): BoardArrow => ({
@@ -52,6 +57,10 @@ const uciArrow = (uci: string, kind: BoardArrow['kind']): BoardArrow => ({
 /** Les raccourcis clavier ne s'appliquent pas pendant la saisie ni dans des onglets. */
 function ignoredTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
+  // Une case à cocher (interrupteur du moteur) ne capte pas la saisie : raccourcis actifs.
+  if (target instanceof HTMLInputElement && ['checkbox', 'radio'].includes(target.type)) {
+    return false;
+  }
   return (
     ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
     target.isContentEditable ||
@@ -72,7 +81,13 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
   const settings = useSettings();
   const [flipped, setFlipped] = useState(false);
   const [hover, setHover] = useState<{ fen: string; uci: string } | null>(null);
-  const engine = useEngine(node.fen, settings.engine);
+  const [threatOn, setThreatOn] = useState(false);
+  const guided = props.guided === true;
+  const checkSquare = tree.checkSquare(current);
+  // Menace : seulement si le camp au trait n'est pas en échec (trait inversé impossible sinon).
+  const threatActive = threatOn && checkSquare === null;
+  const engineOn = settings.engine && !guided;
+  const engine = useEngine(node.fen, engineOn, 3, threatActive);
 
   // Rang de chaque nœud de la ligne fournie (0 = position de départ).
   const lineIds = [tree.rootId, ...tree.initialLine];
@@ -109,6 +124,10 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || ignoredTarget(e.target)) return;
+      if (guided) {
+        if (e.key === 'f') setFlipped((f) => !f);
+        return;
+      }
       const actions: Record<string, () => void> = {
         ArrowLeft: () => go(tree.prev(current)),
         ArrowRight: () => go(tree.next(current)),
@@ -117,6 +136,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
         Home: () => go(tree.rootId),
         End: () => go(tree.end(current)),
         f: () => setFlipped((f) => !f),
+        x: () => setThreatOn((t) => !t),
       };
       const action = actions[e.key];
       if (!action) return;
@@ -145,6 +165,8 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
   const arrows: BoardArrow[] = [...(props.arrows ?? [])];
   if (hovered) arrows.push(uciArrow(hovered, 'best'));
   else if (engineBest && arrows.length === 0) arrows.push(uciArrow(engineBest, 'best'));
+  const threatMove = threatActive ? engine.threat?.pv[0] : undefined;
+  if (threatMove) arrows.push(uciArrow(threatMove, 'threat'));
 
   // Barre : moteur en direct s'il tourne, sinon l'évaluation fournie par la page.
   const liveEval = engine.lines[0];
@@ -171,15 +193,15 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
           <Board
             pieces={pieces}
             orientation={orientation}
-            movable={turn}
+            movable={guided ? null : turn}
             onMove={onMove}
             lastMove={
               node.uci
                 ? { from: node.uci.slice(0, 2) as Square, to: node.uci.slice(2, 4) as Square }
                 : null
             }
-            checkSquare={tree.checkSquare(current)}
-            legalMoves={settings.showLegalMoves ? tree.legalMoves(current) : null}
+            checkSquare={checkSquare}
+            legalMoves={settings.showLegalMoves && !guided ? tree.legalMoves(current) : null}
             arrows={arrows}
             {...(props.marks ? { squareMarks: props.marks } : {})}
           />
@@ -189,41 +211,46 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
 
       <aside className="panel side-panel">
         {props.panelTop}
-        <EnginePanel
-          fen={node.fen}
-          engine={engine}
-          enabled={settings.engine}
-          onToggle={(engineOn) => settings.update({ engine: engineOn })}
-          onPlay={(ucis) => ctl.playLine(ucis)}
-          onHover={(uci) => setHover(uci ? { fen: node.fen, uci } : null)}
-        />
-        <MoveTree
-          tree={tree}
-          version={ctl.version}
-          current={current}
-          onSelect={ctl.select}
-          onPromote={ctl.promote}
-          onDelete={ctl.remove}
-          annotations={annotations}
-          locked={locked}
-        />
-        <div className="nav">
-          <button title="Début" onClick={() => go(tree.rootId)}>
-            ⏮
-          </button>
-          <button title="Précédent" onClick={() => go(tree.prev(current))}>
-            ◀
-          </button>
-          <button title="Suivant" onClick={() => go(tree.next(current))}>
-            ▶
-          </button>
-          <button title="Fin" onClick={() => go(tree.end(current))}>
-            ⏭
-          </button>
-          <button title="Retourner le plateau (f)" onClick={() => setFlipped(!flipped)}>
-            ⇅
-          </button>
-        </div>
+        {!guided && (
+          <>
+            <EnginePanel
+              fen={node.fen}
+              engine={engine}
+              enabled={settings.engine}
+              onToggle={(on) => settings.update({ engine: on })}
+              onPlay={(ucis) => ctl.playLine(ucis)}
+              onHover={(uci) => setHover(uci ? { fen: node.fen, uci } : null)}
+              threat={{ enabled: threatOn, inCheck: checkSquare !== null, onToggle: setThreatOn }}
+            />
+            <MoveTree
+              tree={tree}
+              version={ctl.version}
+              current={current}
+              onSelect={ctl.select}
+              onPromote={ctl.promote}
+              onDelete={ctl.remove}
+              annotations={annotations}
+              locked={locked}
+            />
+            <div className="nav">
+              <button title="Début" onClick={() => go(tree.rootId)}>
+                ⏮
+              </button>
+              <button title="Précédent" onClick={() => go(tree.prev(current))}>
+                ◀
+              </button>
+              <button title="Suivant" onClick={() => go(tree.next(current))}>
+                ▶
+              </button>
+              <button title="Fin" onClick={() => go(tree.end(current))}>
+                ⏭
+              </button>
+              <button title="Retourner le plateau (f)" onClick={() => setFlipped(!flipped)}>
+                ⇅
+              </button>
+            </div>
+          </>
+        )}
         {props.panelBottom}
       </aside>
     </div>

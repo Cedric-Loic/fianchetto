@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   BoardArrow,
   Color,
@@ -18,6 +18,9 @@ import { CLASS_LABEL, CLASS_SYMBOL, classCss } from '../lib/classes';
 import { api } from '../lib/api';
 import { evalLabel } from '../lib/eval';
 import { useSettings } from '../lib/settings';
+import { ExplainText, GuidedPanel } from '../review/GuidedReview';
+import { LearnMistakes } from '../review/LearnMistakes';
+import { keyMoments, mistakesOf, TIPS } from '../review/moments';
 import { SIDE, VARIANT_LABEL } from './labels';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -34,25 +37,6 @@ const isError = (m: ReviewMove) => ERRORS.includes(m.classification);
  * précision des deux camps, courbe d'évaluation, meilleur coup en flèche. Partie locale
  * terminée ou importée ; l'analyse se fait en arrière-plan sur le serveur.
  */
-/** Conseil du coach selon l'erreur la plus fréquente de la partie. */
-const TIPS: Record<ExplanationKind, string> = {
-  'hanging-piece':
-    'Avant chaque coup, vérifie que la pièce jouée, et celles qu’elle protégeait, restent défendues.',
-  'allowed-mate':
-    'Après ton coup envisagé, regarde les échecs possibles de l’adversaire : ton roi est-il en sécurité ?',
-  'allowed-fork':
-    'Repère les cases d’où un cavalier ou un pion adverse attaquerait deux de tes pièces à la fois.',
-  'material-loss':
-    'Avant de jouer, cherche les prises et menaces de l’adversaire après ton coup (routine « échecs, prises, menaces »).',
-  'missed-mate': 'À chaque coup, cherche d’abord tes échecs : un mat se cache parfois derrière.',
-  'missed-fork':
-    'Cherche les coups qui attaquent deux cibles à la fois : fourchettes, échecs doubles.',
-  'missed-material':
-    'Avant de jouer, vérifie si une pièce adverse est en prise : prends ce qu’on te donne.',
-  generic:
-    'Compare deux ou trois coups candidats avant de jouer, surtout dans les positions tendues.',
-};
-
 /** Les 3 plus grosses erreurs du joueur et un conseil (bilan du coach). */
 function CoachSummary(props: {
   moves: readonly ReviewMove[];
@@ -187,7 +171,7 @@ export function Review({ id }: { id: string }) {
     );
   }
 
-  return <ReviewBoard info={info} review={review} />;
+  return <ReviewBoard reviewId={id} info={info} review={review} />;
 }
 
 /** Délai entre deux coups de « Voir la ligne ». */
@@ -203,7 +187,21 @@ const uciArrow = (uci: string, kind: BoardArrow['kind']): BoardArrow => ({
  * Revue terminée : échiquier d'analyse (ligne principale = coups de la partie, variantes
  * libres), précision, courbe d'évaluation, bilan du coach, carte du coup courant.
  */
-function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview }) {
+/** Mode de la revue : libre, guidée (moment clé `index`), ou « Apprends de tes erreurs ». */
+type ReviewMode =
+  | { kind: 'free' }
+  | { kind: 'guided'; index: number }
+  | { kind: 'learn'; moves: readonly ReviewMove[]; back: ReviewMode };
+
+function ReviewBoard({
+  reviewId,
+  info,
+  review,
+}: {
+  reviewId: string;
+  info: ReviewInfo;
+  review: GameReview;
+}) {
   const ctl = useAnalysisTree(
     review.positions[0] ?? '',
     review.moves.map((m, i) => {
@@ -218,6 +216,14 @@ function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview })
   /** Premier nœud de la variante créée par « Voir la ligne » (supprimée au retour). */
   const [tempLine, setTempLine] = useState<string | null>(null);
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const [mode, setMode] = useState<ReviewMode>({ kind: 'free' });
+  /** Case citée dans une explication et survolée : surlignée sur le plateau. */
+  const [hoverSquare, setHoverSquare] = useState<Square | null>(null);
+  const moments = useMemo(() => keyMoments(review, info.userColor), [review, info.userColor]);
+  const learnMoves = useMemo(
+    () => (info.userColor ? mistakesOf(review, info.userColor) : []),
+    [review, info.userColor],
+  );
 
   const stopLine = () => {
     for (const t of timers.current) clearTimeout(t);
@@ -258,6 +264,7 @@ function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview })
   } else if (move && move.classification !== 'best' && before?.bestMoveUci) {
     arrows = [uciArrow(before.bestMoveUci, 'best')];
   }
+  if (hoverSquare) marks = [...marks, { square: hoverSquare, kind: 'target' }];
 
   const chartMarks = review.moves
     .filter(isError)
@@ -314,12 +321,46 @@ function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview })
     });
   };
 
-  const backToGame = () => {
+  const dropTempLine = () => {
     stopLine();
     if (tempLine && tree.has(tempLine)) ctl.remove(tempLine);
     setTempLine(null);
+  };
+  const backToGame = () => {
+    dropTempLine();
     setCursor(deviation);
   };
+
+  // Revue guidée : chaque moment clé place le plateau sur la position après le coup.
+  const showMoment = (index: number) => {
+    dropTempLine();
+    setHoverSquare(null);
+    // Bilan : position finale de la partie.
+    setCursor(moments[index]?.ply ?? total);
+    setMode({ kind: 'guided', index });
+  };
+  const startGuided = () => showMoment(0);
+  const exitMode = useCallback(() => {
+    setHoverSquare(null);
+    setMode((m) => (m.kind === 'learn' ? m.back : { kind: 'free' }));
+  }, []);
+  const startLearn = (moves: readonly ReviewMove[]) => {
+    dropTempLine();
+    setHoverSquare(null);
+    setMode((m) => ({ kind: 'learn', moves, back: m.kind === 'learn' ? m.back : m }));
+  };
+
+  if (mode.kind === 'learn') {
+    return (
+      <LearnMistakes
+        reviewId={reviewId}
+        review={review}
+        moves={mode.moves}
+        orientation={info.userColor ?? mode.moves[0]?.color ?? 'w'}
+        onExit={exitMode}
+      />
+    );
+  }
 
   const accuracyCard = (c: Color) => (
     <div className="accuracy-card" data-testid={`accuracy-${c}`} key={c}>
@@ -370,7 +411,14 @@ function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview })
             </span>{' '}
             <span className="muted">({evalLabel(here)})</span>
           </p>
-          {move.explanation && <p data-testid="explanation">{move.explanation.text}</p>}
+          {move.explanation && (
+            <p data-testid="explanation">
+              <ExplainText
+                text={move.explanation.text}
+                onSquare={(sq) => setHoverSquare(sq as Square | null)}
+              />
+            </p>
+          )}
           {visual?.line && visual.line.length > 0 && (
             <Button
               size="s"
@@ -416,6 +464,44 @@ function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview })
     </div>
   );
 
+  const chart = (
+    <EvalChart evals={review.evals} cursor={ply} onSelect={setCursor} marks={chartMarks} />
+  );
+
+  if (mode.kind === 'guided') {
+    return (
+      <AnalysisBoard
+        controller={ctl}
+        evals={review.evals}
+        moveClasses={review.moves.map((m) => m.classification)}
+        orientation={info.userColor ?? 'w'}
+        arrows={arrows}
+        marks={marks}
+        lockMainline
+        guided
+        names={{ w: info.white, b: info.black }}
+        panelTop={
+          <GuidedPanel
+            info={info}
+            review={review}
+            moments={moments}
+            index={mode.index}
+            onIndex={showMoment}
+            onSquare={(sq) => setHoverSquare(sq as Square | null)}
+            onShowLine={(m, line) => showLine(m, line)}
+            onRetry={(m) => startLearn([m])}
+            onLearn={() => startLearn(learnMoves)}
+            onExit={() => {
+              dropTempLine();
+              exitMode();
+            }}
+            chart={chart}
+          />
+        }
+      />
+    );
+  }
+
   return (
     <AnalysisBoard
       controller={ctl}
@@ -438,8 +524,25 @@ function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview })
               Voir la partie d'origine
             </a>
           )}
+          <div className="mode-launch">
+            <Button variant="primary" data-testid="start-guided" onClick={startGuided}>
+              ▶ Revue guidée
+            </Button>
+            <Button
+              data-testid="start-learn"
+              disabled={info.userColor === null}
+              title={
+                info.userColor === null
+                  ? 'Camp inconnu dans cette partie'
+                  : 'Rejoue tes erreurs et gaffes'
+              }
+              onClick={() => startLearn(learnMoves)}
+            >
+              🎯 Apprends de tes erreurs
+            </Button>
+          </div>
           <div className="accuracy-row">{(['w', 'b'] as const).map(accuracyCard)}</div>
-          <EvalChart evals={review.evals} cursor={ply} onSelect={setCursor} marks={chartMarks} />
+          {chart}
           {card}
           <div className="nav">
             <button

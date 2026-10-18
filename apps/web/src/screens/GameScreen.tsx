@@ -229,6 +229,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           ? [{ from: currentHint.from as Square, to: currentHint.to as Square, kind: 'hint' }]
           : []
       }
+      squareMarks={live && currentHint?.marks ? currentHint.marks : []}
       checkSquare={checkSquare}
       crowns={crowns}
       onMove={(from, to, promotion) => play(promotion ? { from, to, promotion } : { from, to })}

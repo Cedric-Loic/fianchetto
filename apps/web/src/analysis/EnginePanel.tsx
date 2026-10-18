@@ -15,10 +15,19 @@ function numbered(fen: string, sans: readonly string[]): { prefix: string | null
   });
 }
 
+/** Option « Menace » (touche x) : interrupteur et état de la position. */
+export interface ThreatOption {
+  enabled: boolean;
+  /** Le camp au trait est en échec : pas de menace à calculer. */
+  inCheck: boolean;
+  onToggle: (enabled: boolean) => void;
+}
+
 /**
  * Moteur en direct : interrupteur, profondeur, et les meilleures lignes (évaluation du point de
  * vue des Blancs puis la suite en SAN). Clic sur un coup : la ligne est jouée jusqu'à lui dans
- * l'arbre ; survol d'une ligne : flèche de son premier coup sur le plateau.
+ * l'arbre ; survol d'une ligne : flèche de son premier coup sur le plateau. Option « Menace » :
+ * meilleur coup de l'adversaire s'il avait le trait (flèche rouge sur le plateau).
  */
 export function EnginePanel(props: {
   fen: string;
@@ -27,8 +36,10 @@ export function EnginePanel(props: {
   onToggle: (enabled: boolean) => void;
   onPlay: (ucis: string[]) => void;
   onHover: (uci: string | null) => void;
+  threat?: ThreatOption;
 }) {
-  const { engine, enabled } = props;
+  const { engine, enabled, threat } = props;
+  const threatSan = engine.threat?.sanPv[0];
   const line = (l: EngineLine) => (
     <div
       key={l.multipv}
@@ -74,6 +85,23 @@ export function EnginePanel(props: {
           <span className="switch-track" aria-hidden="true" />
           Moteur
         </label>
+        {threat && (
+          <label
+            className={`switch switch-small${enabled ? '' : ' disabled'}`}
+            title="Menace de l'adversaire s'il avait le trait (touche x)"
+          >
+            <input
+              type="checkbox"
+              role="switch"
+              checked={threat.enabled}
+              disabled={!enabled}
+              data-testid="threat-toggle"
+              onChange={(e) => threat.onToggle(e.target.checked)}
+            />
+            <span className="switch-track" aria-hidden="true" />
+            Menace
+          </label>
+        )}
         {enabled && (
           <span className="muted engine-depth" data-testid="engine-depth">
             {engine.status === 'loading'
@@ -87,6 +115,21 @@ export function EnginePanel(props: {
       {enabled && engine.message && (
         <p className="muted engine-message" data-testid="engine-message">
           {engine.message}
+        </p>
+      )}
+      {enabled && threat?.enabled && (
+        <p className="engine-threat" data-testid="engine-threat">
+          {threat.inCheck ? (
+            <span className="muted">Roi en échec : pas de menace à calculer.</span>
+          ) : threatSan ? (
+            <>
+              Menace : <strong>{threatSan}</strong>
+            </>
+          ) : (
+            <span className="muted">
+              {engine.status === 'loading' ? 'Menace : calcul…' : 'Aucune menace trouvée.'}
+            </span>
+          )}
         </p>
       )}
       {enabled && engine.lines.length > 0 && (

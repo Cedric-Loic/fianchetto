@@ -5,7 +5,7 @@ import type { AnalysisEvent } from '@sq/shared';
 import { EnginePanel } from '../src/analysis/EnginePanel';
 import { MoveTree } from '../src/analysis/MoveTree';
 import { AnalysisTree, START_FEN } from '../src/analysis/tree';
-import { parseSseChunk, useEngine } from '../src/analysis/useEngine';
+import { parseSseChunk, THREAT_DEPTH, threatFen, useEngine } from '../src/analysis/useEngine';
 
 afterEach(() => {
   cleanup();
@@ -137,6 +137,76 @@ describe('EnginePanel', () => {
     expect(stream.signals[1]?.aborted).toBe(true);
     expect(screen.queryByTestId('engine-depth')).toBeNull();
     view.unmount();
+  });
+
+  it('menace : flux court sur le trait inversé, fermé, puis analyse principale', async () => {
+    const stream = fakeStream();
+    function ThreatHarness(props: { enabled: boolean }) {
+      const engine = useEngine(FEN_E4, props.enabled, 3, true);
+      return (
+        <EnginePanel
+          fen={FEN_E4}
+          engine={engine}
+          enabled={props.enabled}
+          onToggle={() => {}}
+          onPlay={() => {}}
+          onHover={() => {}}
+          threat={{ enabled: true, inCheck: false, onToggle: () => {} }}
+        />
+      );
+    }
+    const view = render(<ThreatHarness enabled />);
+    await act(() => vi.advanceTimersByTimeAsync(160));
+    // Une seule requête à la fois : la menace d'abord (une ligne, Blancs au trait).
+    expect(stream.urls).toEqual([
+      `/api/analysis/stream?fen=${encodeURIComponent(threatFen(FEN_E4))}&multipv=1`,
+    ]);
+    expect(screen.getByTestId('engine-threat').textContent).toBe('Menace : calcul…');
+    stream.push({
+      type: 'lines',
+      fen: threatFen(FEN_E4),
+      lines: [
+        {
+          multipv: 1,
+          depth: THREAT_DEPTH,
+          evalCp: 80,
+          mate: null,
+          pv: ['f1c4'],
+          sanPv: ['Bc4'],
+        },
+      ],
+    });
+    await flush();
+    // Profondeur atteinte : flux de la menace fermé, analyse principale lancée.
+    expect(stream.signals[0]?.aborted).toBe(true);
+    expect(stream.urls[1]).toBe(`/api/analysis/stream?fen=${encodeURIComponent(FEN_E4)}&multipv=3`);
+    expect(screen.getByTestId('engine-threat').textContent).toBe('Menace : Bc4');
+    stream.push(LINES);
+    await flush();
+    expect(screen.getAllByTestId('engine-line')).toHaveLength(3);
+    expect(screen.getByTestId('engine-threat').textContent).toBe('Menace : Bc4');
+
+    // Moteur coupé : aucun flux, pas de menace.
+    view.rerender(<ThreatHarness enabled={false} />);
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(stream.urls).toHaveLength(2);
+    expect(screen.queryByTestId('engine-threat')).toBeNull();
+  });
+
+  it('menace : roi en échec, rien n’est calculé', () => {
+    vi.stubGlobal('fetch', vi.fn());
+    render(
+      <EnginePanel
+        fen={FEN_E4}
+        engine={{ status: 'done', lines: [], depth: 0, message: null, threat: null }}
+        enabled
+        onToggle={() => {}}
+        onPlay={() => {}}
+        onHover={() => {}}
+        threat={{ enabled: true, inCheck: true, onToggle: () => {} }}
+      />,
+    );
+    expect(screen.getByTestId('engine-threat').textContent).toContain('Roi en échec');
   });
 
   it('message discret si le moteur est indisponible', async () => {

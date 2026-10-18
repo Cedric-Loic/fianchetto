@@ -69,6 +69,12 @@ test('garde-fou avant une gaffe, mat, bilan du coach', async ({ page }) => {
   await page.goto(`/#/game/${gameId}`);
   await expect(page.getByTestId('training-panel')).toBeVisible();
 
+  // Indice de niveau 1 : l'idée et la zone à regarder (le roi à mater), sans le coup.
+  await page.getByTestId('hint').click();
+  await expect(page.getByTestId('hint-text')).toContainText('mat en 1', { timeout: 15_000 });
+  await expect(page.locator('[data-testid="square-mark"][data-square="e8"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="arrows"] line')).toHaveCount(0);
+
   await clickSquare(page, 'h5');
   await clickSquare(page, 'g4');
   await expect(page.getByTestId('guard')).toContainText('La dame jouée en g4 est en prise', {
@@ -81,6 +87,8 @@ test('garde-fou avant une gaffe, mat, bilan du coach', async ({ page }) => {
   await clickSquare(page, 'f7');
   const modal = page.getByTestId('end-modal');
   await expect(modal).toContainText('gagne par échec et mat', { timeout: 15_000 });
+  // Les marques de l'indice disparaissent au coup suivant.
+  await expect(page.getByTestId('square-mark')).toHaveCount(0);
   await expect(page.getByTestId('elo-change')).toHaveCount(0);
   await modal.getByRole('link', { name: /Revue de la partie/ }).click();
   await expect(page.getByTestId('coach-summary')).toContainText('Aucune erreur notable', {

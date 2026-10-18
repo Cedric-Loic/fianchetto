@@ -16,6 +16,7 @@ import type {
   PuzzleNextResponse,
   PuzzleStats,
   ReviewResponse,
+  RetryMoveResponse,
   UserPublic,
   Variant,
 } from '@sq/shared';
@@ -69,6 +70,9 @@ export const api = {
   // Coach : revues et imports.
   review: (id: string) => request<ReviewResponse>('GET', `/api/reviews/${id}`),
   startReview: (id: string) => request<ReviewResponse>('POST', `/api/reviews/${id}`),
+  /** « Apprends de tes erreurs » : autre coup proposé au demi-coup `ply` d'une revue. */
+  retryMove: (id: string, ply: number, uci: string) =>
+    call<RetryMoveResponse>('POST', `/api/reviews/${id}/retry`, { ply, uci }),
   imports: () => call<ImportedGamesResponse>('GET', '/api/imports'),
   importPgn: (pgn: string, as: string) =>
     request<ImportResult>('POST', '/api/imports/pgn', { pgn, ...(as ? { as } : {}) }),

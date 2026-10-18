@@ -6,6 +6,11 @@ import { AnalysisEventSchema, type AnalysisEvent, type EngineLine } from '@sq/sh
  * EventSource) pour connaître le statut HTTP (401, 400, 503) et pour ne jamais se reconnecter
  * tout seul. Une seule recherche à la fois : le flux est fermé à chaque changement de position
  * (après un anti-rebond de 150 ms), à l'arrêt du moteur et au démontage.
+ *
+ * Option « Menace » : le serveur n'exécute qu'une recherche à la fois (une nouvelle demande
+ * arrête la précédente), donc les deux flux ne peuvent pas tourner ensemble. On calcule d'abord
+ * la menace (même position, l'autre camp au trait), brièvement et à profondeur limitée, puis on
+ * ferme ce flux et on lance l'analyse principale.
  */
 
 export type EngineStatus = 'off' | 'loading' | 'running' | 'done' | 'error';
@@ -16,11 +21,32 @@ export interface EngineState {
   depth: number;
   /** Message discret en cas d'indisponibilité. */
   message: string | null;
+  /** Option « Menace » : meilleur coup de l'adversaire s'il jouait maintenant (sinon `null`). */
+  threat: EngineLine | null;
 }
 
-const OFF: EngineState = { status: 'off', lines: [], depth: 0, message: null };
-const LOADING: EngineState = { status: 'loading', lines: [], depth: 0, message: null };
+const OFF: EngineState = { status: 'off', lines: [], depth: 0, message: null, threat: null };
+const LOADING: EngineState = { ...OFF, status: 'loading' };
 export const ENGINE_DEBOUNCE_MS = 150;
+/**
+ * Recherche de la menace : arrêtée à cette profondeur, ou `THREAT_MAX_MS` après sa première
+ * ligne, ou au plus tard après `THREAT_START_MS` (démarrage à froid du moteur compris).
+ */
+export const THREAT_DEPTH = 10;
+export const THREAT_MAX_MS = 1500;
+export const THREAT_START_MS = 5000;
+
+/**
+ * Même position, l'autre camp au trait, case en passant effacée : son meilleur coup est la
+ * « menace ». À n'utiliser que si le camp au trait n'est pas en échec (position sinon illégale).
+ */
+export function threatFen(fen: string): string {
+  const fields = fen.trim().split(/\s+/);
+  if (fields.length < 4) return fen;
+  fields[1] = fields[1] === 'b' ? 'w' : 'b';
+  fields[3] = '-';
+  return fields.join(' ');
+}
 
 const HTTP_MESSAGES: Record<number, string> = {
   401: 'Connecte-toi pour utiliser le moteur.',
@@ -83,21 +109,67 @@ async function stream(
   onEvent({ type: 'done', fen });
 }
 
-/** Lignes du moteur pour `fen` ; `enabled = false` (ou `fen = null`) : moteur coupé. */
-export function useEngine(fen: string | null, enabled: boolean, multipv = 3): EngineState {
-  const key = enabled && fen ? fen : null;
+/**
+ * Menace : flux court (une ligne) sur la position à trait inversé. Se résout dès que la
+ * profondeur `THREAT_DEPTH` est atteinte, à la fin du flux, à l'expiration des délais, ou si
+ * `signal` est interrompu ; le flux est alors fermé (le serveur arrête cette recherche).
+ */
+function searchThreat(
+  fen: string,
+  signal: AbortSignal,
+  onLine: (line: EngineLine) => void,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const own = new AbortController();
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(limit);
+      clearTimeout(short);
+      signal.removeEventListener('abort', finish);
+      own.abort();
+      resolve();
+    };
+    const limit = setTimeout(finish, THREAT_START_MS);
+    let short: ReturnType<typeof setTimeout> | undefined;
+    signal.addEventListener('abort', finish);
+    stream(fen, 1, own.signal, (event) => {
+      if (finished) return;
+      if (event.type !== 'lines') return finish();
+      const line = event.lines[0];
+      if (line) onLine(line);
+      short ??= setTimeout(finish, THREAT_MAX_MS);
+      if ((line?.depth ?? 0) >= THREAT_DEPTH) finish();
+    }).catch(finish);
+  });
+}
+
+/**
+ * Lignes du moteur pour `fen` ; `enabled = false` (ou `fen = null`) : moteur coupé.
+ * `threat` : calcule aussi la menace (le camp au trait ne doit pas être en échec).
+ */
+export function useEngine(
+  fen: string | null,
+  enabled: boolean,
+  multipv = 3,
+  threat = false,
+): EngineState {
+  const key = enabled && fen ? `${threat ? 'T' : 'N'}${fen}` : null;
   const [result, setResult] = useState<(EngineState & { key: string }) | null>(null);
 
   useEffect(() => {
     if (!key) return;
+    const position = key.slice(1);
+    const withThreat = key.startsWith('T');
     const controller = new AbortController();
     let state: EngineState = LOADING;
     const update = (patch: Partial<EngineState>) => {
       state = { ...state, ...patch };
       setResult({ ...state, key });
     };
-    const timer = setTimeout(() => {
-      stream(key, multipv, controller.signal, (event) => {
+    const main = () =>
+      stream(position, multipv, controller.signal, (event) => {
         if (controller.signal.aborted) return;
         if (event.type === 'lines') {
           const depth = Math.max(0, ...event.lines.map((l) => l.depth));
@@ -110,6 +182,15 @@ export function useEngine(fen: string | null, enabled: boolean, multipv = 3): En
       }).catch(() => {
         if (!controller.signal.aborted) update({ status: 'error', message: UNAVAILABLE });
       });
+    const timer = setTimeout(() => {
+      void (async () => {
+        if (withThreat) {
+          await searchThreat(threatFen(position), controller.signal, (line) => {
+            if (!controller.signal.aborted) update({ threat: line });
+          });
+        }
+        if (!controller.signal.aborted) await main();
+      })();
     }, ENGINE_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
