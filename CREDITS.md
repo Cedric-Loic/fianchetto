@@ -14,3 +14,7 @@
   l'analyse. Licence GPLv3. Installé comme dépendance, non redistribué.
 - **Logo Fianchetto** (fou sur la grande diagonale) et favicon : dessin original réalisé pour le
   projet, sans élément tiers.
+- **Polices** (intégrées au site, aucun accès réseau) : Inter (The Inter Project Authors,
+  Rasmus Andersson) et Fraunces (Undercase Type), licence SIL Open Font License 1.1, via les
+  paquets `@fontsource-variable/inter` et `@fontsource-variable/fraunces`.
+- **Identité « Marine & or »** (palette, thème d'échiquier Marine) : création originale.
