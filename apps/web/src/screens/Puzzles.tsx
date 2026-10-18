@@ -18,6 +18,11 @@ import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { LoginRequired } from '../ui/EmptyState';
+import { Loading } from '../ui/Spinner';
+import { Tabs } from '../ui/Tabs';
 
 type Phase = 'loading' | 'playing' | 'solved' | 'failed' | 'empty' | 'no-bank';
 
@@ -192,17 +197,7 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
   };
 
   if (!user) {
-    return (
-      <div className="page">
-        <div className="panel page-panel">
-          <h2>Puzzles</h2>
-          <p className="muted">Connecte-toi pour suivre ton classement puzzle.</p>
-          <a className="button primary" href="#/login">
-            Se connecter
-          </a>
-        </div>
-      </div>
-    );
+    return <LoginRequired title="Puzzles" text="Connecte-toi pour suivre ton classement puzzle." />;
   }
 
   const ended = phase === 'solved' || phase === 'failed';
@@ -236,9 +231,9 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
         <div className="turn-banner">
           Puzzles
           {stats && (
-            <span className="variant-badge" data-testid="puzzle-rating">
+            <Badge tone="accent" testId="puzzle-rating">
               Classement {stats.rating} (±{stats.deviation})
-            </span>
+            </Badge>
           )}
         </div>
         {stats && (
@@ -246,22 +241,22 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
             {stats.solved} réussis sur {stats.attempts}
           </p>
         )}
-        <div className="tabs" role="tablist">
-          {MODES.map((m) => (
-            <button
-              key={m.mode}
-              role="tab"
-              aria-selected={m.mode === mode}
-              data-testid={`puzzle-mode-${m.mode}`}
-              className={m.mode === mode ? 'tc selected' : 'tc'}
-              onClick={() => setMode(m.mode)}
-            >
-              {m.label}
-              {m.mode === 'review' && stats ? ` (${stats.available.due})` : ''}
-              {m.mode === 'mine' && stats ? ` (${stats.available.mine})` : ''}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          label="Type de puzzles"
+          value={mode}
+          onChange={setMode}
+          items={MODES.map((m) => ({
+            id: m.mode,
+            testId: `puzzle-mode-${m.mode}`,
+            label: (
+              <>
+                {m.label}
+                {m.mode === 'review' && stats ? ` (${stats.available.due})` : ''}
+                {m.mode === 'mine' && stats ? ` (${stats.available.mine})` : ''}
+              </>
+            ),
+          }))}
+        />
         {mode === 'theme' && (
           <label className="theme-select">
             Thème
@@ -281,7 +276,7 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
         )}
 
         <div className={`move-card puzzle-status ${phase}`} data-testid="puzzle-status">
-          {phase === 'loading' && <p className="muted">Chargement…</p>}
+          {phase === 'loading' && <Loading inline label="Chargement du puzzle…" />}
           {phase === 'no-bank' && (
             <p>
               La base de puzzles Lichess n'est pas encore installée. Lance une fois{' '}
@@ -334,18 +329,18 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
 
         <div className="actions">
           {phase === 'playing' && (
-            <button onClick={askHint} disabled={busy}>
+            <Button onClick={askHint} disabled={busy}>
               💡 Indice
-            </button>
+            </Button>
           )}
           {phase === 'failed' && solution && solution.length > 0 && (
-            <button onClick={showSolution} data-testid="show-solution">
+            <Button onClick={showSolution} data-testid="show-solution">
               Voir la solution
-            </button>
+            </Button>
           )}
           {(ended || phase === 'playing') && (
-            <button
-              className={ended ? 'primary' : ''}
+            <Button
+              variant={ended ? 'primary' : 'secondary'}
               data-testid="next-puzzle"
               disabled={busy}
               onClick={() => {
@@ -354,7 +349,7 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
               }}
             >
               {ended ? 'Puzzle suivant ▶' : 'Passer'}
-            </button>
+            </Button>
           )}
         </div>
 

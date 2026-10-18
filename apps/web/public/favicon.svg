@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="fi-diag" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#81b64c" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#81b64c" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#262421"/>
+  <g fill="#34312d">
+    <rect x="18" y="6" width="12" height="12"/><rect x="42" y="6" width="12" height="12"/>
+    <rect x="6" y="18" width="12" height="12"/><rect x="30" y="18" width="12" height="12"/>
+    <rect x="18" y="30" width="12" height="12"/><rect x="42" y="30" width="12" height="12"/>
+    <rect x="6" y="42" width="12" height="12"/><rect x="30" y="42" width="12" height="12"/>
+  </g>
+  <path d="M6 6h12l36 36v12h-12L6 18z" fill="url(#fi-diag)"/>
+  <g fill="#81b64c">
+    <circle cx="41" cy="20.5" r="3.6"/>
+    <path d="M41 24c-5.8 5-8.8 10.2-8.8 14.8 0 2.5 1 4.4 2.7 5.6h12.2c1.7-1.2 2.7-3.1 2.7-5.6 0-4.6-3-9.8-8.8-14.8z"/>
+    <rect x="33.5" y="45.6" width="15" height="3" rx="1.5"/>
+    <rect x="30.5" y="49.6" width="21" height="4.6" rx="2.2"/>
+  </g>
+  <path d="M44.8 29.8l-6.4 6.8" stroke="#262421" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

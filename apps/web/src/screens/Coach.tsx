@@ -3,6 +3,9 @@ import { PUZZLE_THEME_LABELS, type CoachDashboard } from '@sq/shared';
 import { LineChart } from '../game/LineChart';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
+import { Button } from '../ui/Button';
+import { EmptyState, LoginRequired } from '../ui/EmptyState';
+import { Loading } from '../ui/Spinner';
 
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
 
@@ -25,19 +28,9 @@ export function Coach() {
   }, [user]);
 
   if (!user) {
-    return (
-      <div className="page">
-        <div className="panel page-panel">
-          <h2>Coach</h2>
-          <p className="muted">Connecte-toi pour suivre ton plan de progression.</p>
-          <a className="button primary" href="#/login">
-            Se connecter
-          </a>
-        </div>
-      </div>
-    );
+    return <LoginRequired title="Coach" text="Connecte-toi pour suivre ton plan de progression." />;
   }
-  if (!data) return <div className="loading">Chargement…</div>;
+  if (!data) return <Loading label="Chargement du tableau de bord…" />;
   const { phase, week, weaknesses: w } = data;
   const maxKind = Math.max(1, ...w.kinds.map((k) => k.count));
   const totalPhases = w.phases.opening + w.phases.middlegame + w.phases.endgame;
@@ -105,7 +98,9 @@ export function Coach() {
         <div className="panel page-panel" data-testid="coach-reco">
           <h2>Que faire maintenant ?</h2>
           {data.recommendations.length === 0 ? (
-            <p className="muted">Rien d'urgent : continue ton plan de la semaine.</p>
+            <EmptyState icon="✓" title="Rien d'urgent">
+              Continue ton plan de la semaine.
+            </EmptyState>
           ) : (
             <ol className="reco">
               {data.recommendations.map((r) => (
@@ -121,10 +116,13 @@ export function Coach() {
       <div className="panel page-panel" data-testid="coach-weaknesses">
         <h2>Ton profil</h2>
         {w.games === 0 ? (
-          <p className="muted">
-            Pas encore de partie analysée. Va dans <a href="#/analyse">Analyse</a> pour importer et
-            analyser tes parties : le profil se calcule sur tes 20 dernières parties.
-          </p>
+          <EmptyState
+            icon="♞"
+            title="Pas encore de partie analysée"
+            action={<Button href="#/analyse">Importer et analyser mes parties</Button>}
+          >
+            Le profil se calcule sur tes 20 dernières parties analysées.
+          </EmptyState>
         ) : (
           <>
             <p className="muted">

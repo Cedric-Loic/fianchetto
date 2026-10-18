@@ -7,6 +7,7 @@ import {
   type BoardTheme,
   type PieceSet,
 } from '../lib/settings';
+import { Button } from '../ui/Button';
 
 /**
  * Réglages : thème du plateau, jeu de pièces, sons, retournement automatique en hot-seat, coups
@@ -17,14 +18,16 @@ export function SettingsMenu() {
   const settings = useSettings();
   return (
     <>
-      <button
-        className="link"
+      <Button
+        variant="ghost"
+        size="s"
         title="Réglages"
+        aria-expanded={open}
         data-testid="settings"
         onClick={() => setOpen(!open)}
       >
         ⚙ Réglages
-      </button>
+      </Button>
       {open && (
         <div className="settings-menu" data-testid="settings-menu">
           <strong>Plateau</strong>

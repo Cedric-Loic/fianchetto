@@ -80,13 +80,13 @@ function ArrowShape({
         y1={ay}
         x2={ex}
         y2={ey}
-        stroke={color}
+        style={{ stroke: color }}
         strokeWidth={0.17}
         strokeLinecap="round"
       />
       <polygon
         points="0,-0.32 0.42,0 0,0.32"
-        fill={color}
+        style={{ fill: color }}
         transform={`translate(${ex},${ey}) rotate(${(Math.atan2(by - ay, bx - ax) * 180) / Math.PI})`}
       />
     </g>
@@ -302,8 +302,9 @@ export function Board(props: BoardProps) {
       : [];
 
   const allArrows = [
-    ...arrows.map((a) => ({ a, c: '#f2a33a' })),
-    ...(props.extraArrows ?? []).map((a) => ({ a, c: '#4a9eea' })),
+    // Couleurs des jetons du thème (styles.css).
+    ...arrows.map((a) => ({ a, c: 'var(--arrow-user)' })),
+    ...(props.extraArrows ?? []).map((a) => ({ a, c: 'var(--arrow-line)' })),
   ];
 
   return (

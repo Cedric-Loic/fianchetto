@@ -1,5 +1,6 @@
 import type { MoveClass, PositionEval } from '@sq/shared';
-import { CLASS_COLOR } from '../lib/classes';
+import type { CSSProperties } from 'react';
+import { classCss } from '../lib/classes';
 import { evalValue } from '../lib/eval';
 
 /** Barre d'évaluation verticale (blanc en bas). */
@@ -7,7 +8,8 @@ export function EvalBar({ value }: { value: number }) {
   const white = 50 + 50 * Math.tanh(value / 400);
   return (
     <div className="eval-bar" data-testid="eval-bar">
-      <div className="white-part" style={{ height: `${white}%` }} />
+      {/* Part des Blancs dans une variable : hauteur (barre verticale) ou largeur (écran étroit). */}
+      <div className="white-part" style={{ '--white': `${white}%` } as CSSProperties} />
     </div>
   );
 }
@@ -38,14 +40,14 @@ export function EvalChart(props: {
         props.onSelect(Math.round(((e.clientX - rect.left) / rect.width) * n));
       }}
     >
-      <polygon points={`0,100 ${points.join(' ')} 100,100`} fill="#f0f0f0" opacity={0.85} />
-      <line x1="0" y1="50" x2="100" y2="50" stroke="#888" strokeWidth={0.5} />
+      <polygon className="eval-area" points={`0,100 ${points.join(' ')} 100,100`} />
+      <line className="eval-axis" x1="0" y1="50" x2="100" y2="50" strokeWidth={0.5} />
       <line
         x1={(props.cursor / n) * 100}
         x2={(props.cursor / n) * 100}
         y1="0"
         y2="100"
-        stroke="#4a9eea"
+        className="eval-cursor"
         strokeWidth={1}
       />
       {props.marks?.map((m) => (
@@ -55,7 +57,7 @@ export function EvalChart(props: {
           cy={yOf(props.evals[m.ply])}
           rx={1.2}
           ry={3}
-          fill={CLASS_COLOR[m.cls]}
+          className={`chart-mark ${classCss(m.cls)}`}
         />
       ))}
     </svg>

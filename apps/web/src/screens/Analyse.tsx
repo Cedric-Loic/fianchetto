@@ -3,6 +3,9 @@ import type { ImportedGameSummary, ImportResult } from '@sq/shared';
 import { api, type Result } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
+import { Button } from '../ui/Button';
+import { EmptyState, LoginRequired } from '../ui/EmptyState';
+import { Loading } from '../ui/Spinner';
 
 const COUNTS = [20, 50, 100] as const;
 
@@ -42,10 +45,9 @@ function Baseline({ games }: { games: ImportedGameSummary[] }) {
   const stats = games.flatMap((g) => (g.stats ? [g.stats] : []));
   if (stats.length === 0) {
     return (
-      <p className="muted">
-        Analyse tes parties importées pour mesurer ton point de départ (précision, gaffes par
-        partie…).
-      </p>
+      <EmptyState icon="📈" title="Point de départ pas encore mesuré">
+        Analyse tes parties importées pour mesurer ta précision, tes gaffes par partie…
+      </EmptyState>
     );
   }
   const accuracy = average(stats.flatMap((s) => (s.accuracy === null ? [] : [s.accuracy])));
@@ -111,15 +113,7 @@ export function Analyse() {
 
   if (!user) {
     return (
-      <div className="page">
-        <div className="panel page-panel">
-          <h2>Analyse</h2>
-          <p className="muted">Connecte-toi pour importer et analyser tes parties.</p>
-          <a className="button primary" href="#/login">
-            Se connecter
-          </a>
-        </div>
-      </div>
+      <LoginRequired title="Analyse" text="Connecte-toi pour importer et analyser tes parties." />
     );
   }
 
@@ -156,22 +150,18 @@ export function Analyse() {
             </label>
             <div className="row">
               {COUNTS.map((n) => (
-                <button
-                  key={n}
-                  className={n === count ? 'tc selected' : 'tc'}
-                  onClick={() => setCount(n)}
-                >
+                <Button key={n} size="s" pressed={n === count} onClick={() => setCount(n)}>
                   {n} dernières
-                </button>
+                </Button>
               ))}
             </div>
-            <button
-              className="primary"
+            <Button
+              variant="primary"
               disabled={busy || chessCom.length < 2}
               onClick={() => void run(() => api.importChessCom(chessCom, count))}
             >
               Récupérer mes parties
-            </button>
+            </Button>
             <p className="muted">
               Seul accès à Internet de l'application : l'API publique de chess.com, uniquement quand
               tu cliques.
@@ -191,8 +181,8 @@ export function Analyse() {
               data-testid="pgn-input"
               onChange={(e) => setPgn(e.target.value)}
             />
-            <button
-              className="primary"
+            <Button
+              variant="primary"
               disabled={busy || pgn.trim() === ''}
               onClick={() =>
                 void run(async () => {
@@ -203,10 +193,10 @@ export function Analyse() {
               }
             >
               Importer le PGN
-            </button>
+            </Button>
           </div>
         </div>
-        {busy && <p className="muted">Import en cours…</p>}
+        {busy && <Loading inline label="Import en cours…" />}
         {message && (
           <p className={message.error ? 'error' : 'muted'} data-testid="import-message">
             {message.text}
@@ -222,15 +212,21 @@ export function Analyse() {
       <div className="panel page-panel">
         <div className="list-header">
           <h2>Parties importées</h2>
-          <button
+          <Button
             disabled={toAnalyse === 0}
             data-testid="review-all"
             onClick={() => void api.reviewAll().then(() => setRefresh((r) => r + 1))}
           >
             Tout analyser ({toAnalyse})
-          </button>
+          </Button>
         </div>
-        <div className="table-scroll">
+        {games === null && <Loading inline />}
+        {games?.length === 0 && (
+          <EmptyState icon="♞" title="Aucune partie importée pour l'instant">
+            Récupère tes parties chess.com ou colle un PGN ci-dessus.
+          </EmptyState>
+        )}
+        <div className="table-scroll" hidden={!games?.length}>
           <table className="table" data-testid="imported-games">
             <thead>
               <tr>
@@ -274,27 +270,21 @@ export function Analyse() {
                       )}
                     </td>
                     <td>
-                      <button
-                        className="link"
+                      <Button
+                        variant="link"
                         title="Supprimer"
+                        aria-label="Supprimer la partie"
                         onClick={() =>
                           window.confirm('Supprimer cette partie importée ?') &&
                           void api.deleteImport(g.id).then(() => setRefresh((r) => r + 1))
                         }
                       >
                         ✕
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );
               })}
-              {games?.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="muted">
-                    Aucune partie importée pour l'instant.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>

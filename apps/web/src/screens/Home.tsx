@@ -1,44 +1,136 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   TIME_CONTROLS,
   TIME_CONTROL_IDS,
-  VARIANTS,
   type BotLevelInfo,
+  type CoachDashboard,
   type TimeControlId,
   type Variant,
 } from '@sq/shared';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
+import { pieceUrl, useSettings } from '../lib/settings';
+import { Button } from '../ui/Button';
+import { IconBook, IconBulb, IconChart, IconPuzzle, IconTarget } from '../ui/icons';
+import { Logo } from '../ui/Logo';
+import { Tabs } from '../ui/Tabs';
 import { VARIANT_LABEL } from './labels';
 
-const VARIANT_DESCRIPTION: Record<Variant, string> = {
-  classic: 'Les échecs, tout simplement.',
-  'secret-queen': 'Un de vos pions est une dame. Personne ne sait lequel.',
-};
+/** Mode choisi sur l'accueil : une variante, ou l'entraînement (classique contre le bot). */
+type Mode = Variant | 'training';
 
 function TimeControls(props: { value: TimeControlId; onChange: (id: TimeControlId) => void }) {
   return (
     <div className="time-controls">
       {TIME_CONTROL_IDS.map((id) => (
-        <button
-          key={id}
-          className={id === props.value ? 'tc selected' : 'tc'}
-          onClick={() => props.onChange(id)}
-        >
+        <Button key={id} pressed={id === props.value} onClick={() => props.onChange(id)}>
           {TIME_CONTROLS[id].label}
-        </button>
+        </Button>
       ))}
     </div>
   );
 }
 
-/** Accueil : choix de la variante, puis partie contre le bot (classée) ou à deux sur cet écran. */
+/** Carte d'un mode : icône, nom, description. */
+function ModeLabel(props: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <>
+      <span className="mode-icon" aria-hidden="true">
+        {props.icon}
+      </span>
+      <span className="mode-text">
+        <strong>{props.title}</strong>
+        <span>{props.text}</span>
+      </span>
+    </>
+  );
+}
+
+/**
+ * Bandeau du coach : première tâche de la semaine pas encore faite, sinon première
+ * recommandation. Rien tant que le tableau de bord n'est pas chargé.
+ */
+function CoachBanner() {
+  const [data, setData] = useState<CoachDashboard | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void api.dashboard().then((d) => !cancelled && setData(d));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (!data) return null;
+  const task = data.week.tasks.find((t) => t.done < t.target);
+  const reco = data.recommendations[0];
+  if (!task && !reco) return null;
+  return (
+    <section className="panel banner" data-testid="coach-banner" aria-label="Coach">
+      <span className="banner-icon">
+        <IconTarget size={28} />
+      </span>
+      <div className="banner-body">
+        <span className="banner-title">Coach : ta tâche du jour</span>
+        {task ? (
+          <>
+            <strong>{task.label}</strong>
+            <span className="muted">
+              {task.done} / {task.target} cette semaine
+            </span>
+            <span className="progress">
+              <span
+                className="progress-bar"
+                style={{ width: `${Math.min(100, (task.done / task.target) * 100)}%` }}
+              />
+            </span>
+          </>
+        ) : (
+          <strong>{reco?.text}</strong>
+        )}
+      </div>
+      <Button variant="primary" href={task?.href ?? reco?.href ?? '#/coach'}>
+        Y aller
+      </Button>
+    </section>
+  );
+}
+
+/** Accès rapides vers les écrans de progression. */
+const QUICK_LINKS = [
+  {
+    title: 'Puzzles',
+    text: 'Des positions tactiques à ton niveau, et tes erreurs à réviser.',
+    href: '#/puzzles',
+    action: 'Résoudre',
+    icon: <IconPuzzle />,
+  },
+  {
+    title: 'Leçons',
+    text: 'Le programme du coach, phase par phase, avec exercices.',
+    href: '#/lessons',
+    action: 'Apprendre',
+    icon: <IconBook />,
+  },
+  {
+    title: 'Analyse',
+    text: 'Importe tes parties chess.com ou PGN et trouve tes erreurs.',
+    href: '#/analyse',
+    action: 'Importer mes parties',
+    icon: <IconChart />,
+  },
+];
+
+/**
+ * Accueil : choix du mode (Classique, Secret Queen, Entraînement), puis partie contre le bot
+ * (classée, ou entraînement) ou à deux sur cet écran ; tâche du coach et accès rapides.
+ */
 export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   const user = useSession((s) => s.user);
+  const pieceSet = useSettings((s) => s.pieces);
   const [variant, setVariant] = useState<Variant>('classic');
   const [trainingChoice, setTraining] = useState(false);
   // Entraînement : variante classique seulement.
   const training = trainingChoice && variant === 'classic';
+  const mode: Mode = training ? 'training' : variant;
   const [levels, setLevels] = useState<BotLevelInfo[]>([]);
   const [level, setLevel] = useState(3);
   const [color, setColor] = useState<'w' | 'b' | 'random'>('random');
@@ -63,42 +155,88 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
     onStart(res.gameId);
   };
 
+  const chooseMode = (m: Mode) => {
+    setVariant(m === 'training' ? 'classic' : m);
+    setTraining(m === 'training');
+  };
+
   return (
-    <div className="home wide">
-      <h1>Fianchetto</h1>
-      <p className="tagline">Ta plateforme d'échecs personnelle.</p>
+    <div className="home">
+      <header className="home-hero">
+        <Logo size={88} />
+        <h1>Fianchetto</h1>
+        <p className="tagline">Ta plateforme d'échecs personnelle.</p>
+      </header>
+
       {active && (
-        <div className="panel resume">
-          Une partie est en cours.{' '}
-          <button className="primary" onClick={() => onStart(active)}>
+        <div className="panel banner resume">
+          <span className="banner-body">
+            <span className="banner-title">Partie en cours</span>
+            <span>Une partie t'attend.</span>
+          </span>
+          <Button variant="primary" onClick={() => onStart(active)}>
             Reprendre
-          </button>
+          </Button>
         </div>
       )}
-      <div className="variant-tabs" role="tablist">
-        {VARIANTS.map((v) => (
-          <button
-            key={v}
-            role="tab"
-            aria-selected={v === variant}
-            data-testid={`variant-${v}`}
-            className={`variant-tab${v === variant ? ' selected' : ''}`}
-            onClick={() => setVariant(v)}
-          >
-            <strong>{VARIANT_LABEL[v]}</strong>
-            <span>{VARIANT_DESCRIPTION[v]}</span>
-          </button>
-        ))}
-      </div>
+      {user && <CoachBanner key={user.username} />}
+
+      <Tabs<Mode>
+        variant="cards"
+        label="Mode de jeu"
+        value={mode}
+        onChange={chooseMode}
+        items={[
+          {
+            id: 'classic',
+            testId: 'variant-classic',
+            label: (
+              <ModeLabel
+                icon={<img src={pieceUrl(pieceSet, 'w', 'n')} alt="" />}
+                title={VARIANT_LABEL.classic}
+                text="Les échecs, tout simplement."
+              />
+            ),
+          },
+          {
+            id: 'secret-queen',
+            testId: 'variant-secret-queen',
+            label: (
+              <ModeLabel
+                icon={
+                  <>
+                    <img src={pieceUrl(pieceSet, 'w', 'p')} alt="" />
+                    <span className="mode-mark">♛</span>
+                  </>
+                }
+                title={VARIANT_LABEL['secret-queen']}
+                text="Un de vos pions est une dame. Personne ne sait lequel."
+              />
+            ),
+          },
+          {
+            id: 'training',
+            testId: 'mode-training',
+            label: (
+              <ModeLabel
+                icon={<IconBulb size={30} />}
+                title="Entraînement"
+                text="Contre le bot avec le coach : indices, garde-fou, reprises."
+              />
+            ),
+          },
+        ]}
+      />
+
       <div className="home-cards">
         <div className="panel home-panel">
           <h2>Contre le bot</h2>
           {!user ? (
             <>
               <p className="muted">Partie classée : connecte-toi pour suivre ton Elo.</p>
-              <a className="button primary" href="#/login">
+              <Button variant="primary" href="#/login">
                 Se connecter
-              </a>
+              </Button>
             </>
           ) : (
             <>
@@ -107,15 +245,15 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
               </p>
               <div className="levels">
                 {levels.map((l) => (
-                  <button
+                  <Button
                     key={l.level}
                     data-testid={`level-${l.level}`}
-                    className={l.level === level ? 'tc selected' : 'tc'}
+                    pressed={l.level === level}
                     onClick={() => setLevel(l.level)}
                   >
                     <strong>{l.name}</strong>
                     <span className="muted">{l.elo}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
               <div className="colors">
@@ -126,13 +264,9 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
                     ['b', 'Noirs'],
                   ] as const
                 ).map(([c, label]) => (
-                  <button
-                    key={c}
-                    className={c === color ? 'tc selected' : 'tc'}
-                    onClick={() => setColor(c)}
-                  >
+                  <Button key={c} pressed={c === color} onClick={() => setColor(c)}>
                     {label}
-                  </button>
+                  </Button>
                 ))}
               </div>
               {variant === 'classic' && (
@@ -148,8 +282,9 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
                 </label>
               )}
               {!training && <TimeControls value={botTc} onChange={setBotTc} />}
-              <button
-                className="primary big"
+              <Button
+                variant="primary"
+                size="l"
                 onClick={() =>
                   void create({
                     mode: 'bot',
@@ -162,7 +297,7 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
                 }
               >
                 Jouer contre le bot
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -178,8 +313,9 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
             <input value={black} maxLength={32} onChange={(e) => setBlack(e.target.value)} />
           </label>
           <TimeControls value={seatTc} onChange={setSeatTc} />
-          <button
-            className="primary big"
+          <Button
+            variant="primary"
+            size="l"
             disabled={!white.trim() || !black.trim()}
             onClick={() =>
               void create({
@@ -192,11 +328,31 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
             }
           >
             Jouer
-          </button>
-          <p className="muted">Partie non classée.</p>
+          </Button>
+          <p className="muted">
+            Partie non classée{training ? ', en variante classique (sans coach)' : ''}.
+          </p>
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+
+      <section className="quick-links" aria-labelledby="quick-links-title">
+        <h2 id="quick-links-title">Pour progresser</h2>
+        <div className="quick-grid">
+          {QUICK_LINKS.map((q) => (
+            <div key={q.href} className="panel quick-card">
+              <h3>
+                {q.icon}
+                {q.title}
+              </h3>
+              <p className="muted">{q.text}</p>
+              <Button size="s" href={q.href} className="stretched">
+                {q.action}
+              </Button>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { api } from './lib/api';
 import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
@@ -14,7 +13,8 @@ import { Profile } from './screens/Profile';
 import { Puzzles } from './screens/Puzzles';
 import { Review } from './screens/Review';
 import { Selection } from './screens/Selection';
-import { SettingsMenu } from './game/SettingsMenu';
+import { NavBar, type NavSection } from './ui/NavBar';
+import { Loading } from './ui/Spinner';
 
 type Route =
   | { page: 'home' }
@@ -30,8 +30,7 @@ type Route =
   | { page: 'game'; gameId: string };
 
 /** Routage par l'URL (`#/game/<id>`, `#/profile/<pseudo>`…) : survit au rafraîchissement. */
-function parseHash(): Route {
-  const h = location.hash;
+function parseHash(h: string): Route {
   let m = /^#\/game\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'game', gameId: m[1] };
   m = /^#\/profile\/([\w-]+)$/.exec(h);
@@ -54,39 +53,28 @@ function parseHash(): Route {
   return { page: 'home' };
 }
 
-function Nav() {
-  const { user, setUser } = useSession();
-  return (
-    <nav className="nav-bar">
-      <a href="#/" className="logo">
-        ♞ Fianchetto
-      </a>
-      <a href="#/">Jouer</a>
-      <a href="#/coach">Coach</a>
-      <a href="#/lessons">Leçons</a>
-      <a href="#/puzzles">Puzzles</a>
-      <a href="#/analyse">Analyse</a>
-      <a href="#/leaderboard">Classement</a>
-      <span className="spacer" />
-      <SettingsMenu />
-      {user ? (
-        <>
-          <a href={`#/profile/${user.username}`} data-testid="nav-user">
-            {user.username}
-          </a>
-          <button className="link" onClick={() => void api.logout().then(() => setUser(null))}>
-            Déconnexion
-          </button>
-        </>
-      ) : (
-        <a href="#/login">Connexion</a>
-      )}
-    </nav>
-  );
+/** Rubrique de la barre de navigation correspondant à la page. */
+function sectionOf(route: Route): NavSection {
+  switch (route.page) {
+    case 'home':
+    case 'game':
+      return 'play';
+    case 'lessons':
+    case 'lesson':
+      return 'lessons';
+    case 'analyse':
+    case 'review':
+      return 'analyse';
+    case 'profile':
+      return null;
+    default:
+      return route.page;
+  }
 }
 
 export function App() {
-  const [route, setRoute] = useState<Route>(parseHash);
+  const [hash, setHash] = useState(() => location.hash);
+  const route = parseHash(hash);
   const state = useGame((s) => s.state);
   const focus = useGame((s) => s.focus);
   const refresh = useSession((s) => s.refresh);
@@ -94,7 +82,7 @@ export function App() {
 
   useEffect(() => {
     void refresh();
-    const onHash = () => setRoute(parseHash());
+    const onHash = () => setHash(location.hash);
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, [refresh]);
@@ -124,11 +112,7 @@ export function App() {
   else if (route.page === 'analyse') content = <Analyse />;
   else if (route.page === 'puzzles') {
     content = (
-      <Puzzles
-        key={location.hash}
-        initialMode={route.mode ?? 'rated'}
-        initialTheme={route.theme ?? null}
-      />
+      <Puzzles key={hash} initialMode={route.mode ?? 'rated'} initialTheme={route.theme ?? null} />
     );
   } else if (route.page === 'coach') content = <Coach />;
   else if (route.page === 'lessons') content = <Lessons />;
@@ -136,7 +120,7 @@ export function App() {
   else if (route.page === 'review') content = <Review key={route.id} id={route.id} />;
   else if (route.page === 'home') {
     content = <Home onStart={(id) => (location.hash = `#/game/${id}`)} />;
-  } else if (!state) content = <div className="loading">Connexion…</div>;
+  } else if (!state) content = <Loading label="Connexion…" />;
   else if (state.phase === 'secret-selection') {
     // Clé : un nouveau chooser (ou un nouvel écran de passage) repart d'un choix vide.
     const key = `${state.selection?.chooser}-${state.selection?.handoffPending}`;
@@ -146,7 +130,7 @@ export function App() {
   return (
     <>
       {/* Mode concentration : pas de barre de navigation, l'échiquier seul. */}
-      {!(focus && route.page === 'game') && <Nav />}
+      {!(focus && route.page === 'game') && <NavBar section={sectionOf(route)} hash={hash} />}
       {content}
     </>
   );

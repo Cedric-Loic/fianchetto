@@ -16,6 +16,9 @@ import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
+import { Button } from '../ui/Button';
+import { EmptyState, LoginRequired } from '../ui/EmptyState';
+import { Loading } from '../ui/Spinner';
 
 const PHASES: Record<number, string> = {
   1: 'Phase 1 · Ne plus rien donner',
@@ -46,17 +49,7 @@ function RichText({ text }: { text: string }) {
 }
 
 function LoginNeeded() {
-  return (
-    <div className="page">
-      <div className="panel page-panel">
-        <h2>Leçons</h2>
-        <p className="muted">Connecte-toi pour suivre ta progression.</p>
-        <a className="button primary" href="#/login">
-          Se connecter
-        </a>
-      </div>
-    </div>
-  );
+  return <LoginRequired title="Leçons" text="Connecte-toi pour suivre ta progression." />;
 }
 
 /** Liste des leçons, par phase du plan, avec la progression. */
@@ -67,23 +60,28 @@ export function Lessons() {
     if (user) void api.lessons().then((r) => setLessons(r?.lessons ?? []));
   }, [user]);
   if (!user) return <LoginNeeded />;
-  const phases = [...new Set((lessons ?? []).map((l) => l.phase))];
-  const passed = lessons?.filter((l) => l.passed).length ?? 0;
+  if (lessons === null) return <Loading label="Chargement des leçons…" />;
+  const phases = [...new Set(lessons.map((l) => l.phase))];
+  const passed = lessons.filter((l) => l.passed).length;
   return (
     <div className="page">
       <div className="panel page-panel">
         <h2>Leçons</h2>
         <p className="muted">
-          {passed} leçon{passed > 1 ? 's' : ''} validée{passed > 1 ? 's' : ''} sur{' '}
-          {lessons?.length ?? 0}. Une leçon est validée quand 80 % de ses exercices sont réussis du
-          premier coup.
+          {passed} leçon{passed > 1 ? 's' : ''} validée{passed > 1 ? 's' : ''} sur {lessons.length}.
+          Une leçon est validée quand 80 % de ses exercices sont réussis du premier coup.
         </p>
+        {lessons.length === 0 && (
+          <EmptyState icon="📖" title="Aucune leçon disponible">
+            Le serveur n'a renvoyé aucune leçon.
+          </EmptyState>
+        )}
         {phases.map((phase) => (
           <div key={phase} className="lesson-phase">
             <h3>{PHASES[phase] ?? `Phase ${phase}`}</h3>
             <div className="lesson-list">
               {lessons
-                ?.filter((l) => l.phase === phase)
+                .filter((l) => l.phase === phase)
                 .map((l, i) => (
                   <a
                     key={l.id}
@@ -252,8 +250,20 @@ export function LessonPage({ id }: { id: string }) {
   }, [id, user]);
 
   if (!user) return <LoginNeeded />;
-  if (lesson === undefined) return <div className="loading">Chargement…</div>;
-  if (lesson === null) return <div className="loading">Leçon introuvable.</div>;
+  if (lesson === undefined) return <Loading label="Chargement de la leçon…" />;
+  if (lesson === null) {
+    return (
+      <div className="page">
+        <div className="panel page-panel">
+          <EmptyState
+            icon="📖"
+            title="Leçon introuvable"
+            action={<Button href="#/lessons">Toutes les leçons</Button>}
+          />
+        </div>
+      </div>
+    );
+  }
 
   const total = lesson.exercises.length;
   const exercise = current === null ? undefined : lesson.exercises[current];
@@ -278,7 +288,7 @@ export function LessonPage({ id }: { id: string }) {
   return (
     <div className="page lesson">
       <div className="panel page-panel">
-        <a href="#/lessons" className="muted">
+        <a href="#/lessons" className="back-link">
           ← Toutes les leçons
         </a>
         <h2>{lesson.title}</h2>
@@ -317,9 +327,9 @@ export function LessonPage({ id }: { id: string }) {
               {total} exercices. Réussis-en {Math.ceil(lesson.passRatio * total)} du premier coup
               pour valider la leçon.
             </p>
-            <button className="primary" onClick={() => setCurrent(0)} data-testid="start-exercises">
+            <Button variant="primary" onClick={() => setCurrent(0)} data-testid="start-exercises">
               Commencer les exercices
-            </button>
+            </Button>
           </>
         )}
         {exercise && current !== null && (
@@ -335,13 +345,13 @@ export function LessonPage({ id }: { id: string }) {
               onDone={onDone}
             />
             {answered && (
-              <button
-                className="primary"
+              <Button
+                variant="primary"
                 onClick={() => setCurrent(current + 1)}
                 data-testid="next-exercise"
               >
                 {current + 1 < total ? 'Exercice suivant ▶' : 'Voir le bilan'}
-              </button>
+              </Button>
             )}
           </>
         )}
@@ -359,10 +369,8 @@ export function LessonPage({ id }: { id: string }) {
               <p>Pas encore validée : relis la leçon et recommence les exercices.</p>
             )}
             <div className="actions">
-              <button onClick={restart}>Recommencer</button>
-              <a className="button" href="#/lessons">
-                Leçons
-              </a>
+              <Button onClick={restart}>Recommencer</Button>
+              <Button href="#/lessons">Leçons</Button>
             </div>
           </div>
         )}

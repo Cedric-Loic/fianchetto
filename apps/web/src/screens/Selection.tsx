@@ -4,6 +4,7 @@ import { Board } from '../game/Board';
 import { initialPieces } from '../lib/position';
 import { send } from '../lib/net';
 import { useGame } from '../lib/store';
+import { Button } from '../ui/Button';
 
 /**
  * Choix du pion secret en hot-seat : écran de passage (plateau caché), puis choix en 30 s.
@@ -35,9 +36,9 @@ export function Selection({ state }: { state: ViewerGameState }) {
           {name} ({side}), à vous de choisir votre pion secret
         </h2>
         <p>{other}, détournez le regard.</p>
-        <button className="primary big" onClick={() => send({ type: 'start-selection' })}>
+        <Button variant="primary" size="l" onClick={() => send({ type: 'start-selection' })}>
           Je suis prêt
-        </button>
+        </Button>
       </div>
     );
   }
@@ -70,13 +71,14 @@ export function Selection({ state }: { state: ViewerGameState }) {
       )}
       <div className="selection-actions">
         <p className="muted">Sans confirmation à temps, un pion est tiré au hasard.</p>
-        <button
-          className="primary big"
+        <Button
+          variant="primary"
+          size="l"
           disabled={choice === null}
           onClick={() => choice && send({ type: 'lock-secret', square: choice })}
         >
           Confirmer
-        </button>
+        </Button>
       </div>
     </div>
   );

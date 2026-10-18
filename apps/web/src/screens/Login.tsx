@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
+import { Button } from '../ui/Button';
+import { Logo } from '../ui/Logo';
 
 /** Connexion / inscription (comptes locaux). */
 export function Login({ onDone }: { onDone: () => void }) {
@@ -28,8 +30,9 @@ export function Login({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <div className="home">
-      <div className="panel home-panel">
+    <div className="page login">
+      <div className="panel home-panel login-panel">
+        <Logo size={48} />
         <h2>{mode === 'login' ? 'Connexion' : 'Créer un compte'}</h2>
         <label>
           Pseudo
@@ -49,13 +52,13 @@ export function Login({ onDone }: { onDone: () => void }) {
             onKeyDown={(e) => e.key === 'Enter' && void submit()}
           />
         </label>
-        <button className="primary big" onClick={() => void submit()}>
+        <Button variant="primary" size="l" onClick={() => void submit()}>
           {mode === 'login' ? 'Se connecter' : "S'inscrire"}
-        </button>
+        </Button>
         {error && <p className="error">{error}</p>}
-        <button className="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+        <Button variant="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
           {mode === 'login' ? 'Pas de compte ? Créer un compte' : 'Déjà un compte ? Se connecter'}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -13,6 +13,8 @@ import { useGame } from '../lib/store';
 import { useSession } from '../lib/session';
 import { REASONS, SIDE, VARIANT_LABEL } from './labels';
 import { useSettings } from '../lib/settings';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 
 function resultText(result: GameResult, state: ViewerGameState): string {
   if (result.winner === null) return `Partie nulle ${REASONS[result.reason]}`;
@@ -279,9 +281,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           {ended
             ? 'Partie terminée'
             : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`}
-          <span className="variant-badge">{VARIANT_LABEL[state.variant]}</span>
-          {state.rated && <span className="rated-badge">Classée</span>}
-          {state.training && <span className="rated-badge">Entraînement</span>}
+          <Badge>{VARIANT_LABEL[state.variant]}</Badge>
+          {state.rated && <Badge tone="accent">Classée</Badge>}
+          {state.training && <Badge tone="info">Entraînement</Badge>}
         </div>
         <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />
         <div className="nav">
@@ -377,20 +379,20 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         )}
         {ended && (
           <div className="actions">
-            <button className="primary" onClick={() => send({ type: 'offer-rematch' })}>
+            <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
               Revanche
-            </button>
-            <button onClick={onLeave}>Nouvelle partie</button>
+            </Button>
+            <Button onClick={onLeave}>Nouvelle partie</Button>
           </div>
         )}
         {ended && (
           <div className="actions">
-            <a className="button" href={`#/review/${state.gameId}`} data-testid="review-link">
+            <Button href={`#/review/${state.gameId}`} data-testid="review-link">
               📊 Revue de la partie
-            </a>
-            <a className="button" href={`/api/games/${state.gameId}/pgn`} download="partie.pgn">
+            </Button>
+            <Button href={`/api/games/${state.gameId}/pgn`} download="partie.pgn">
               ⬇ PGN
-            </a>
+            </Button>
           </div>
         )}
       </aside>
@@ -401,17 +403,17 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
             <h2>Es-tu sûr ?</h2>
             <p>{guard.warning}</p>
             <div className="actions">
-              <button className="primary" onClick={() => setGuard(null)}>
+              <Button variant="primary" onClick={() => setGuard(null)}>
                 Je cherche un autre coup
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setGuard(null);
                   commit(guard.move);
                 }}
               >
                 Jouer quand même
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -442,14 +444,12 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
               );
             })}
             <div className="actions">
-              <button className="primary" onClick={() => send({ type: 'offer-rematch' })}>
+              <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
                 Revanche
-              </button>
-              <a className="button" href={`#/review/${state.gameId}`}>
-                📊 Revue de la partie
-              </a>
-              <button onClick={() => setShowEnd(false)}>Voir le plateau</button>
-              <button onClick={onLeave}>Nouvelle partie</button>
+              </Button>
+              <Button href={`#/review/${state.gameId}`}>📊 Revue de la partie</Button>
+              <Button onClick={() => setShowEnd(false)}>Voir le plateau</Button>
+              <Button onClick={onLeave}>Nouvelle partie</Button>
             </div>
           </div>
         </div>

@@ -8,12 +8,16 @@ import type {
   Square,
 } from '@sq/shared';
 import { EvalBar, EvalChart } from '../game/Analysis';
-import { CLASS_COLOR, CLASS_LABEL, CLASS_SYMBOL } from '../lib/classes';
+import { CLASS_LABEL, CLASS_SYMBOL, classCss } from '../lib/classes';
 import { Board } from '../game/Board';
 import { api } from '../lib/api';
 import { evalLabel, evalValue } from '../lib/eval';
 import { piecesFromFen } from '../lib/fen';
 import { SIDE, VARIANT_LABEL } from './labels';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/EmptyState';
+import { Loading } from '../ui/Spinner';
 
 const ERRORS: readonly MoveClass[] = ['inaccuracy', 'mistake', 'blunder'];
 const SOURCE_LABEL = { local: 'Partie locale', pgn: 'Import PGN', chesscom: 'chess.com' } as const;
@@ -40,7 +44,7 @@ function ReviewMoveList(props: {
             >
               {m.san}
               {m.classification !== 'good' && m.classification !== 'excellent' && (
-                <span className="class-symbol" style={{ color: CLASS_COLOR[m.classification] }}>
+                <span className={`class-symbol ${classCss(m.classification)}`}>
                   {' '}
                   {CLASS_SYMBOL[m.classification]}
                 </span>
@@ -111,10 +115,10 @@ function CoachSummary(props: {
         <>
           {key.map((m) => (
             <p key={m.ply} className="key-moment">
-              <button className="link" onClick={() => props.onSelect(m.ply)}>
+              <Button variant="link" onClick={() => props.onSelect(m.ply)}>
                 {Math.ceil(m.ply / 2)}
                 {m.color === 'w' ? '.' : '…'} {m.san} {CLASS_SYMBOL[m.classification]}
-              </button>{' '}
+              </Button>{' '}
               {m.explanation?.text}
             </p>
           ))}
@@ -178,8 +182,24 @@ export function Review({ id }: { id: string }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [total]);
 
-  if (failure) return <div className="loading">{failure}</div>;
-  if (!data) return <div className="loading">Chargement…</div>;
+  if (failure) {
+    return (
+      <div className="page">
+        <div className="panel page-panel">
+          <EmptyState
+            icon="♞"
+            title={failure}
+            action={
+              <Button variant="primary" href="#/analyse">
+                Mes parties analysées
+              </Button>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+  if (!data) return <Loading label="Chargement de la revue…" />;
   const { info, state } = data;
 
   if (state.status !== 'done' || !review) {
@@ -193,15 +213,20 @@ export function Review({ id }: { id: string }) {
           {state.status === 'error' ? (
             <>
               <p className="error">L'analyse a échoué.</p>
-              <button onClick={() => setAttempt((a) => a + 1)}>Réessayer</button>
+              <Button variant="primary" onClick={() => setAttempt((a) => a + 1)}>
+                Réessayer
+              </Button>
             </>
           ) : (
             <>
-              <p>
-                {state.status === 'running'
-                  ? `Analyse Stockfish en cours… ${progress} %`
-                  : 'En attente : d’autres parties sont en cours d’analyse…'}
-              </p>
+              <Loading
+                inline
+                label={
+                  state.status === 'running'
+                    ? `Analyse Stockfish en cours… ${progress} %`
+                    : 'En attente : d’autres parties sont en cours d’analyse…'
+                }
+              />
               <div className="progress">
                 <div className="progress-bar" style={{ width: `${progress}%` }} />
               </div>
@@ -261,7 +286,7 @@ export function Review({ id }: { id: string }) {
       <strong>{review.accuracy[c] === null ? '—' : `${review.accuracy[c]} %`}</strong>
       <span className="counts">
         {(['blunder', 'mistake', 'inaccuracy'] as const).map((cls) => (
-          <span key={cls} style={{ color: CLASS_COLOR[cls] }} title={CLASS_LABEL[cls]}>
+          <span key={cls} className={`class-count ${classCss(cls)}`} title={CLASS_LABEL[cls]}>
             {review.counts[c][cls]} {CLASS_SYMBOL[cls]}
           </span>
         ))}
@@ -289,8 +314,8 @@ export function Review({ id }: { id: string }) {
       <aside className="panel side-panel">
         <div className="turn-banner">
           {info.white} – {info.black} · {info.result}
-          <span className="variant-badge">{VARIANT_LABEL[info.variant]}</span>
-          <span className="variant-badge">{SOURCE_LABEL[info.source]}</span>
+          <Badge>{VARIANT_LABEL[info.variant]}</Badge>
+          <Badge>{SOURCE_LABEL[info.source]}</Badge>
         </div>
         {info.url && (
           <a className="muted" href={info.url} target="_blank" rel="noreferrer">
@@ -311,10 +336,7 @@ export function Review({ id }: { id: string }) {
                   {Math.ceil(move.ply / 2)}
                   {move.color === 'w' ? '.' : '…'} {move.san}
                 </strong>{' '}
-                <span
-                  className="class-badge"
-                  style={{ background: CLASS_COLOR[move.classification] }}
-                >
+                <span className={`class-badge ${classCss(move.classification)}`}>
                   {CLASS_LABEL[move.classification]}
                 </span>{' '}
                 <span className="muted">({evalLabel(here)})</span>
@@ -322,9 +344,9 @@ export function Review({ id }: { id: string }) {
               {move.explanation && <p data-testid="explanation">{move.explanation.text}</p>}
               {isError(move) && (info.userColor === null || move.color === info.userColor) && (
                 <div className="replay">
-                  <button data-testid="replay" onClick={() => void replay(move)}>
+                  <Button size="s" data-testid="replay" onClick={() => void replay(move)}>
                     ↺ Rejouer d'ici contre le bot
-                  </button>
+                  </Button>
                   <select
                     value={replayLevel}
                     aria-label="Niveau du bot"
