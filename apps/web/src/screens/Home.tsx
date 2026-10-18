@@ -9,7 +9,7 @@ import {
 } from '@sq/shared';
 import { api, summarizePgn, type PgnSummary } from '../lib/api';
 import { useSession } from '../lib/session';
-import { pieceUrl, useSettings } from '../lib/settings';
+import { DEFAULT_LAST_PLAY, pieceUrl, useSettings, type LastPlay } from '../lib/settings';
 import { Button } from '../ui/Button';
 import {
   IconBook,
@@ -23,6 +23,8 @@ import {
 import { Logo } from '../ui/Logo';
 import { Tabs } from '../ui/Tabs';
 import { VARIANT_LABEL } from './labels';
+import { Onboarding } from './Onboarding';
+import { onboardingWanted } from '../lib/onboarding';
 
 /** Mode choisi sur l'accueil : une variante, ou l'entraînement (classique contre le bot). */
 type Mode = Variant | 'training';
@@ -187,21 +189,41 @@ const QUICK_LINKS = [
  * Accueil : choix du mode (Classique, Secret Queen, Entraînement), puis partie contre le bot
  * (classée, ou entraînement) ou à deux sur cet écran ; tâche du coach et accès rapides.
  */
+const COLOR_LABEL = { w: 'avec les Blancs', b: 'avec les Noirs', random: 'couleur au hasard' };
+
+/** Salutation selon l'heure. */
+function greeting(name: string | null): string {
+  const hour = new Date().getHours();
+  const hello = hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour';
+  return `${hello}${name ? ` ${name}` : ''}, prêt pour une partie ?`;
+}
+
+/**
+ * Accueil : bouton « Jouer » qui relance la dernière configuration, puis choix du mode
+ * (Classique, Secret Queen, Entraînement), partie contre le bot (classée, ou entraînement) ou à
+ * deux sur cet écran ; tâche du coach et accès rapides. Premier lancement guidé si besoin.
+ */
 export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   const user = useSession((s) => s.user);
   const pieceSet = useSettings((s) => s.pieces);
-  const [variant, setVariant] = useState<Variant>('classic');
-  const [trainingChoice, setTraining] = useState(false);
+  const updateSettings = useSettings((s) => s.update);
+  const [onboarding, setOnboarding] = useState(() =>
+    onboardingWanted(useSettings.getState().onboarded),
+  );
+  // Dernière configuration jouée (ou choisie au premier lancement) : valeurs de départ.
+  const [initial] = useState<LastPlay>(() => useSettings.getState().lastPlay ?? DEFAULT_LAST_PLAY);
+  const [variant, setVariant] = useState<Variant>(initial.variant);
+  const [trainingChoice, setTraining] = useState(initial.training);
   // Entraînement : variante classique seulement.
   const training = trainingChoice && variant === 'classic';
   const mode: Mode = training ? 'training' : variant;
   const [levels, setLevels] = useState<BotLevelInfo[]>([]);
-  const [level, setLevel] = useState(3);
-  const [color, setColor] = useState<'w' | 'b' | 'random'>('random');
-  const [botTc, setBotTc] = useState<TimeControlId>('blitz-5+0');
+  const [level, setLevel] = useState(initial.level);
+  const [color, setColor] = useState<'w' | 'b' | 'random'>(initial.color);
+  const [botTc, setBotTc] = useState<TimeControlId>(initial.timeControl);
   const [white, setWhite] = useState('Joueur 1');
   const [black, setBlack] = useState('Joueur 2');
-  const [seatTc, setSeatTc] = useState<TimeControlId>('blitz-5+0');
+  const [seatTc, setSeatTc] = useState<TimeControlId>(initial.timeControl);
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -212,12 +234,53 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
     if (user) void api.activeGame().then((a) => setActive(a?.gameId ?? null));
   }, [user]);
 
-  const create = async (body: unknown) => {
+  /** Crée la partie et mémorise sa configuration pour le bouton « Jouer ». */
+  const launch = async (play: LastPlay) => {
     setError(null);
-    const res = await api.createGame(body);
+    updateSettings({ lastPlay: play });
+    const res = await api.createGame(
+      play.mode === 'bot'
+        ? {
+            mode: 'bot',
+            variant: play.variant,
+            level: play.level,
+            color: play.color,
+            timeControl: play.training ? 'untimed' : play.timeControl,
+            ...(play.training ? { training: true } : {}),
+          }
+        : {
+            mode: 'hotseat',
+            variant: play.variant,
+            timeControl: play.timeControl,
+            whiteName: white.trim() || 'Joueur 1',
+            blackName: black.trim() || 'Joueur 2',
+          },
+    );
     if (!res) return setError('Impossible de créer la partie.');
     onStart(res.gameId);
   };
+
+  // Bouton « Jouer » : la dernière configuration ; sans compte, une partie contre le bot
+  // devient une partie à deux sur cet écran (même variante et cadence).
+  const remembered = useSettings((s) => s.lastPlay) ?? DEFAULT_LAST_PLAY;
+  const quick: LastPlay =
+    remembered.mode === 'bot' && !user
+      ? { ...remembered, mode: 'hotseat', training: false }
+      : remembered;
+  const quickLevel = levels.find((l) => l.level === quick.level);
+  const quickSummary =
+    quick.mode === 'bot'
+      ? [
+          quick.training ? 'Entraînement' : VARIANT_LABEL[quick.variant],
+          `contre ${quickLevel ? `${quickLevel.name} (${quickLevel.elo})` : `le bot niveau ${quick.level}`}`,
+          COLOR_LABEL[quick.color],
+          quick.training ? 'sans pendule' : TIME_CONTROLS[quick.timeControl].label,
+        ].join(' · ')
+      : [
+          VARIANT_LABEL[quick.variant],
+          'à deux sur cet écran',
+          TIME_CONTROLS[quick.timeControl].label,
+        ].join(' · ');
 
   const chooseMode = (m: Mode) => {
     setVariant(m === 'training' ? 'classic' : m);
@@ -227,10 +290,28 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   return (
     <div className="home">
       <header className="home-hero">
-        <Logo size={88} />
+        <Logo size={36} />
         <h1>Fianchetto</h1>
-        <p className="tagline">Ta plateforme d'échecs personnelle.</p>
+        <p className="tagline" data-testid="greeting">
+          {greeting(user?.username ?? null)}
+        </p>
       </header>
+
+      <section className="panel quick-play" aria-label="Partie rapide">
+        <Button
+          variant="primary"
+          size="l"
+          className="quick-play-button"
+          data-testid="quick-play"
+          onClick={() => void launch(quick)}
+        >
+          <IconPlay size={22} />
+          Jouer
+        </Button>
+        <span className="quick-play-summary" data-testid="quick-play-summary">
+          {quickSummary}
+        </span>
+      </section>
 
       {active && user && (
         <ResumeCard
@@ -347,14 +428,7 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
                 variant="primary"
                 size="l"
                 onClick={() =>
-                  void create({
-                    mode: 'bot',
-                    variant,
-                    level,
-                    color,
-                    timeControl: training ? 'untimed' : botTc,
-                    ...(training ? { training: true } : {}),
-                  })
+                  void launch({ mode: 'bot', variant, training, level, color, timeControl: botTc })
                 }
               >
                 Jouer contre le bot
@@ -379,12 +453,13 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
             size="l"
             disabled={!white.trim() || !black.trim()}
             onClick={() =>
-              void create({
+              void launch({
                 mode: 'hotseat',
                 variant,
+                training: false,
+                level,
+                color,
                 timeControl: seatTc,
-                whiteName: white,
-                blackName: black,
               })
             }
           >
@@ -396,6 +471,18 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {onboarding && (
+        <Onboarding
+          onDone={() => {
+            // Le guide a pu régler le niveau du bot et la cadence : on les reprend.
+            const play = useSettings.getState().lastPlay ?? DEFAULT_LAST_PLAY;
+            setLevel(play.level);
+            setBotTc(play.timeControl);
+            setSeatTc(play.timeControl);
+            setOnboarding(false);
+          }}
+        />
+      )}
 
       <section className="quick-links" aria-labelledby="quick-links-title">
         <h2 id="quick-links-title">Pour progresser</h2>

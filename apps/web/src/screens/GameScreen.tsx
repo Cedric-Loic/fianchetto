@@ -10,7 +10,8 @@ import { api } from '../lib/api';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { Board } from '../game/Board';
 import { usePremoves } from '../game/usePremoves';
-import { MoveList } from '../game/MoveList';
+import { MoveList, MoveStrip } from '../game/MoveList';
+import { MOBILE_QUERY, useMediaQuery } from '../lib/media';
 import { PlayerBar } from '../game/PlayerBar';
 import { send } from '../lib/net';
 import { publicPositionAt } from '../lib/position';
@@ -31,13 +32,16 @@ import {
   IconChart,
   IconClose,
   IconDownload,
+  IconDraw,
   IconExpand,
+  IconFlag,
   IconFirst,
   IconFlip,
   IconLast,
   IconNext,
   IconPrev,
   IconRetry,
+  IconTrophy,
   IconUndo,
 } from '../ui/icons';
 
@@ -82,6 +86,8 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     null,
   );
   const [checking, setChecking] = useState(false);
+  // Téléphone : bande de coups sous le plateau et barre d'actions fixe en bas.
+  const mobile = useMediaQuery(MOBILE_QUERY);
 
   useEffect(() => {
     if (!toast) return;
@@ -372,8 +378,79 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
       ? `${board.turn === me ? 'À toi de jouer' : 'Le bot réfléchit…'}${board.inCheck ? ' — échec !' : ''}`
       : `Au tour de ${state.players[board.turn].name} (${SIDE[board.turn]})${board.inCheck ? ' — échec !' : ''}`;
 
+  // Barre d'actions du téléphone : navigation, plein écran, retourner, nulle et abandon (ou
+  // résultat en fin de partie). Cibles d'au moins 44 px (styles.css).
+  const mobileBar = (
+    <nav className="mobile-actions" aria-label="Actions de la partie" data-testid="mobile-actions">
+      {ended && (
+        <button title="Début" aria-label="Début" onClick={() => setCursor(0)}>
+          <IconFirst size={22} />
+        </button>
+      )}
+      <button
+        title="Précédent"
+        aria-label="Précédent"
+        onClick={() => setCursor(Math.max(0, shownPly - 1))}
+      >
+        <IconPrev size={22} />
+      </button>
+      <button
+        title="Suivant"
+        aria-label="Suivant"
+        onClick={() => setCursor(Math.min(plyCount, shownPly + 1))}
+      >
+        <IconNext size={22} />
+      </button>
+      {ended && (
+        <button title="Fin" aria-label="Fin" onClick={() => setCursor(null)}>
+          <IconLast size={22} />
+        </button>
+      )}
+      <button
+        title="Plein écran"
+        aria-label="Mode concentration"
+        data-testid="focus-button"
+        onClick={enterFocus}
+      >
+        <IconExpand size={22} />
+      </button>
+      <button
+        title="Retourner le plateau"
+        aria-label="Retourner le plateau"
+        onClick={() => setOrientation(top)}
+      >
+        <IconFlip size={22} />
+      </button>
+      {ended ? (
+        <button title="Résultat" aria-label="Résultat" onClick={() => setShowEnd(true)}>
+          <IconTrophy size={22} />
+        </button>
+      ) : (
+        <>
+          <button
+            title="Proposer nulle"
+            aria-label="Proposer nulle"
+            data-testid="offer-draw"
+            disabled={state.drawOffer !== null}
+            onClick={() => send({ type: 'offer-draw', color: actor })}
+          >
+            <IconDraw size={22} />
+          </button>
+          <button
+            title="Abandonner"
+            aria-label="Abandonner"
+            data-testid="resign"
+            onClick={() => setConfirmResign(true)}
+          >
+            <IconFlag size={22} />
+          </button>
+        </>
+      )}
+    </nav>
+  );
+
   return (
-    <div className="game">
+    <div className={`game${mobile ? ' game-mobile' : ''}`}>
       <div className="board-column">
         {bar(top)}
         <div className="board-wrap">
@@ -381,6 +458,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           {toastRegion}
         </div>
         {bar(bottom)}
+        {mobile && <MoveStrip moves={board.moves} cursor={shownPly} onSelect={setCursor} />}
       </div>
 
       <aside className="panel side-panel">
@@ -390,8 +468,8 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           {state.rated && <Badge tone="accent">Classée</Badge>}
           {state.training && <Badge tone="info">Entraînement</Badge>}
         </div>
-        <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />
-        <div className="nav">
+        {!mobile && <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />}
+        <div className="nav" hidden={mobile}>
           <button title="Début" aria-label="Début" onClick={() => setCursor(0)}>
             <IconFirst size={20} />
           </button>
@@ -471,7 +549,8 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
                 Voir ma dame secrète ({SIDE[board.turn]}) — maintenir
               </button>
             )}
-            {actions(false)}
+            {/* Téléphone : nulle et abandon dans la barre du bas, sauf réponse à une offre. */}
+            {(!mobile || state.drawOffer !== null) && actions(false)}
           </>
         )}
         {ended && (
@@ -496,6 +575,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           </div>
         )}
       </aside>
+      {mobile && mobileBar}
       {overlays}
     </div>
   );

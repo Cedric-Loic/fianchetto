@@ -1,4 +1,10 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import type {
   ArrowKind,
   BoardArrow,
@@ -8,6 +14,7 @@ import type {
   Square,
   SquareMarkKind,
 } from '@sq/shared';
+import { pieceName, squareLabel } from '../lib/a11y';
 import { BOARD_THEMES, pieceUrl, useSettings } from '../lib/settings';
 
 const FILES = 'abcdefgh';
@@ -77,6 +84,8 @@ function xyToSquare(x: number, y: number, orientation: Color): Square | null {
   const rank = orientation === 'w' ? 7 - y : y;
   return `${FILES[file]}${rank + 1}` as Square;
 }
+
+const PROMOTION_NAMES = { q: 'Dame', r: 'Tour', b: 'Fou', n: 'Cavalier' } as const;
 
 /** Flèche SVG d'une case à une autre (coordonnées en 1/8 de plateau). */
 function ArrowShape({
@@ -168,6 +177,14 @@ export function Board(props: BoardProps) {
   /** Boutons dont le prochain relâchement est ignoré (ils ont servi à annuler une sélection). */
   const ignoreUp = useRef(new Set<number>());
   const bySquare = new Map(pieces.map((p) => [p.square, p]));
+  /**
+   * Clavier : case qui porte le focus (tabindex itinérant, une seule case dans l'ordre de
+   * tabulation) ; par défaut le coin en bas à gauche. Message lu après une action au clavier.
+   */
+  const [cursor, setCursor] = useState<Square | null>(null);
+  const focusSquare: Square = cursor ?? (orientation === 'w' ? 'a1' : 'h8');
+  const [said, setSaid] = useState('');
+  const promotionRef = useRef<HTMLDivElement>(null);
 
   // Camp manipulable maintenant : le mien à mon tour, ou mes pièces en premove.
   const handColor = movable ?? props.premoveColor ?? null;
@@ -190,6 +207,11 @@ export function Board(props: BoardProps) {
       orientation,
     );
   };
+
+  // Fenêtre de promotion ouverte : le focus va sur la dame (utilisable au clavier).
+  useEffect(() => {
+    if (promotion) promotionRef.current?.querySelector('button')?.focus();
+  }, [promotion]);
 
   const attempt = (from: Square, to: Square) => {
     setSelected(null);
@@ -249,6 +271,7 @@ export function Board(props: BoardProps) {
     // Un clic gauche efface les annotations (comme sur les sites d'échecs habituels).
     setArrows([]);
     setMarks([]);
+    setCursor(square);
     const piece = bySquare.get(square);
     if (props.onPieceClick) {
       if (piece) props.onPieceClick(piece);
@@ -262,6 +285,77 @@ export function Board(props: BoardProps) {
       dragStart.current = { x: e.clientX, y: e.clientY, from: square, id: piece.id };
     } else {
       setSelected(null);
+    }
+  };
+
+  /** Déplace le focus vers une case (et le donne à son élément). */
+  const moveFocus = (square: Square) => {
+    setCursor(square);
+    boardRef.current?.querySelector<HTMLElement>(`[data-cell="${square}"]`)?.focus();
+  };
+
+  /**
+   * Clavier : flèches pour se déplacer de case en case (dans le sens de l'affichage), Entrée ou
+   * Espace pour prendre une pièce puis la poser, Échap pour annuler. Aucun coup possible n'est
+   * annoncé : le plateau ne lit que les pièces affichées.
+   */
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (promotion) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setPromotion(null);
+        moveFocus(promotion.from);
+      }
+      return;
+    }
+    // Case focalisée : celle de l'élément qui reçoit la touche (à défaut, la case mémorisée).
+    const target = e.target instanceof HTMLElement ? e.target.dataset.cell : undefined;
+    const current = (target as Square | undefined) ?? focusSquare;
+    const [x, y] = squareXY(current, orientation);
+    const delta: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    };
+    const step = delta[e.key];
+    if (step) {
+      e.preventDefault();
+      const next = xyToSquare(x + step[0], y + step[1], orientation);
+      if (next) moveFocus(next);
+      return;
+    }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      moveFocus(xyToSquare(e.key === 'Home' ? 0 : 7, y, orientation) as Square);
+      return;
+    }
+    if (e.key === 'Escape') {
+      // Échap n'est intercepté que s'il annule quelque chose (sinon : mode concentration…).
+      if (selected === null) return;
+      e.stopPropagation();
+      setSelected(null);
+      setSaid('Sélection annulée.');
+      return;
+    }
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    const square = current;
+    const piece = bySquare.get(square);
+    if (props.onPieceClick) {
+      if (piece) props.onPieceClick(piece);
+      return;
+    }
+    if (handColor === null) return;
+    if (selected === square) {
+      setSelected(null);
+      setSaid('Sélection annulée.');
+    } else if (piece && piece.color === handColor) {
+      setSelected(square);
+      setSaid(`${pieceName(piece)} en ${square} prise. Choisis la case d'arrivée.`);
+    } else if (selected) {
+      setSaid(`${premoving ? 'Coup anticipé' : 'Coup'} ${selected} ${square} proposé.`);
+      attempt(selected, square);
     }
   };
 
@@ -310,8 +404,10 @@ export function Board(props: BoardProps) {
     }
   };
 
-  const squares = [];
+  const crownSet = new Set(props.crowns ?? []);
+  const rows = [];
   for (let y = 0; y < 8; y++) {
+    const squares = [];
     for (let x = 0; x < 8; x++) {
       const square = xyToSquare(x, y, orientation) as Square;
       const light = (x + y) % 2 === 0;
@@ -329,14 +425,34 @@ export function Board(props: BoardProps) {
       squares.push(
         <div
           key={square}
+          role="gridcell"
+          data-cell={square}
+          tabIndex={square === focusSquare ? 0 : -1}
+          aria-label={squareLabel(square, bySquare.get(square), crownSet.has(square))}
+          aria-selected={selected === square}
           className={classes.join(' ')}
           style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
+          onFocus={() => setCursor(square)}
         >
-          {x === 0 && <span className="coord rank">{square[1]}</span>}
-          {y === 7 && <span className="coord file">{square[0]}</span>}
+          {x === 0 && (
+            <span className="coord rank" aria-hidden="true">
+              {square[1]}
+            </span>
+          )}
+          {y === 7 && (
+            <span className="coord file" aria-hidden="true">
+              {square[0]}
+            </span>
+          )}
         </div>,
       );
     }
+    // Rangée sans boîte propre (`display: contents`) : structure de grille pour l'accessibilité.
+    rows.push(
+      <div key={y} role="row" className="board-row">
+        {squares}
+      </div>,
+    );
   }
 
   // Coups possibles de la pièce sélectionnée (classique) : point, ou anneau sur une prise.
@@ -364,7 +480,10 @@ export function Board(props: BoardProps) {
       ref={boardRef}
       className="board"
       data-testid="board"
+      role="grid"
+      aria-label={`Échiquier, ${orientation === 'w' ? 'Blancs' : 'Noirs'} en bas`}
       style={{ ['--square-light' as string]: theme.light, ['--square-dark' as string]: theme.dark }}
+      onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -372,13 +491,17 @@ export function Board(props: BoardProps) {
       onLostPointerCapture={resetDrag}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {squares}
+      {rows}
+      <p className="sr-only" aria-live="polite" data-testid="board-announce">
+        {said}
+      </p>
       {props.squareMarks?.map((m) => {
         const [x, y] = squareXY(m.square, orientation);
         return (
           <div
             key={`mark-${m.square}-${m.kind}`}
             className={`square-mark mark-${m.kind}`}
+            aria-hidden="true"
             data-testid="square-mark"
             data-square={m.square}
             style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
@@ -392,6 +515,7 @@ export function Board(props: BoardProps) {
             <div
               key={`flash-${props.flash.id}`}
               className={`square-flash ${props.flash.tone}`}
+              aria-hidden="true"
               data-testid="square-flash"
               data-tone={props.flash.tone}
               style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
@@ -408,6 +532,7 @@ export function Board(props: BoardProps) {
             <img
               key={`${p.id}-ghost`}
               className="piece ghost"
+              aria-hidden="true"
               src={src}
               alt=""
               draggable={false}
@@ -417,6 +542,7 @@ export function Board(props: BoardProps) {
           <img
             key={p.id}
             className={`piece${dragging ? ' dragging' : ''}${dropped === p.id ? ' no-anim' : ''}`}
+            aria-hidden="true"
             src={src}
             alt={`${p.color}${p.type}`}
             data-square={p.square}
@@ -435,6 +561,7 @@ export function Board(props: BoardProps) {
           <div
             key={`hint-${square}`}
             className={`hint${bySquare.has(square) ? ' capture' : ''}`}
+            aria-hidden="true"
             data-testid="legal-hint"
             style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
           />
@@ -446,6 +573,7 @@ export function Board(props: BoardProps) {
           <div
             key={`crown-${square}`}
             className="crown"
+            aria-hidden="true"
             data-testid="secret-marker"
             style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
           >
@@ -454,7 +582,7 @@ export function Board(props: BoardProps) {
         );
       })}
       {allArrows.length > 0 && (
-        <svg className="arrows" viewBox="0 0 8 8" data-testid="arrows">
+        <svg className="arrows" viewBox="0 0 8 8" data-testid="arrows" aria-hidden="true">
           {allArrows.map(({ a, k, c, o, i }, n) => (
             <ArrowShape
               key={`${a.from}${a.to}${c}${n}`}
@@ -469,10 +597,17 @@ export function Board(props: BoardProps) {
         </svg>
       )}
       {promotion && (
-        <div className="promotion" onPointerDown={(e) => e.stopPropagation()}>
+        <div
+          ref={promotionRef}
+          className="promotion"
+          role="group"
+          aria-label="Promotion"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           {(['q', 'r', 'b', 'n'] as const).map((type) => (
             <button
               key={type}
+              aria-label={PROMOTION_NAMES[type]}
               onClick={() => {
                 props.onMove?.(promotion.from, promotion.to, type);
                 setPromotion(null);
@@ -481,7 +616,11 @@ export function Board(props: BoardProps) {
               <img src={pieceUrl(settings.pieces, movable ?? 'w', type)} alt={type} />
             </button>
           ))}
-          <button className="cancel" onClick={() => setPromotion(null)}>
+          <button
+            className="cancel"
+            aria-label="Annuler la promotion"
+            onClick={() => setPromotion(null)}
+          >
             ✕
           </button>
         </div>

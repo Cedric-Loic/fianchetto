@@ -4,6 +4,7 @@ import { LineChart } from '../game/LineChart';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
 import { Button } from '../ui/Button';
+import { IconCheck, IconTarget } from '../ui/icons';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 
@@ -35,8 +36,45 @@ export function Coach() {
   const maxKind = Math.max(1, ...w.kinds.map((k) => k.count));
   const totalPhases = w.phases.opening + w.phases.middlegame + w.phases.endgame;
 
+  // Prochaine action : la première recommandation, sinon la première tâche pas encore faite.
+  const reco = data.recommendations[0];
+  const task = week.tasks.find((t) => t.done < t.target);
+  const next = reco
+    ? { title: reco.text, detail: null, href: reco.href }
+    : task
+      ? {
+          title: task.label,
+          detail: `${task.done} / ${task.target} cette semaine`,
+          href: task.href,
+        }
+      : null;
+
   return (
     <div className="page coach">
+      <section
+        className="panel banner coach-next"
+        data-testid="coach-next"
+        aria-label="Prochaine action"
+      >
+        <span className="banner-icon">
+          <IconTarget size={28} />
+        </span>
+        <div className="banner-body">
+          <span className="banner-title">Prochaine action</span>
+          {next ? (
+            <>
+              <strong>{next.title}</strong>
+              {next.detail && <span className="muted">{next.detail}</span>}
+            </>
+          ) : (
+            <strong>Tout est fait cette semaine : bravo !</strong>
+          )}
+        </div>
+        <Button variant="primary" href={next?.href ?? '#/puzzles'}>
+          {next ? "C'est parti" : 'Un puzzle de plus'}
+        </Button>
+      </section>
+
       <div className="panel page-panel" data-testid="coach-phase">
         <p className="muted">Ton programme</p>
         <h2>
@@ -57,6 +95,11 @@ export function Coach() {
                       {c.met ? ' — atteint' : ' — pas encore atteint'}
                     </span>
                   </span>
+                  {c.value === null && (
+                    <Button size="s" href="#/analyse" data-testid="import-cta">
+                      Importer
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -74,25 +117,38 @@ export function Coach() {
               month: 'long',
             })}
           </p>
-          {week.tasks.map((t) => {
-            const ratio = Math.min(1, t.done / t.target);
-            return (
-              <a key={t.id} href={t.href} className="task" data-testid={`task-${t.id}`}>
-                <span className="task-head">
-                  <span>
-                    {ratio >= 1 ? '✓ ' : ''}
-                    {t.label}
+          <ul className="task-list">
+            {week.tasks.map((t) => {
+              const ratio = Math.min(1, t.done / t.target);
+              const done = ratio >= 1;
+              return (
+                <li
+                  key={t.id}
+                  className={`task-item${done ? ' done' : ''}`}
+                  data-testid={`task-${t.id}`}
+                >
+                  {/* Case cochée = tâche faite (calculée par le serveur, non modifiable). */}
+                  <span className="task-check" aria-hidden="true">
+                    {done && <IconCheck size={16} />}
                   </span>
-                  <strong>
-                    {t.done} / {t.target}
-                  </strong>
-                </span>
-                <span className="progress">
-                  <span className="progress-bar" style={{ width: `${ratio * 100}%` }} />
-                </span>
-              </a>
-            );
-          })}
+                  <a href={t.href} className="task">
+                    <span className="task-head">
+                      <span>
+                        {t.label}
+                        <span className="sr-only">{done ? ' (faite)' : ' (à faire)'}</span>
+                      </span>
+                      <strong>
+                        {t.done} / {t.target}
+                      </strong>
+                    </span>
+                    <span className="progress">
+                      <span className="progress-bar" style={{ width: `${ratio * 100}%` }} />
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         <div className="panel page-panel" data-testid="coach-reco">
@@ -245,7 +301,17 @@ export function Coach() {
                     <strong>{t.current ?? '—'}</strong>
                   </td>
                   <td className="muted">{t.target}</td>
-                  <td>{t.met ? '✓ atteint' : ''}</td>
+                  <td>
+                    {t.met ? (
+                      '✓ atteint'
+                    ) : t.current === null ? (
+                      <Button size="s" href="#/analyse" data-testid="import-cta">
+                        Importer
+                      </Button>
+                    ) : (
+                      ''
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
