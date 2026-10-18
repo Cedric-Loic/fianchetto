@@ -119,7 +119,10 @@ describe('parties d’entraînement', () => {
 
     const hint = async (level: number) =>
       (await http('POST', `/api/games/${created.gameId}/hint`, { level })).json as HintResponse;
-    expect((await hint(1)).text).toContain('mat en 1');
+    expect(await hint(1)).toMatchObject({
+      text: expect.stringContaining('mat en 1') as string,
+      marks: [{ square: 'e8', kind: 'mate' }],
+    });
     expect(await hint(2)).toMatchObject({ level: 2, from: 'h5' });
     expect(await hint(3)).toMatchObject({ level: 3, from: 'h5', to: 'f7' });
 

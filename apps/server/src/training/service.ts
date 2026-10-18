@@ -1,6 +1,6 @@
-import { Chess, type PieceSymbol, type Square } from 'chess.js';
+import { Chess, type Move, type PieceSymbol, type Square } from 'chess.js';
 import { explainMove, forkTargets, winChance, winsMaterial, type EngineEval } from '@sq/coach';
-import type { Color, HintResponse } from '@sq/shared';
+import type { Color, HintResponse, SquareMark } from '@sq/shared';
 import type { PositionAnalysis } from '@sq/bot';
 
 /** Seuil de gaffe (points de % de gain perdus) qui déclenche le garde-fou. */
@@ -44,6 +44,21 @@ function threatenedPiece(chess: Chess): { type: PieceSymbol; square: Square } | 
     }
   }
   return worst;
+}
+
+/**
+ * Une case marquée par l'indice de niveau 1 révélerait-elle le meilleur coup ? Toujours pour sa
+ * case de départ (c'est l'indice de niveau 2) ; pour sa case d'arrivée, quand une seule pièce
+ * peut y aller.
+ */
+function revealsMove(chess: Chess, best: Move, square: Square): boolean {
+  if (square === best.from) return true;
+  if (square !== best.to) return false;
+  const origins = chess
+    .moves({ verbose: true })
+    .filter((m) => m.to === square)
+    .map((m) => m.from);
+  return new Set(origins).size <= 1;
 }
 
 /**
@@ -93,17 +108,30 @@ export class TrainingService {
     const mate =
       analysis.mate === null ? null : chess.turn() === 'w' ? analysis.mate : -analysis.mate;
     const threatened = threatenedPiece(chess);
+    const them = chess.turn() === 'w' ? 'b' : 'w';
     let text: string;
-    if (mate !== null && mate > 0) text = `Il y a un mat en ${mate} !`;
-    else if (threatened && move.from === threatened.square) {
+    let marks: SquareMark[] = [];
+    if (mate !== null && mate > 0) {
+      text = `Il y a un mat en ${mate} !`;
+      const [king] = chess.findPiece({ type: 'k', color: them });
+      if (king) marks = [{ square: king, kind: 'mate' }];
+    } else if (threatened && move.from === threatened.square) {
       text = `Ton ${NAME[threatened.type]} en ${threatened.square} est menacé : mets-le à l'abri.`;
-    } else if (move.captured && winsMaterial(fen, move)) text = 'Une prise gagne du matériel.';
-    else if (forkTargets(fen, best).length > 0) text = 'Cherche une fourchette.';
+      // La pièce menacée est celle qui doit jouer : on montre ses attaquants, pas elle.
+      marks = chess
+        .attackers(threatened.square, them)
+        .map((square): SquareMark => ({ square, kind: 'attacker' }));
+    } else if (move.captured && winsMaterial(fen, move)) {
+      text = 'Une prise gagne du matériel.';
+      marks = [{ square: move.to, kind: 'target' }];
+    } else if (forkTargets(fen, best).length > 0) text = 'Cherche une fourchette.';
     else if (move.san.includes('+')) text = 'Cherche un échec.';
     else if (threatened) {
       text = `Attention : ton ${NAME[threatened.type]} en ${threatened.square} est menacé.`;
+      marks = [{ square: threatened.square, kind: 'hanging' }];
     } else text = 'Pas de tactique immédiate : améliore ta pièce la moins active.';
-    return { level: 1, text, from: null, to: null };
+    marks = marks.filter((m) => !revealsMove(chess, move, m.square));
+    return { level: 1, text, from: null, to: null, ...(marks.length > 0 ? { marks } : {}) };
   }
 
   /**

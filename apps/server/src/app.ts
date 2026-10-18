@@ -12,6 +12,8 @@ import {
   type ProfileResponse,
   type ServerMessage,
 } from '@sq/shared';
+import { registerAnalysisRoutes } from './analysis/routes.js';
+import { AnalysisService, type LiveEngine } from './analysis/service.js';
 import { currentUser, registerAuthRoutes } from './auth.js';
 import type { BotDriver } from './bot/driver.js';
 import { loadConfig } from './config.js';
@@ -48,6 +50,11 @@ export interface ServerOptions {
   reviewMovetimeMs?: number;
   /** Accès à l'API chess.com (tests : faux serveur). Défaut : `fetch`. */
   chessComFetcher?: JsonFetcher;
+  /**
+   * Moteur en direct (`/api/analysis/stream`) : fabrique du moteur (tests), ou `null` pour le
+   * désactiver. Défaut : un Stockfish dédié, créé à la demande.
+   */
+  createAnalysisEngine?: (() => LiveEngine) | null;
 }
 export type { BotDriver };
 export { WorkerBot } from './bot/driver.js';
@@ -83,6 +90,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const training = new TrainingService((fen) => reviews.evaluate(fen));
   const lessons = new LessonService(store, (fen) => reviews.evaluate(fen, 400));
   const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen));
+  const analysis =
+    options.createAnalysisEngine === null
+      ? null
+      : new AnalysisService(
+          options.createAnalysisEngine ? { createEngine: options.createAnalysisEngine } : {},
+        );
+  // Avant la fermeture des connexions : les flux SSE ouverts doivent se terminer.
+  app.addHook('preClose', async () => {
+    await analysis?.dispose();
+  });
   app.addHook('onClose', () => {
     reviews.dispose();
     games.disposeAll();
@@ -144,6 +161,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   registerPuzzleRoutes(app, store, puzzles);
   registerLessonRoutes(app, store, lessons);
   registerCoachRoutes(app, store, puzzles);
+  registerAnalysisRoutes(app, store, analysis);
   registerTrainingRoutes(app, training, (id, request) => viewable(id, request));
   registerReviewRoutes(app, {
     store,

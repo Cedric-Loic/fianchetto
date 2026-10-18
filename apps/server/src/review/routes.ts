@@ -3,6 +3,7 @@ import { parseGame, type ReviewInput } from '@sq/coach';
 import {
   ImportChessComRequestSchema,
   ImportPgnRequestSchema,
+  RetryMoveRequestSchema,
   type GameReview,
   type ImportResult,
   type ImportedGamesResponse,
@@ -17,6 +18,7 @@ import type { GameSession } from '../games/session.js';
 import type { GameStore, ImportedGameRow } from '../persistence/db.js';
 import { ChessComError, fetchRecentGames, type JsonFetcher } from './chesscom.js';
 import { importedRow } from './imports.js';
+import { judgeRetry } from './retry.js';
 import type { ReviewService } from './service.js';
 
 export interface ReviewDeps {
@@ -121,6 +123,25 @@ export function registerReviewRoutes(app: FastifyInstance, deps: ReviewDeps): vo
     if (!target) return reply.code(404).send({ error: 'NOT_FOUND' });
     reviews.request(target.info.gameId, target.load, { priority: true });
     return respond(target);
+  });
+
+  /** « Apprends de tes erreurs » : autre coup proposé à un demi-coup d'une revue terminée. */
+  app.post<{ Params: { id: string } }>('/api/reviews/:id/retry', async (request, reply) => {
+    const target = resolve(request.params.id, request);
+    if (target === 'not-over') return reply.code(409).send({ error: 'GAME_NOT_OVER' });
+    if (!target) return reply.code(404).send({ error: 'NOT_FOUND' });
+    const parsed = RetryMoveRequestSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'BAD_REQUEST' });
+    const state = reviews.status(target.info.gameId);
+    if (state.status !== 'done') return reply.code(409).send({ error: 'REVIEW_NOT_READY' });
+    const outcome = await judgeRetry(state.review, parsed.data.ply, parsed.data.uci, (fen) =>
+      reviews.evaluate(fen),
+    );
+    if (outcome.kind === 'ok') return outcome.response;
+    if (outcome.kind === 'engine') return reply.code(503).send({ error: 'ENGINE_UNAVAILABLE' });
+    return reply
+      .code(400)
+      .send({ error: outcome.kind === 'illegal' ? 'ILLEGAL_MOVE' : 'BAD_REQUEST' });
   });
 
   const save = (rows: (ImportedGameRow | null)[]): ImportResult => {
