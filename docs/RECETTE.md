@@ -135,6 +135,19 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Objectifs du plan et bilan mensuel                                    | ✅     | `dashboard.test.ts`                                            |
 | Recommandations menant au bon exercice                                | ✅     | `dashboard.spec.ts`                                            |
 
+## Étape 12 : interface, premove, analyse interactive
+
+| Exigence                                                       | État   | Preuve                                                                    |
+| -------------------------------------------------------------- | ------ | ------------------------------------------------------------------------- |
+| Logo, favicon, navigation et affichage mobile sans débordement | ✅ / 👁 | `tests/e2e/layout.spec.ts` ; captures à l'œil                             |
+| Premove (bot, puzzles, leçons), réglage on/off                 | ✅     | `apps/web/test/usePremoves.test.ts`, `tests/e2e/board-input.spec.ts`      |
+| Tout bouton autre que le gauche annule la pièce en main        | ✅     | `apps/web/test/Board.test.tsx`, `board-input.spec.ts`                     |
+| Exploration de variantes, échiquier d'analyse (FEN, PGN)       | ✅     | `apps/web/test/tree.test.ts`, `tests/e2e/analysis-board.spec.ts`          |
+| Moteur en direct à 3 lignes, menace ; FEN seule, sans partie   | ✅     | `apps/server/test/analysis-live.test.ts`, `review-modes.spec.ts`          |
+| Schémas des explications (flèches, cases, ligne)               | ✅     | `packages/coach/test/explain.test.ts`                                     |
+| Revue guidée, « Apprends de tes erreurs »                      | ✅     | `apps/web/test/moments.test.ts`, `learn.test.tsx`, `review-retry.test.ts` |
+| chess.js absent de l'écran de partie et du chargement initial  | ✅     | `tests/security/bundle.test.ts`                                           |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).

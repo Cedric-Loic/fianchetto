@@ -91,12 +91,16 @@ docs/
    Ton propre pion-dame est marqué d'une petite couronne ♛, visible de toi seul.
 4. **À deux sur cet écran** (Secret Queen) : chacun choisit son pion à tour de rôle (l'autre détourne le regard) ;
    pendant la partie, maintiens « Voir ma dame secrète » pour la retrouver.
-5. Pendant la partie : glisser-déposer ou clic-clic, clic droit pour les flèches, premoves contre
-   le bot (clic droit pour les annuler), ⛶ pour le mode concentration (✕ ou Échap pour sortir).
+5. Pendant la partie : glisser-déposer ou clic-clic, clic droit pour les flèches (ou pour
+   annuler la pièce en main), premoves contre le bot, en puzzles et en leçons (clic droit pour
+   les annuler, désactivables dans ⚙ Réglages), ⛶ pour le mode concentration.
 6. À la fin (Secret Queen) : révélation des deux dames.
 7. **Revue de la partie** (bouton de fin de partie, ou 📊 dans le profil) : Stockfish analyse
-   chaque coup ; meilleur coup en flèche, explication des imprécisions (?!), erreurs (?) et
-   gaffes (??), précision des deux camps, ◀ !? ▶ pour sauter d'erreur en erreur.
+   chaque coup ; explication des imprécisions (?!), erreurs (?) et gaffes (??) avec flèches et
+   cases marquées, « ▶ Voir la ligne », précision des deux camps. Le plateau est jouable :
+   explore des variantes (← → ↑ ↓, f pour retourner), active le **Moteur** (3 lignes
+   cliquables) et la **Menace** (touche x). **▶ Revue guidée** parcourt les moments clés avec
+   le coach ; **Apprends de tes erreurs** te fait retrouver le bon coup à chaque erreur.
 8. **Coach** (menu) : ta page d'accueil d'entraînement. Elle dit où tu en es (phase du plan et
    critères pour passer à la suivante), ce qu'il reste à faire cette semaine, et quoi faire
    maintenant ; les courbes suivent ton Elo chess.com (lu dans tes parties importées), ton
@@ -119,7 +123,8 @@ docs/
 
 12. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
     fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
-    est le seul accès à Internet de l'application, uniquement quand tu cliques.
+    est le seul accès à Internet de l'application, uniquement quand tu cliques. L'onglet
+    **Échiquier d'analyse** charge une FEN ou un PGN, avec le moteur en direct.
 
 ## Comment le secret est protégé (résumé)
 
@@ -144,6 +149,7 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 9     | Coach : entraînement (indices, garde-fou, reprise), bilan      | ✅   |
 | 10    | Coach : leçons (moteur et 10 leçons de la phase 1)             | ✅   |
 | 11    | Coach : tableau de bord                                        | ✅   |
+| 12    | Interface et logo, premove partout, analyse interactive        | ✅   |
 
 ## Licences et crédits
 
