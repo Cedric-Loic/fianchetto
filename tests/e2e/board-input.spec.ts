@@ -25,7 +25,7 @@ test('puzzle : clic droit pendant un glisser annule, premove pendant la réponse
   await page.getByRole('button', { name: "S'inscrire" }).click();
   await expect(page.getByTestId('nav-user')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Puzzles' }).click();
+  await page.locator('nav').getByRole('link', { name: 'Puzzles', exact: true }).click();
   await page.getByTestId('puzzle-mode-theme').click();
   // Thème sans puzzle d'abord (au cas où « Fourchette » serait déjà le thème du jour).
   await page.getByTestId('puzzle-theme').selectOption('mateIn3');

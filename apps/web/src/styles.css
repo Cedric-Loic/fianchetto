@@ -3249,3 +3249,124 @@ textarea:focus-visible {
   text-decoration: line-through;
   text-decoration-color: var(--text-faint);
 }
+
+/* --- Régularité (étape 13) : série de jours, objectif du jour, verdict mensuel, verrou blitz --- */
+.regularity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+.regularity-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.regularity-item .progress {
+  width: 100%;
+}
+.regularity-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.regularity-head strong {
+  font-size: var(--fs-16);
+}
+.streak-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-faint);
+}
+.streak-card.lit {
+  color: var(--warning);
+}
+.streak-card div {
+  display: flex;
+  flex-direction: column;
+}
+.streak-days {
+  font-size: var(--fs-20);
+  color: var(--text);
+}
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--space-2);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-12);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.table .verdict {
+  margin-left: 0;
+}
+.verdict-ahead {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
+.verdict-on-track {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.verdict-behind {
+  background: var(--danger-soft);
+  color: var(--danger-hover);
+}
+.month-verdict {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--border-strong);
+}
+.month-verdict p {
+  margin: 0 0 var(--space-1);
+}
+.verdict-card-ahead {
+  box-shadow: inset 3px 0 0 var(--success);
+}
+.verdict-card-on-track {
+  box-shadow: inset 3px 0 0 var(--info);
+}
+.verdict-card-behind {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+.day-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-1);
+  font-size: var(--fs-12);
+  color: var(--text-muted);
+}
+.day-streak .icon {
+  color: var(--warning);
+}
+.day-streak.done {
+  color: var(--success);
+}
+.blitz-lock {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--warning);
+  font-size: var(--fs-14);
+}
+.blitz-lock .icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--warning);
+}
+.tc-locked .icon {
+  margin-right: 4px;
+  opacity: 0.8;
+}

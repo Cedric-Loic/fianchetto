@@ -10,11 +10,16 @@ import {
 import { api, summarizePgn, type PgnSummary } from '../lib/api';
 import { useSession } from '../lib/session';
 import { DEFAULT_LAST_PLAY, pieceUrl, useSettings, type LastPlay } from '../lib/settings';
+import { blitzLockApplies, dailyGoal, days, isFastTimeControl } from '../lib/regularity';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Dialog } from '../ui/Dialog';
 import {
   IconBook,
   IconBulb,
   IconChart,
+  IconFlame,
+  IconLock,
   IconPlay,
   IconPuzzle,
   IconTarget,
@@ -29,15 +34,66 @@ import { onboardingWanted } from '../lib/onboarding';
 /** Mode choisi sur l'accueil : une variante, ou l'entraînement (classique contre le bot). */
 type Mode = Variant | 'training';
 
-function TimeControls(props: { value: TimeControlId; onChange: (id: TimeControlId) => void }) {
+/**
+ * Choix de la cadence. `locked` : verrou souple du coach, un cadenas sur le blitz et le bullet
+ * (le clic reste possible, la confirmation est demandée par l'appelant).
+ */
+function TimeControls(props: {
+  value: TimeControlId;
+  onChange: (id: TimeControlId) => void;
+  locked?: boolean;
+  /** Préfixe des `data-testid` (deux sélecteurs de cadence sur l'accueil). */
+  testPrefix?: string;
+}) {
   return (
     <div className="time-controls">
-      {TIME_CONTROL_IDS.map((id) => (
-        <Button key={id} pressed={id === props.value} onClick={() => props.onChange(id)}>
-          {TIME_CONTROLS[id].label}
-        </Button>
-      ))}
+      {TIME_CONTROL_IDS.map((id) => {
+        const locked = Boolean(props.locked) && isFastTimeControl(id);
+        return (
+          <Button
+            key={id}
+            pressed={id === props.value}
+            className={locked ? 'tc-locked' : undefined}
+            data-testid={`${props.testPrefix ?? 'tc'}-${id}`}
+            onClick={() => props.onChange(id)}
+          >
+            {locked && <IconLock size={14} />}
+            {TIME_CONTROLS[id].label}
+            {locked && <span className="sr-only"> (après les puzzles du jour)</span>}
+          </Button>
+        );
+      })}
     </div>
+  );
+}
+
+/** Confirmation du verrou souple : jamais de blocage, seulement un rappel. */
+function BlitzLockDialog(props: {
+  reason: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog
+      title="Fais d'abord tes puzzles du jour"
+      onClose={props.onCancel}
+      testId="blitz-lock-dialog"
+      initialFocus="[data-autofocus]"
+    >
+      <p>
+        {props.reason ??
+          'Le coach conseille de valider ta journée (puzzles ou entraînement) avant le blitz.'}
+      </p>
+      <div className="actions">
+        <Button variant="primary" href="#/puzzles" data-autofocus>
+          <IconPuzzle size={18} />
+          Faire mes puzzles
+        </Button>
+        <Button data-testid="blitz-confirm" onClick={props.onConfirm}>
+          Jouer quand même
+        </Button>
+      </div>
+    </Dialog>
   );
 }
 
@@ -58,21 +114,12 @@ function ModeLabel(props: { icon: ReactNode; title: string; text: string }) {
 
 /**
  * Bandeau du coach : première tâche de la semaine pas encore faite, sinon première
- * recommandation. Rien tant que le tableau de bord n'est pas chargé.
+ * recommandation ; série de jours et objectif du jour.
  */
-function CoachBanner() {
-  const [data, setData] = useState<CoachDashboard | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void api.dashboard().then((d) => !cancelled && setData(d));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  if (!data) return null;
+function CoachBanner({ data }: { data: CoachDashboard }) {
   const task = data.week.tasks.find((t) => t.done < t.target);
   const reco = data.recommendations[0];
-  if (!task && !reco) return null;
+  const goal = dailyGoal(data.streak);
   return (
     <section className="panel banner" data-testid="coach-banner" aria-label="Coach">
       <span className="banner-icon">
@@ -94,8 +141,15 @@ function CoachBanner() {
             </span>
           </>
         ) : (
-          <strong>{reco?.text}</strong>
+          <strong>{reco?.text ?? 'Plan de la semaine terminé : bravo !'}</strong>
         )}
+        <span
+          className={`day-streak${data.streak.todayDone ? ' done' : ''}`}
+          data-testid="home-streak"
+        >
+          <IconFlame size={16} />
+          Série : {days(data.streak.current)} · Aujourd'hui : {goal.text}
+        </span>
       </div>
       <Button variant="primary" href={task?.href ?? reco?.href ?? '#/coach'}>
         Y aller
@@ -226,6 +280,11 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   const [seatTc, setSeatTc] = useState<TimeControlId>(initial.timeControl);
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dashboard, setDashboard] = useState<CoachDashboard | null>(null);
+  // Verrou souple du blitz : action en attente de confirmation, et confirmation déjà donnée.
+  const [pending, setPending] = useState<(() => void) | null>(null);
+  const [blitzOk, setBlitzOk] = useState(false);
+  const coach = user ? dashboard : null;
 
   useEffect(() => {
     void api.botLevels().then((l) => setLevels(l ?? []));
@@ -233,6 +292,27 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   useEffect(() => {
     if (user) void api.activeGame().then((a) => setActive(a?.gameId ?? null));
   }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void api.dashboard().then((d) => {
+      if (cancelled) return;
+      setDashboard(d);
+      // Niveau conseillé présélectionné, sauf si une configuration a déjà été jouée.
+      if (d?.suggestedBotLevel && useSettings.getState().lastPlay === null) {
+        setLevel(d.suggestedBotLevel);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  /** Exécute `action`, après confirmation si la cadence tombe sous le verrou souple du blitz. */
+  const unlessLocked = (tc: TimeControlId, action: () => void) => {
+    if (!blitzOk && blitzLockApplies(coach, tc)) setPending(() => action);
+    else action();
+  };
 
   /** Crée la partie et mémorise sa configuration pour le bouton « Jouer ». */
   const launch = async (play: LastPlay) => {
@@ -303,7 +383,11 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
           size="l"
           className="quick-play-button"
           data-testid="quick-play"
-          onClick={() => void launch(quick)}
+          onClick={() =>
+            quick.mode === 'bot' && !quick.training
+              ? unlessLocked(quick.timeControl, () => void launch(quick))
+              : void launch(quick)
+          }
         >
           <IconPlay size={22} />
           Jouer
@@ -321,7 +405,7 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
           onResume={() => onStart(active)}
         />
       )}
-      {user && <CoachBanner key={user.username} />}
+      {coach && <CoachBanner data={coach} />}
 
       <Tabs<Mode>
         variant="cards"
@@ -395,6 +479,11 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
                   >
                     <strong>{l.name}</strong>
                     <span className="muted">{l.elo}</span>
+                    {l.level === coach?.suggestedBotLevel && (
+                      <Badge tone="accent" testId="level-suggested">
+                        conseillé
+                      </Badge>
+                    )}
                   </Button>
                 ))}
               </div>
@@ -423,12 +512,41 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
                   non classée)
                 </label>
               )}
-              {!training && <TimeControls value={botTc} onChange={setBotTc} />}
+              {!training && coach?.blitzLocked && (
+                <p className="blitz-lock" data-testid="blitz-lock">
+                  <IconLock size={16} />
+                  <span>
+                    <strong>Fais d'abord tes puzzles du jour</strong>
+                    {coach.blitzLockReason && (
+                      <span className="muted"> — {coach.blitzLockReason}</span>
+                    )}{' '}
+                    <a href="#/puzzles">Puzzles du jour</a>
+                  </span>
+                </p>
+              )}
+              {!training && (
+                <TimeControls
+                  value={botTc}
+                  locked={!blitzOk && Boolean(coach?.blitzLocked)}
+                  onChange={(id) => unlessLocked(id, () => setBotTc(id))}
+                />
+              )}
               <Button
                 variant="primary"
                 size="l"
                 onClick={() =>
-                  void launch({ mode: 'bot', variant, training, level, color, timeControl: botTc })
+                  unlessLocked(
+                    training ? 'untimed' : botTc,
+                    () =>
+                      void launch({
+                        mode: 'bot',
+                        variant,
+                        training,
+                        level,
+                        color,
+                        timeControl: botTc,
+                      }),
+                  )
                 }
               >
                 Jouer contre le bot
@@ -447,7 +565,7 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
             Noirs
             <input value={black} maxLength={32} onChange={(e) => setBlack(e.target.value)} />
           </label>
-          <TimeControls value={seatTc} onChange={setSeatTc} />
+          <TimeControls value={seatTc} onChange={setSeatTc} testPrefix="seat-tc" />
           <Button
             variant="primary"
             size="l"
@@ -471,6 +589,17 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {pending && (
+        <BlitzLockDialog
+          reason={coach?.blitzLockReason ?? null}
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            setBlitzOk(true);
+            setPending(null);
+            pending();
+          }}
+        />
+      )}
       {onboarding && (
         <Onboarding
           onDone={() => {

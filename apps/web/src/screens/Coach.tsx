@@ -3,8 +3,9 @@ import { PUZZLE_THEME_LABELS, type CoachDashboard } from '@sq/shared';
 import { LineChart } from '../game/LineChart';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
+import { VERDICT_LABEL, dailyGoal, days, formatMinutes } from '../lib/regularity';
 import { Button } from '../ui/Button';
-import { IconCheck, IconTarget } from '../ui/icons';
+import { IconCheck, IconFlame, IconPuzzle, IconTarget } from '../ui/icons';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 
@@ -74,6 +75,8 @@ export function Coach() {
           {next ? "C'est parti" : 'Un puzzle de plus'}
         </Button>
       </section>
+
+      <Regularity data={data} />
 
       <div className="panel page-panel" data-testid="coach-phase">
         <p className="muted">Ton programme</p>
@@ -321,6 +324,7 @@ export function Coach() {
 
       <div className="panel page-panel" data-testid="coach-months">
         <h2>Bilan mensuel</h2>
+        <MonthVerdictCard months={data.months} />
         <div className="table-scroll">
           <table className="table">
             <thead>
@@ -334,6 +338,9 @@ export function Coach() {
                 <th>Leçons validées</th>
                 <th>chess.com Rapide</th>
                 <th>chess.com Blitz</th>
+                <th>Entraînement</th>
+                <th>Elo visé</th>
+                <th>Verdict</th>
               </tr>
             </thead>
             <tbody>
@@ -348,12 +355,117 @@ export function Coach() {
                   <td>{m.lessons}</td>
                   <td>{m.chessComRapid ?? '—'}</td>
                   <td>{m.chessComBlitz ?? '—'}</td>
+                  <td>{formatMinutes(m.minutes)}</td>
+                  <td>{m.targetElo ?? '—'}</td>
+                  <td>
+                    {m.verdict ? (
+                      <span className={`verdict verdict-${m.verdict}`}>
+                        {VERDICT_LABEL[m.verdict]}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Régularité : série de jours validés (et record), objectif du jour (puzzles ou minutes),
+ * minutes d'entraînement de la semaine face à l'objectif, thème du jour.
+ */
+function Regularity({ data }: { data: CoachDashboard }) {
+  const { streak, minutes } = data;
+  const goal = dailyGoal(streak);
+  const weekRatio = Math.min(1, minutes.week / Math.max(1, minutes.target));
+  return (
+    <div className="panel page-panel regularity" data-testid="coach-regularity">
+      <h2>Régularité</h2>
+      <div className="regularity-grid">
+        <div className={`streak-card${streak.current > 0 ? ' lit' : ''}`} data-testid="day-streak">
+          <IconFlame size={32} />
+          <div>
+            <strong className="streak-days">{days(streak.current)}</strong>
+            <span className="muted">de suite · record : {days(streak.best)}</span>
+          </div>
+        </div>
+        <div className="regularity-item" data-testid="daily-goal">
+          <span className="regularity-head">
+            <span>
+              Objectif du jour{' '}
+              {streak.todayDone && (
+                <span className="verdict verdict-ahead">
+                  <IconCheck size={14} /> validé
+                </span>
+              )}
+            </span>
+            <strong>{goal.text}</strong>
+          </span>
+          <span className="progress">
+            <span className="progress-bar" style={{ width: `${goal.ratio * 100}%` }} />
+          </span>
+          {!streak.todayDone && (
+            <Button size="s" href="#/puzzles">
+              <IconPuzzle size={16} />
+              Puzzles du jour
+            </Button>
+          )}
+        </div>
+        <div className="regularity-item" data-testid="week-minutes">
+          <span className="regularity-head">
+            <span>Entraînement cette semaine</span>
+            <strong>
+              {formatMinutes(minutes.week)} / {formatMinutes(minutes.target)}
+            </strong>
+          </span>
+          <span
+            className="progress"
+            role="meter"
+            aria-label="Minutes d'entraînement cette semaine"
+            aria-valuemin={0}
+            aria-valuemax={minutes.target}
+            aria-valuenow={Math.min(minutes.week, minutes.target)}
+          >
+            <span className="progress-bar" style={{ width: `${weekRatio * 100}%` }} />
+          </span>
+          <span className="muted">
+            Thème du jour :{' '}
+            <a href={`#/puzzles/theme/${data.themeOfDay}`} data-testid="coach-theme-of-day">
+              {PUZZLE_THEME_LABELS[data.themeOfDay] ?? data.themeOfDay}
+            </a>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Verdict du dernier mois qui en a un : couleur sémantique, conseil, minutes, Elo visé. */
+function MonthVerdictCard({ months }: { months: CoachDashboard['months'] }) {
+  const m = [...months].reverse().find((x) => x.verdict !== null || x.advice !== null);
+  if (!m) return null;
+  return (
+    <div
+      className={`month-verdict verdict-card-${m.verdict ?? 'none'}`}
+      data-testid="month-verdict"
+    >
+      <p>
+        <strong>{monthName(m.month)}</strong>
+        {m.verdict && (
+          <span className={`verdict verdict-${m.verdict}`}>{VERDICT_LABEL[m.verdict]}</span>
+        )}
+      </p>
+      {m.advice && <p data-testid="month-advice">{m.advice}</p>}
+      <p className="muted">
+        {formatMinutes(m.minutes)} d'entraînement
+        {m.targetElo !== null && <> · Elo visé : {m.targetElo}</>}
+      </p>
     </div>
   );
 }
