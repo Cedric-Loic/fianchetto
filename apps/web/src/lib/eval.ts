@@ -18,3 +18,10 @@ export function evalLabel(p: EvalLike | undefined): string {
   if (Math.abs(v) >= 100) return v > 0 ? '1-0' : '0-1';
   return `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
 }
+
+/** Évaluation d'une ligne du moteur à la française : « +1,2 », « -0,4 », « #3 », « #-2 ». */
+export function engineEvalLabel(p: EvalLike): string {
+  if (p.mate !== null) return `#${p.mate}`;
+  const v = (p.evalCp ?? 0) / 100;
+  return `${v > 0 ? '+' : ''}${v.toFixed(1).replace('.', ',')}`;
+}

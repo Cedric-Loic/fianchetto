@@ -224,9 +224,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
       ownSecretSquare={isBot ? ownSecretSquare : null}
       lastMove={lastMove ? { from: lastMove.from, to: lastMove.to } : null}
       highlighted={live && currentHint?.from ? (currentHint.from as Square) : null}
-      extraArrows={
+      arrows={
         live && currentHint?.from && currentHint.to
-          ? [{ from: currentHint.from as Square, to: currentHint.to as Square }]
+          ? [{ from: currentHint.from as Square, to: currentHint.to as Square, kind: 'hint' }]
           : []
       }
       checkSquare={checkSquare}

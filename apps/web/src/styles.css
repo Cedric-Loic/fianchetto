@@ -776,18 +776,22 @@ textarea:focus-visible {
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-2);
 }
+/* Niveaux du bot : largeur selon le nom (« Joueur de club » tient sur une ligne), retour à la
+   ligne des boutons seulement si la place manque. */
 .levels {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .levels button {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
   font-size: 0.8rem;
-  padding: var(--space-2) var(--space-1);
+  padding: var(--space-2) var(--space-2);
   min-width: 0;
+  white-space: nowrap;
 }
 .resume {
   justify-content: space-between;
@@ -972,6 +976,46 @@ textarea:focus-visible {
   height: 100%;
   pointer-events: none;
   z-index: 5;
+}
+.arrow-index {
+  font-size: 0.22px;
+  font-weight: 800;
+  fill: var(--text-on-color);
+}
+/* Cases marquées imposées (schémas d'explication, leçons) : anneau et teinte légère. */
+.square-mark {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: inset 0 0 0 clamp(2px, 0.45vw, 5px) var(--mark);
+}
+.square-mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--mark);
+  opacity: 0.35;
+}
+.square-mark.mark-user {
+  --mark: var(--mark-user);
+  box-shadow: none;
+}
+.square-mark.mark-user::before {
+  opacity: 1;
+}
+.square-mark.mark-hanging {
+  --mark: var(--mark-hanging);
+}
+.square-mark.mark-target {
+  --mark: var(--mark-target);
+}
+.square-mark.mark-attacker {
+  --mark: var(--mark-attacker);
+}
+.square-mark.mark-mate {
+  --mark: var(--mark-mate);
 }
 .promotion {
   position: absolute;
@@ -1767,6 +1811,195 @@ textarea:focus-visible {
   padding: var(--space-5) 0;
 }
 
+/* --- Échiquier d'analyse : moteur, arbre de coups --- */
+.engine-panel {
+  background: var(--surface-0);
+  border-radius: var(--radius-m);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.engine-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  cursor: pointer;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.switch-track {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-4);
+  transition: background 0.15s;
+}
+.switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s;
+}
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+.switch input:checked + .switch-track::after {
+  transform: translateX(16px);
+}
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.engine-depth {
+  font-size: 0.8rem;
+}
+.engine-message {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.engine-lines {
+  display: flex;
+  flex-direction: column;
+}
+.engine-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 2px 0;
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 0.85rem;
+}
+.engine-line:first-child {
+  border-top: 0;
+}
+.engine-eval {
+  flex-shrink: 0;
+  min-width: 46px;
+  text-align: center;
+  font-weight: 800;
+  border-radius: var(--radius-s);
+  padding: 0 var(--space-1);
+}
+.engine-eval.white {
+  background: var(--eval-white);
+  color: var(--text-inverse);
+}
+.engine-eval.black {
+  background: var(--eval-black);
+  color: var(--text);
+}
+.engine-pv {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.engine-number {
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+.engine-move {
+  background: none;
+  padding: 0 3px;
+  font-weight: 600;
+  border-radius: var(--radius-s);
+}
+.engine-move:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.move-tree .move-row .move.muted {
+  color: var(--text-muted);
+}
+.move-variations {
+  background: var(--surface-1);
+  border-left: 3px solid var(--surface-4);
+  margin: 2px 0 2px var(--space-3);
+  padding: 2px var(--space-2);
+  font-size: 0.85rem;
+}
+.variation {
+  padding: 1px 0;
+  line-height: 1.6;
+}
+.tree-number {
+  color: var(--text-muted);
+  margin: 0 2px 0 4px;
+}
+.move.tree-move {
+  padding: 0 3px;
+  font-weight: 500;
+  border-radius: var(--radius-s);
+}
+.tree-sub {
+  color: var(--text-muted);
+  margin: 0 2px;
+}
+.tree-empty {
+  padding: var(--space-3);
+  margin: 0;
+}
+.tree-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.variation-card .btn {
+  margin-bottom: var(--space-2);
+}
+.analyse-shell .analyse-tabs {
+  max-width: 960px;
+  margin: var(--space-4) auto 0;
+  width: calc(100% - 2 * var(--space-4));
+}
+.analyse-shell > .page {
+  padding-top: var(--space-4);
+}
+.load-position {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--surface-0);
+  border-radius: var(--radius-m);
+  padding: var(--space-2) var(--space-3);
+}
+.load-position label {
+  font-weight: 700;
+}
+.load-position textarea {
+  resize: vertical;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+.load-position .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.position-link {
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
 /* ===================== Écrans étroits (tablette, téléphone) ===================== */
 @media (max-width: 899px) {
   :root {
@@ -1905,8 +2138,8 @@ textarea:focus-visible {
 }
 
 @media (max-width: 480px) {
-  .levels {
-    grid-template-columns: repeat(3, 1fr);
+  .levels button {
+    flex-basis: 30%;
   }
   .hbar {
     grid-template-columns: 1fr auto;

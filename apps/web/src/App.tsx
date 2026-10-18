@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
-import { Analyse } from './screens/Analyse';
 import { Coach } from './screens/Coach';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
@@ -11,17 +10,21 @@ import { Login } from './screens/Login';
 import { LessonPage, Lessons } from './screens/Lessons';
 import { Profile } from './screens/Profile';
 import { Puzzles } from './screens/Puzzles';
-import { Review } from './screens/Review';
 import { Selection } from './screens/Selection';
 import { NavBar, type NavSection } from './ui/NavBar';
 import { Loading } from './ui/Spinner';
+
+// Revue et échiquier d'analyse chargés à la demande : chess.js (exploration de variantes sur
+// des positions publiques) n'est jamais dans le code de l'écran de partie.
+const Analyse = lazy(() => import('./screens/Analyse').then((m) => ({ default: m.Analyse })));
+const Review = lazy(() => import('./screens/Review').then((m) => ({ default: m.Review })));
 
 type Route =
   | { page: 'home' }
   | { page: 'login' }
   | { page: 'leaderboard' }
   | { page: 'profile'; username: string }
-  | { page: 'analyse' }
+  | { page: 'analyse'; tab: 'import' | 'board'; fen: string | null }
   | { page: 'puzzles'; mode?: 'theme' | 'review' | 'mine'; theme?: string }
   | { page: 'coach' }
   | { page: 'lessons' }
@@ -37,7 +40,18 @@ function parseHash(h: string): Route {
   if (m?.[1]) return { page: 'profile', username: m[1] };
   m = /^#\/review\/([\w-]+)$/.exec(h);
   if (m?.[1]) return { page: 'review', id: m[1] };
-  if (h === '#/analyse') return { page: 'analyse' };
+  if (h === '#/analyse') return { page: 'analyse', tab: 'import', fen: null };
+  // Échiquier d'analyse, éventuellement sur une position : #/analyse/board?fen=<FEN encodée>.
+  m = /^#\/analyse\/board(?:\?fen=(.*))?$/.exec(h);
+  if (m) {
+    let fen: string | null;
+    try {
+      fen = m[1] ? decodeURIComponent(m[1]) : null;
+    } catch {
+      fen = null;
+    }
+    return { page: 'analyse', tab: 'board', fen };
+  }
   if (h === '#/puzzles') return { page: 'puzzles' };
   if (h === '#/coach') return { page: 'coach' };
   // Liens du coach : #/puzzles/theme/fork, #/puzzles/review, #/puzzles/mine.
@@ -109,7 +123,7 @@ export function App() {
   if (route.page === 'login') content = <Login onDone={() => (location.hash = '#/')} />;
   else if (route.page === 'leaderboard') content = <Leaderboard />;
   else if (route.page === 'profile') content = <Profile username={route.username} />;
-  else if (route.page === 'analyse') content = <Analyse />;
+  else if (route.page === 'analyse') content = <Analyse tab={route.tab} fen={route.fen} />;
   else if (route.page === 'puzzles') {
     content = (
       <Puzzles key={hash} initialMode={route.mode ?? 'rated'} initialTheme={route.theme ?? null} />
@@ -131,7 +145,7 @@ export function App() {
     <>
       {/* Mode concentration : pas de barre de navigation, l'échiquier seul. */}
       {!(focus && route.page === 'game') && <NavBar section={sectionOf(route)} hash={hash} />}
-      {content}
+      <Suspense fallback={<Loading label="Chargement…" />}>{content}</Suspense>
     </>
   );
 }

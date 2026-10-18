@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { ImportedGameSummary, ImportResult } from '@sq/shared';
+import { AnalysisBoard } from '../analysis/AnalysisBoard';
+import { checkFen, parsePgn, START_FEN } from '../analysis/tree';
+import { useAnalysisTree } from '../analysis/useAnalysisTree';
 import { api, type Result } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
 import { Button } from '../ui/Button';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
+import { Tabs } from '../ui/Tabs';
 
 const COUNTS = [20, 50, 100] as const;
 
@@ -79,11 +83,105 @@ function Baseline({ games }: { games: ImportedGameSummary[] }) {
   );
 }
 
+type AnalyseTab = 'import' | 'board';
+
+/** Lien vers l'échiquier d'analyse, avec la position si ce n'est pas celle de départ. */
+const boardLink = (fen: string) =>
+  fen === START_FEN ? '#/analyse/board' : `#/analyse/board?fen=${encodeURIComponent(fen)}`;
+
 /**
- * Analyse (coach) : import de parties (chess.com à la demande, fichier ou texte PGN), liste des
- * parties importées avec leur analyse, point de départ mesuré.
+ * Échiquier d'analyse libre : position de départ (ou FEN du lien), chargement d'une FEN ou d'un
+ * PGN, variantes, moteur en direct.
  */
-export function Analyse() {
+function BoardTab({ fen }: { fen: string | null }) {
+  const invalid = fen !== null && checkFen(fen) !== null;
+  const ctl = useAnalysisTree(fen && !invalid ? fen.trim() : START_FEN);
+  const [text, setText] = useState('');
+  const [error, setError] = useState<string | null>(
+    invalid ? 'La FEN du lien est invalide : position de départ affichée.' : null,
+  );
+  const node = ctl.tree.get(ctl.current);
+
+  const load = () => {
+    const input = text.trim();
+    if (!input) return;
+    // Une FEN tient sur une ligne et compte au moins sept « / » ; sinon on tente le PGN.
+    if (!input.includes('\n') && (input.match(/\//g) ?? []).length === 7) {
+      const problem = checkFen(input);
+      if (problem) return setError(problem);
+      ctl.load(input);
+    } else {
+      const res = parsePgn(input);
+      if (!res.ok) return setError(res.error);
+      ctl.load(res.fen, res.moves);
+    }
+    setError(null);
+    setText('');
+  };
+
+  return (
+    <AnalysisBoard
+      controller={ctl}
+      panelBottom={
+        <div className="load-position">
+          <label htmlFor="load-position">Charger une FEN ou un PGN</label>
+          <textarea
+            id="load-position"
+            rows={2}
+            value={text}
+            data-testid="load-position"
+            placeholder="Colle une FEN ou un PGN"
+            onChange={(e) => setText(e.target.value)}
+          />
+          <div className="row">
+            <Button size="s" variant="primary" disabled={!text.trim()} onClick={load}>
+              Charger
+            </Button>
+            <Button size="s" onClick={() => ctl.load(START_FEN)}>
+              Position de départ
+            </Button>
+            <a className="muted position-link" href={boardLink(node.fen)} data-testid="board-link">
+              Lien de la position
+            </a>
+          </div>
+          {error && (
+            <p className="error" data-testid="load-error">
+              {error}
+            </p>
+          )}
+        </div>
+      }
+    />
+  );
+}
+
+/**
+ * Analyse : onglet « Importer » (parties chess.com ou PGN, analyse, point de départ) et onglet
+ * « Échiquier d'analyse » (plateau libre).
+ */
+export function Analyse({ tab = 'import', fen = null }: { tab?: AnalyseTab; fen?: string | null }) {
+  return (
+    <div className="analyse-shell">
+      <Tabs
+        label="Analyse"
+        className="analyse-tabs"
+        value={tab}
+        onChange={(t) => (location.hash = t === 'board' ? '#/analyse/board' : '#/analyse')}
+        items={[
+          { id: 'import', label: 'Mes parties', testId: 'tab-import' },
+          { id: 'board', label: "Échiquier d'analyse", testId: 'tab-board' },
+        ]}
+      />
+      {tab === 'board' ? <BoardTab key={fen ?? ''} fen={fen} /> : <Imports />}
+    </div>
+  );
+}
+
+/**
+ * Import de parties (chess.com à la demande, fichier ou texte PGN), liste des parties importées
+ * avec leur analyse, point de départ mesuré.
+ */
+function Imports() {
   const user = useSession((s) => s.user);
   const chessCom = useSettings((s) => s.chessComUsername);
   const update = useSettings((s) => s.update);

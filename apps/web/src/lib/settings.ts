@@ -31,6 +31,8 @@ interface Settings {
   trainingGuard: boolean;
   /** Coups anticipés (premoves) : partout sauf à deux sur le même écran. */
   premoves: boolean;
+  /** Analyse : moteur en direct (désactivé par défaut). */
+  engine: boolean;
 }
 
 const KEY = 'sq-settings';
@@ -43,6 +45,7 @@ const DEFAULTS: Settings = {
   chessComUsername: '',
   trainingGuard: true,
   premoves: true,
+  engine: false,
 };
 const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
 
@@ -58,6 +61,7 @@ function load(): Settings {
       showLegalMoves: bool(parsed.showLegalMoves, DEFAULTS.showLegalMoves),
       trainingGuard: bool(parsed.trainingGuard, DEFAULTS.trainingGuard),
       premoves: bool(parsed.premoves, DEFAULTS.premoves),
+      engine: bool(parsed.engine, DEFAULTS.engine),
       chessComUsername:
         typeof parsed.chessComUsername === 'string'
           ? parsed.chessComUsername.slice(0, 40)
@@ -82,6 +86,7 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
         chessComUsername,
         trainingGuard,
         premoves,
+        engine,
       } = get();
       try {
         localStorage.setItem(
@@ -95,6 +100,7 @@ export const useSettings = create<Settings & { update: (patch: Partial<Settings>
             chessComUsername,
             trainingGuard,
             premoves,
+            engine,
           }),
         );
       } catch {

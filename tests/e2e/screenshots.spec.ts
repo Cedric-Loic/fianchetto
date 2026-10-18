@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Captures d'écran de contrôle visuel (bureau 1366 × 768 et téléphone 390 × 844) : accueil,
- * partie, revue, puzzles, coach, leçons. Lancé seulement à la demande :
+ * partie, revue, échiquier d'analyse, puzzles, coach, leçons. Lancé seulement à la demande :
  *   FIANCHETTO_SHOTS=/chemin/du/dossier pnpm test:e2e tests/e2e/screenshots.spec.ts
  */
 const OUT = process.env.FIANCHETTO_SHOTS;
@@ -79,6 +79,11 @@ test('captures d’écran (bureau et téléphone)', async ({ page }) => {
       () => expect(page.getByTestId('move-list').locator('button.move')).toHaveCount(2),
     ],
     ['revue', reviewUrl, () => expect(page.getByTestId('move-card')).toBeVisible()],
+    [
+      'echiquier',
+      '/#/analyse/board',
+      () => expect(page.getByTestId('analysis-board')).toBeVisible(),
+    ],
     ['puzzles', '/#/puzzles', () => expect(page.getByTestId('puzzle-status')).toBeVisible()],
     ['coach', '/#/coach', () => expect(page.getByTestId('coach-phase')).toBeVisible()],
     ['lecons', '/#/lessons', () => expect(page.getByTestId('lesson-routine')).toBeVisible()],

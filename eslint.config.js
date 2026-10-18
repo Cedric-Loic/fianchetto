@@ -141,4 +141,23 @@ export default defineConfig(
       ],
     },
   },
+
+  // Exploration de variantes (revue, échiquier d'analyse) : chess.js autorisé dans ce seul
+  // fichier, chargé à la demande, jamais par l'écran de partie (DECISIONS, étape 12).
+  {
+    files: ['apps/web/src/analysis/tree.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@sq/shared/secret', '@sq/engine', '@sq/bot', '@sq/coach', '@sq/server'],
+              message: "Le client n'a ni secret ni moteur : il affiche la vue reçue du serveur.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

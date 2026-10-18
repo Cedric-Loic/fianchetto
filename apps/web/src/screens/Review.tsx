@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
+  BoardArrow,
   Color,
   ExplanationKind,
+  GameReview,
   MoveClass,
+  ReviewInfo,
   ReviewMove,
   ReviewResponse,
   Square,
 } from '@sq/shared';
-import { EvalBar, EvalChart } from '../game/Analysis';
+import { AnalysisBoard } from '../analysis/AnalysisBoard';
+import { useAnalysisTree } from '../analysis/useAnalysisTree';
+import { EvalChart } from '../game/Analysis';
+import type { BoardMark } from '../game/Board';
 import { CLASS_LABEL, CLASS_SYMBOL, classCss } from '../lib/classes';
-import { Board } from '../game/Board';
 import { api } from '../lib/api';
-import { evalLabel, evalValue } from '../lib/eval';
-import { piecesFromFen } from '../lib/fen';
+import { evalLabel } from '../lib/eval';
+import { useSettings } from '../lib/settings';
 import { SIDE, VARIANT_LABEL } from './labels';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -23,46 +28,6 @@ const ERRORS: readonly MoveClass[] = ['inaccuracy', 'mistake', 'blunder'];
 const SOURCE_LABEL = { local: 'Partie locale', pgn: 'Import PGN', chesscom: 'chess.com' } as const;
 
 const isError = (m: ReviewMove) => ERRORS.includes(m.classification);
-
-/** Liste des coups de la revue, avec le symbole de chaque classe. */
-function ReviewMoveList(props: {
-  moves: readonly ReviewMove[];
-  cursor: number;
-  onSelect: (ply: number) => void;
-}) {
-  const rows = [];
-  for (let i = 0; i < props.moves.length; i += 2) {
-    rows.push(
-      <div className="move-row" key={i}>
-        <span className="move-number">{i / 2 + 1}.</span>
-        {[props.moves[i], props.moves[i + 1]].map((m, k) =>
-          m ? (
-            <button
-              key={m.ply}
-              className={`move${props.cursor === m.ply ? ' current' : ''}`}
-              onClick={() => props.onSelect(m.ply)}
-            >
-              {m.san}
-              {m.classification !== 'good' && m.classification !== 'excellent' && (
-                <span className={`class-symbol ${classCss(m.classification)}`}>
-                  {' '}
-                  {CLASS_SYMBOL[m.classification]}
-                </span>
-              )}
-            </button>
-          ) : (
-            <span key={`empty-${k}`} className="move" />
-          ),
-        )}
-      </div>,
-    );
-  }
-  return (
-    <div className="move-list" data-testid="move-list">
-      {rows}
-    </div>
-  );
-}
 
 /**
  * Revue de partie (coach) : analyse Stockfish de chaque coup, classe, explication des erreurs,
@@ -137,10 +102,6 @@ export function Review({ id }: { id: string }) {
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [cursor, setCursor] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [replayLevel, setReplayLevel] = useState(4);
-  const [replayError, setReplayError] = useState<string | null>(null);
 
   // Chargement, lancement de l'analyse si besoin, puis suivi de sa progression.
   useEffect(() => {
@@ -170,17 +131,6 @@ export function Review({ id }: { id: string }) {
   }, [id, attempt]);
 
   const review = data?.state.status === 'done' ? data.state.review : null;
-  const total = review?.moves.length ?? 0;
-
-  // Flèches du clavier : coup précédent / suivant.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') setCursor((c) => Math.max(0, c - 1));
-      if (e.key === 'ArrowRight') setCursor((c) => Math.min(total, c + 1));
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [total]);
 
   if (failure) {
     return (
@@ -237,23 +187,81 @@ export function Review({ id }: { id: string }) {
     );
   }
 
-  const ply = Math.min(cursor, total);
-  const move = ply > 0 ? review.moves[ply - 1] : undefined;
+  return <ReviewBoard info={info} review={review} />;
+}
+
+/** Délai entre deux coups de « Voir la ligne ». */
+const LINE_STEP_MS = 700;
+
+const uciArrow = (uci: string, kind: BoardArrow['kind']): BoardArrow => ({
+  from: uci.slice(0, 2) as Square,
+  to: uci.slice(2, 4) as Square,
+  kind,
+});
+
+/**
+ * Revue terminée : échiquier d'analyse (ligne principale = coups de la partie, variantes
+ * libres), précision, courbe d'évaluation, bilan du coach, carte du coup courant.
+ */
+function ReviewBoard({ info, review }: { info: ReviewInfo; review: GameReview }) {
+  const ctl = useAnalysisTree(
+    review.positions[0] ?? '',
+    review.moves.map((m, i) => {
+      const fen = review.positions[i + 1];
+      return fen ? { uci: m.uci, san: m.san, fen } : { uci: m.uci, san: m.san };
+    }),
+  );
+  const { tree, current } = ctl;
+  const engineOn = useSettings((s) => s.engine);
+  const [replayLevel, setReplayLevel] = useState(4);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  /** Premier nœud de la variante créée par « Voir la ligne » (supprimée au retour). */
+  const [tempLine, setTempLine] = useState<string | null>(null);
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+
+  const stopLine = () => {
+    for (const t of timers.current) clearTimeout(t);
+    timers.current.clear();
+  };
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const t of pending) clearTimeout(t);
+    };
+  }, []);
+
+  const lineIds = [tree.rootId, ...tree.initialLine];
+  const total = tree.initialLine.length;
+  const index = lineIds.indexOf(current);
+  const inVariation = index < 0;
+  // Dernier coup de la partie avant la variante (curseur de la courbe, retour à la partie).
+  const deviation = inVariation
+    ? Math.max(0, ...tree.path(current).map((id) => lineIds.indexOf(id)))
+    : index;
+  const ply = Math.min(deviation, total);
+  const setCursor = (p: number) => {
+    const id = lineIds[Math.max(0, Math.min(total, p))];
+    if (id) ctl.select(id);
+  };
+
+  const move = !inVariation && ply > 0 ? review.moves[ply - 1] : undefined;
   const before = ply > 0 ? review.evals[ply - 1] : undefined;
   const here = review.evals[ply];
-  const pieces = piecesFromFen(review.positions[ply] ?? '');
-  const base: Color = info.userColor ?? 'w';
-  const orientation: Color = flipped ? (base === 'w' ? 'b' : 'w') : base;
-  const arrow = (uci: string) => ({
-    from: uci.slice(0, 2) as Square,
-    to: uci.slice(2, 4) as Square,
-  });
-  // Meilleur coup à la place du coup joué (s'il n'était pas déjà le meilleur).
-  const bestArrow =
-    move && move.classification !== 'best' && before?.bestMoveUci
-      ? [arrow(before.bestMoveUci)]
-      : [];
-  const marks = review.moves.filter(isError).map((m) => ({ ply: m.ply, cls: m.classification }));
+  const visual = move?.explanation?.visual;
+
+  // Schéma de l'explication s'il existe, sinon le meilleur coup à la place du coup joué.
+  let arrows: BoardArrow[] = [];
+  let marks: BoardMark[] = [];
+  if (move && visual) {
+    arrows = visual.arrows;
+    marks = visual.marks;
+  } else if (move && move.classification !== 'best' && before?.bestMoveUci) {
+    arrows = [uciArrow(before.bestMoveUci, 'best')];
+  }
+
+  const chartMarks = review.moves
+    .filter(isError)
+    .map((m) => ({ ply: m.ply, cls: m.classification }));
   // Moments clés : erreurs du joueur (ou des deux camps si son camp est inconnu).
   const keyMoves = review.moves.filter(
     (m) => isError(m) && (info.userColor === null || m.color === info.userColor),
@@ -278,6 +286,41 @@ export function Review({ id }: { id: string }) {
     else setReplayError('Connecte-toi pour rejouer contre le bot.');
   };
 
+  /** « Voir la ligne » : la ligne est jouée coup par coup depuis la position d'avant le coup. */
+  const showLine = (m: ReviewMove, ucis: readonly string[]) => {
+    stopLine();
+    const start = lineIds[m.ply - 1];
+    if (!start) return;
+    ctl.select(start);
+    let previous = start;
+    let created: string | null = null;
+    ucis.forEach((uci, i) => {
+      const timer = setTimeout(
+        () => {
+          timers.current.delete(timer);
+          const existed = tree.child(previous, uci) !== null;
+          const id = ctl.playFrom(previous, uci);
+          if (!id) return stopLine();
+          if (!existed && created === null && !lineIds.includes(id)) {
+            created = id;
+            setTempLine(id);
+          }
+          previous = id;
+          ctl.select(id);
+        },
+        LINE_STEP_MS * (i + 1),
+      );
+      timers.current.add(timer);
+    });
+  };
+
+  const backToGame = () => {
+    stopLine();
+    if (tempLine && tree.has(tempLine)) ctl.remove(tempLine);
+    setTempLine(null);
+    setCursor(deviation);
+  };
+
   const accuracyCard = (c: Color) => (
     <div className="accuracy-card" data-testid={`accuracy-${c}`} key={c}>
       <span className="muted">
@@ -294,124 +337,134 @@ export function Review({ id }: { id: string }) {
     </div>
   );
 
-  return (
-    <div className="game review">
-      <EvalBar value={evalValue(here)} />
-      <div className="board-column">
-        <div className="player-bar simple">{name(orientation === 'w' ? 'b' : 'w')}</div>
-        <div className="board-wrap">
-          <Board
-            pieces={pieces}
-            orientation={orientation}
-            movable={null}
-            lastMove={move ? arrow(move.uci) : null}
-            extraArrows={bestArrow}
-          />
-        </div>
-        <div className="player-bar simple">{name(orientation)}</div>
-      </div>
-
-      <aside className="panel side-panel">
-        <div className="turn-banner">
-          {info.white} – {info.black} · {info.result}
-          <Badge>{VARIANT_LABEL[info.variant]}</Badge>
-          <Badge>{SOURCE_LABEL[info.source]}</Badge>
-        </div>
-        {info.url && (
-          <a className="muted" href={info.url} target="_blank" rel="noreferrer">
-            Voir la partie d'origine
-          </a>
-        )}
-        <div className="accuracy-row">{(['w', 'b'] as const).map(accuracyCard)}</div>
-        <EvalChart evals={review.evals} cursor={ply} onSelect={setCursor} marks={marks} />
-        {info.userColor && (
-          <CoachSummary moves={review.moves} color={info.userColor} onSelect={setCursor} />
-        )}
-
-        <div className="move-card" data-testid="move-card">
-          {move ? (
-            <>
-              <p>
-                <strong>
-                  {Math.ceil(move.ply / 2)}
-                  {move.color === 'w' ? '.' : '…'} {move.san}
-                </strong>{' '}
-                <span className={`class-badge ${classCss(move.classification)}`}>
-                  {CLASS_LABEL[move.classification]}
-                </span>{' '}
-                <span className="muted">({evalLabel(here)})</span>
-              </p>
-              {move.explanation && <p data-testid="explanation">{move.explanation.text}</p>}
-              {isError(move) && (info.userColor === null || move.color === info.userColor) && (
-                <div className="replay">
-                  <Button size="s" data-testid="replay" onClick={() => void replay(move)}>
-                    ↺ Rejouer d'ici contre le bot
-                  </Button>
-                  <select
-                    value={replayLevel}
-                    aria-label="Niveau du bot"
-                    onChange={(e) => setReplayLevel(Number(e.target.value))}
-                  >
-                    {[1, 2, 3, 4, 5].map((l) => (
-                      <option key={l} value={l}>
-                        Niveau {l}
-                      </option>
-                    ))}
-                  </select>
-                  {replayError && <span className="error"> {replayError}</span>}
-                </div>
-              )}
-              {move.classification !== 'best' &&
-                move.explanation?.kind !== 'generic' &&
-                before?.bestMoveSan && (
-                  <p className="muted">
-                    Meilleur : <span className="best-move">{before.bestMoveSan}</span>
-                  </p>
-                )}
-            </>
-          ) : (
-            <p className="muted">
-              Position initiale. Utilise ◀ ▶ (ou les flèches du clavier) pour parcourir la partie.
-            </p>
-          )}
-        </div>
-
-        <div className="nav">
-          <button
-            disabled={!prevKey}
-            onClick={() => prevKey && setCursor(prevKey.ply)}
-            title="Erreur précédente"
-          >
-            ◀ !?
-          </button>
-          <button
-            disabled={!nextKey}
-            data-testid="next-mistake"
-            onClick={() => nextKey && setCursor(nextKey.ply)}
-            title="Erreur suivante"
-          >
-            !? ▶
-          </button>
-        </div>
-        <ReviewMoveList moves={review.moves} cursor={ply} onSelect={setCursor} />
-        <div className="nav">
-          <button title="Début" onClick={() => setCursor(0)}>
-            ⏮
-          </button>
-          <button title="Précédent" onClick={() => setCursor(Math.max(0, ply - 1))}>
-            ◀
-          </button>
-          <button title="Suivant" onClick={() => setCursor(Math.min(total, ply + 1))}>
-            ▶
-          </button>
-          <button title="Fin" onClick={() => setCursor(total)}>
-            ⏭
-          </button>
-          <button title="Retourner le plateau" onClick={() => setFlipped(!flipped)}>
-            ⇅
-          </button>
-        </div>
-      </aside>
+  const node = tree.get(current);
+  const label = tree.moveLabel(current);
+  const card = inVariation ? (
+    <div className="move-card variation-card" data-testid="move-card">
+      <p>
+        <Badge>Variante</Badge>{' '}
+        <strong>
+          {label.number}
+          {label.color === 'w' ? '.' : '…'} {node.san}
+        </strong>
+      </p>
+      <p className="muted">
+        Tu explores une autre suite que celle de la partie.
+        {!engineOn && ' Active le moteur pour l’évaluer.'}
+      </p>
+      <Button size="s" variant="primary" data-testid="back-to-game" onClick={backToGame}>
+        ↩ Revenir à la partie
+      </Button>
     </div>
+  ) : (
+    <div className="move-card" data-testid="move-card">
+      {move ? (
+        <>
+          <p>
+            <strong>
+              {Math.ceil(move.ply / 2)}
+              {move.color === 'w' ? '.' : '…'} {move.san}
+            </strong>{' '}
+            <span className={`class-badge ${classCss(move.classification)}`}>
+              {CLASS_LABEL[move.classification]}
+            </span>{' '}
+            <span className="muted">({evalLabel(here)})</span>
+          </p>
+          {move.explanation && <p data-testid="explanation">{move.explanation.text}</p>}
+          {visual?.line && visual.line.length > 0 && (
+            <Button
+              size="s"
+              data-testid="show-line"
+              onClick={() => showLine(move, visual.line ?? [])}
+            >
+              ▶ Voir la ligne
+            </Button>
+          )}
+          {isError(move) && (info.userColor === null || move.color === info.userColor) && (
+            <div className="replay">
+              <Button size="s" data-testid="replay" onClick={() => void replay(move)}>
+                ↺ Rejouer d'ici contre le bot
+              </Button>
+              <select
+                value={replayLevel}
+                aria-label="Niveau du bot"
+                onChange={(e) => setReplayLevel(Number(e.target.value))}
+              >
+                {[1, 2, 3, 4, 5].map((l) => (
+                  <option key={l} value={l}>
+                    Niveau {l}
+                  </option>
+                ))}
+              </select>
+              {replayError && <span className="error"> {replayError}</span>}
+            </div>
+          )}
+          {move.classification !== 'best' &&
+            move.explanation?.kind !== 'generic' &&
+            before?.bestMoveSan && (
+              <p className="muted">
+                Meilleur : <span className="best-move">{before.bestMoveSan}</span>
+              </p>
+            )}
+        </>
+      ) : (
+        <p className="muted">
+          Position initiale. Utilise ◀ ▶ (ou les flèches du clavier) pour parcourir la partie, et
+          joue un coup sur l'échiquier pour explorer une variante.
+        </p>
+      )}
+    </div>
+  );
+
+  return (
+    <AnalysisBoard
+      controller={ctl}
+      evals={review.evals}
+      moveClasses={review.moves.map((m) => m.classification)}
+      orientation={info.userColor ?? 'w'}
+      arrows={arrows}
+      marks={marks}
+      lockMainline
+      names={{ w: info.white, b: info.black }}
+      panelTop={
+        <>
+          <div className="turn-banner">
+            {info.white} – {info.black} · {info.result}
+            <Badge>{VARIANT_LABEL[info.variant]}</Badge>
+            <Badge>{SOURCE_LABEL[info.source]}</Badge>
+          </div>
+          {info.url && (
+            <a className="muted" href={info.url} target="_blank" rel="noreferrer">
+              Voir la partie d'origine
+            </a>
+          )}
+          <div className="accuracy-row">{(['w', 'b'] as const).map(accuracyCard)}</div>
+          <EvalChart evals={review.evals} cursor={ply} onSelect={setCursor} marks={chartMarks} />
+          {card}
+          <div className="nav">
+            <button
+              disabled={!prevKey}
+              onClick={() => prevKey && setCursor(prevKey.ply)}
+              title="Erreur précédente"
+            >
+              ◀ !?
+            </button>
+            <button
+              disabled={!nextKey}
+              data-testid="next-mistake"
+              onClick={() => nextKey && setCursor(nextKey.ply)}
+              title="Erreur suivante"
+            >
+              !? ▶
+            </button>
+          </div>
+        </>
+      }
+      panelBottom={
+        info.userColor && (
+          <CoachSummary moves={review.moves} color={info.userColor} onSelect={setCursor} />
+        )
+      }
+    />
   );
 }

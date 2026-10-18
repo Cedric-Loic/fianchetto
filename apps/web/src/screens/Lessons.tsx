@@ -309,8 +309,8 @@ export function LessonPage({ id }: { id: string }) {
                   pieces={piecesFromFen(s.fen)}
                   orientation={s.fen.split(' ')[1] === 'b' ? 'b' : 'w'}
                   movable={null}
-                  extraArrows={s.arrows}
-                  markedSquares={s.marks}
+                  arrows={s.arrows.map((a) => ({ ...a, kind: 'line' as const }))}
+                  squareMarks={s.marks.map((square) => ({ square, kind: 'user' as const }))}
                 />
               </div>
               <figcaption>{s.caption}</figcaption>

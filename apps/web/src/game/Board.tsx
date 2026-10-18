@@ -1,5 +1,13 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { Color, DisplayedPiece, PromotionPiece, Square } from '@sq/shared';
+import type {
+  ArrowKind,
+  BoardArrow,
+  Color,
+  DisplayedPiece,
+  PromotionPiece,
+  Square,
+  SquareMarkKind,
+} from '@sq/shared';
 import { BOARD_THEMES, pieceUrl, useSettings } from '../lib/settings';
 
 const FILES = 'abcdefgh';
@@ -7,6 +15,12 @@ const FILES = 'abcdefgh';
 export interface Arrow {
   from: Square;
   to: Square;
+}
+
+/** Case marquée imposée : type du contrat (`hanging`…) ou `user` (surlignage simple). */
+export interface BoardMark {
+  square: Square;
+  kind: SquareMarkKind | 'user';
 }
 
 export interface BoardProps {
@@ -32,10 +46,13 @@ export interface BoardProps {
   onPremove?: (move: Arrow & { promotion?: PromotionPiece }) => void;
   /** Clic droit : annule tous les premoves. */
   onCancelPremove?: () => void;
-  /** Flèches imposées (meilleur coup en analyse, illustrations des leçons). */
-  extraArrows?: readonly Arrow[];
-  /** Cases marquées imposées (illustrations des leçons). */
-  markedSquares?: readonly Square[];
+  /**
+   * Flèches imposées (meilleur coup, schémas d'explication, illustrations des leçons, indices),
+   * colorées selon leur type ; les flèches d'une ligne sont numérotées et de plus en plus pâles.
+   */
+  arrows?: readonly BoardArrow[];
+  /** Cases marquées imposées (pièce en prise, cible, illustrations des leçons…). */
+  squareMarks?: readonly BoardMark[];
   /**
    * Classique, si le réglage est actif : coups légaux du camp au trait, fournis par le serveur.
    * Les cases accessibles à la pièce sélectionnée sont marquées. Toujours absent en Secret Queen.
@@ -61,10 +78,16 @@ function ArrowShape({
   arrow,
   orientation,
   color,
+  opacity = 0.8,
+  index,
+  kind,
 }: {
   arrow: Arrow;
   orientation: Color;
   color: string;
+  opacity?: number;
+  index?: number | undefined;
+  kind: string;
 }) {
   const [x1, y1] = squareXY(arrow.from, orientation);
   const [x2, y2] = squareXY(arrow.to, orientation);
@@ -74,7 +97,7 @@ function ArrowShape({
   const ex = bx - ((bx - ax) / len) * 0.35;
   const ey = by - ((by - ay) / len) * 0.35;
   return (
-    <g opacity={0.8}>
+    <g opacity={opacity} data-kind={kind}>
       <line
         x1={ax}
         y1={ay}
@@ -89,9 +112,25 @@ function ArrowShape({
         style={{ fill: color }}
         transform={`translate(${ex},${ey}) rotate(${(Math.atan2(by - ay, bx - ax) * 180) / Math.PI})`}
       />
+      {index !== undefined && (
+        // Numéro du coup dans la ligne, au départ de la flèche.
+        <g transform={`translate(${ax + ((bx - ax) / len) * 0.3},${ay + ((by - ay) / len) * 0.3})`}>
+          <circle r={0.17} style={{ fill: color }} />
+          <text className="arrow-index" textAnchor="middle" dominantBaseline="central">
+            {index}
+          </text>
+        </g>
+      )}
     </g>
   );
 }
+
+/** Ordre de dessin : les lignes dessous, le meilleur coup et les menaces dessus. */
+const ARROW_LAYER: Record<ArrowKind, number> = { line: 0, hint: 1, played: 2, threat: 3, best: 4 };
+
+/** Opacité d'une flèche : dégressive le long d'une ligne numérotée. */
+const arrowOpacity = (a: BoardArrow) =>
+  a.kind === 'line' && a.index !== undefined ? Math.max(0.35, 0.9 - (a.index - 1) * 0.1) : 0.8;
 
 /**
  * Échiquier : glisser-déposer et clic-clic (pointer events), coordonnées dans les cases,
@@ -280,7 +319,7 @@ export function Board(props: BoardProps) {
         classes.push('premove');
       }
       if (drag?.over === square) classes.push('drag-over');
-      if (marks.includes(square) || props.markedSquares?.includes(square)) classes.push('marked');
+      if (marks.includes(square)) classes.push('marked');
       if (props.checkSquare === square) classes.push('check');
       squares.push(
         <div
@@ -301,10 +340,18 @@ export function Board(props: BoardProps) {
       ? props.legalMoves.filter((m) => m.from === selected).map((m) => m.to)
       : [];
 
+  // Couleurs des jetons du thème (styles.css) : --arrow-<type>, --arrow-user pour le clic droit.
   const allArrows = [
-    // Couleurs des jetons du thème (styles.css).
-    ...arrows.map((a) => ({ a, c: 'var(--arrow-user)' })),
-    ...(props.extraArrows ?? []).map((a) => ({ a, c: 'var(--arrow-line)' })),
+    ...[...(props.arrows ?? [])]
+      .sort((x, y) => ARROW_LAYER[x.kind] - ARROW_LAYER[y.kind])
+      .map((a) => ({
+        a,
+        k: a.kind,
+        c: `var(--arrow-${a.kind})`,
+        o: arrowOpacity(a),
+        i: a.index,
+      })),
+    ...arrows.map((a) => ({ a, k: 'user', c: 'var(--arrow-user)', o: 0.8, i: undefined })),
   ];
 
   return (
@@ -321,6 +368,18 @@ export function Board(props: BoardProps) {
       onContextMenu={(e) => e.preventDefault()}
     >
       {squares}
+      {props.squareMarks?.map((m) => {
+        const [x, y] = squareXY(m.square, orientation);
+        return (
+          <div
+            key={`mark-${m.square}-${m.kind}`}
+            className={`square-mark mark-${m.kind}`}
+            data-testid="square-mark"
+            data-square={m.square}
+            style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
+          />
+        );
+      })}
       {pieces.map((p) => {
         const [x, y] = squareXY(p.square, orientation);
         const dragging = drag?.id === p.id;
@@ -378,12 +437,15 @@ export function Board(props: BoardProps) {
       })}
       {allArrows.length > 0 && (
         <svg className="arrows" viewBox="0 0 8 8" data-testid="arrows">
-          {allArrows.map(({ a, c }) => (
+          {allArrows.map(({ a, k, c, o, i }, n) => (
             <ArrowShape
-              key={`${a.from}${a.to}${c}`}
+              key={`${a.from}${a.to}${c}${n}`}
               arrow={a}
               orientation={orientation}
               color={c}
+              opacity={o}
+              index={i}
+              kind={k}
             />
           ))}
         </svg>
