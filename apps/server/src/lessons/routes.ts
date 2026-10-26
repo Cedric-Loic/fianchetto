@@ -36,6 +36,7 @@ export function registerLessonRoutes(
           Number(request.params.index),
           parsed.data.step,
           parsed.data.uci,
+          user.id,
         );
         return result ?? reply.code(404).send({ error: 'NOT_FOUND' });
       });

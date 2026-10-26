@@ -16,9 +16,17 @@ export class LessonService {
   readonly #store: GameStore;
   readonly #evaluate: (fen: string) => Promise<PositionAnalysis | null>;
 
-  constructor(store: GameStore, evaluate: (fen: string) => Promise<PositionAnalysis | null>) {
+  /** Coach pédagogique : alimenté par le jugement des exercices (étape 14). */
+  readonly #onJudged: ((userId: string, id: string, index: number, solved: boolean) => void) | null;
+
+  constructor(
+    store: GameStore,
+    evaluate: (fen: string) => Promise<PositionAnalysis | null>,
+    onJudged?: (userId: string, id: string, index: number, solved: boolean) => void,
+  ) {
     this.#store = store;
     this.#evaluate = evaluate;
+    this.#onJudged = onJudged ?? null;
   }
 
   #progress(userId: string, lesson: Lesson) {
@@ -79,6 +87,7 @@ export class LessonService {
     index: number,
     step: number,
     uci: string,
+    userId?: string,
   ): Promise<LessonMoveResponse | null> {
     const exercise = lessonById(id)?.exercises[index];
     if (!exercise) return null;
@@ -113,6 +122,7 @@ export class LessonService {
         fen,
         exact ? exercise.solution.slice(step) : [exercise.solution[0] ?? ''],
       );
+      if (userId) this.#onJudged?.(userId, id, index, false);
       return {
         status: 'failed',
         steps: [],
@@ -129,6 +139,7 @@ export class LessonService {
       if (replied) steps.push(replied);
     }
     const solved = !reply;
+    if (solved && userId) this.#onJudged?.(userId, id, index, true);
     return {
       status: solved ? 'solved' : 'continue',
       steps,

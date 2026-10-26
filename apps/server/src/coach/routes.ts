@@ -12,9 +12,15 @@ import {
   type BotResult,
   type DashboardGame,
 } from '@sq/coach';
-import type { CoachDashboard, GameConfig, GameSummary } from '@sq/shared';
+import {
+  SessionProgressRequestSchema,
+  type CoachDashboard,
+  type GameConfig,
+  type GameSummary,
+} from '@sq/shared';
 import { currentUser } from '../auth.js';
 import type { GameStore } from '../persistence/db.js';
+import type { LearningService } from './learning.js';
 import type { PuzzleService } from '../puzzles/service.js';
 
 /** Cadences locales considérées comme lentes (le plan recommande des parties 15+10). */
@@ -230,10 +236,48 @@ export class CoachService {
 }
 
 /** Tableau de bord du coach (étape 11). */
-export function registerCoachRoutes(app: FastifyInstance, store: GameStore, coach: CoachService) {
+export function registerCoachRoutes(
+  app: FastifyInstance,
+  store: GameStore,
+  coach: CoachService,
+  learning: LearningService,
+) {
   app.get('/api/coach/dashboard', (request, reply) => {
     const user = currentUser(store, request);
     if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
     return coach.dashboard(user.id);
+  });
+
+  // Coach pédagogique (étape 14) : compétences, parcours, cartes, séance du jour.
+  app.get('/api/coach/skills', (request, reply) => {
+    const user = currentUser(store, request);
+    if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+    return { skills: learning.skills(user.id) };
+  });
+
+  app.get('/api/coach/curriculum', (request, reply) => {
+    const user = currentUser(store, request);
+    if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+    return learning.curriculum(user.id);
+  });
+
+  app.get('/api/coach/session', (request, reply) => {
+    const user = currentUser(store, request);
+    if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+    return { session: learning.session(user.id) };
+  });
+
+  app.post('/api/coach/session/progress', (request, reply) => {
+    const user = currentUser(store, request);
+    if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+    const parsed = SessionProgressRequestSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'BAD_REQUEST' });
+    return { session: learning.markStep(user.id, parsed.data.kind) };
+  });
+
+  app.get('/api/reviews/cards', (request, reply) => {
+    const user = currentUser(store, request);
+    if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+    return learning.cards(user.id);
   });
 }

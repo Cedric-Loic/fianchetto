@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -91,6 +92,21 @@ export interface OpeningProgressRow {
 
 /** Séances comptées dans les minutes d'entraînement du coach. */
 export type ActivityKind = 'lesson' | 'analysis';
+
+/** Carte de révision (étape 14) : planification d'un exercice de leçon ou d'une erreur perso. */
+export interface CardRow {
+  id: string;
+  source: string;
+  ref: string;
+  skill: string;
+  step: number;
+  dueAt: number;
+  mastered: boolean;
+  reviewedAt: number | null;
+}
+
+const CARD_SELECT = `SELECT id, source, ref, skill, step, due_at AS dueAt, mastered,
+  reviewed_at AS reviewedAt FROM review_cards`;
 
 export interface SavedGame {
   record: SessionRecord;
@@ -213,6 +229,36 @@ export class GameStore {
         failures   INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (user_id, line_id)
+      );
+      -- Étape 14 : coach pédagogique (tentatives d'exercices, cartes de révision, séance du jour).
+      CREATE TABLE IF NOT EXISTS exercise_attempts (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id        TEXT NOT NULL REFERENCES users(id),
+        lesson_id      TEXT NOT NULL,
+        exercise_index INTEGER NOT NULL,
+        success        INTEGER NOT NULL,
+        hints          INTEGER NOT NULL DEFAULT 0,
+        at             INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS exercise_attempts_user ON exercise_attempts (user_id, at);
+      CREATE TABLE IF NOT EXISTS review_cards (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id),
+        source      TEXT NOT NULL,
+        ref         TEXT NOT NULL,
+        skill       TEXT NOT NULL,
+        step        INTEGER NOT NULL,
+        due_at      INTEGER NOT NULL,
+        mastered    INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL,
+        reviewed_at INTEGER,
+        UNIQUE (user_id, source, ref)
+      );
+      CREATE TABLE IF NOT EXISTS daily_sessions (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        day        TEXT NOT NULL,
+        steps_done TEXT NOT NULL,
+        PRIMARY KEY (user_id, day)
       );
       -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
       INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
@@ -422,6 +468,123 @@ export class GameStore {
       )
       .run(userId, lessonId, correct, Date.now());
     this.recordActivity(userId, 'lesson', lessonId);
+  }
+
+  // --- Coach pédagogique (étape 14) ----------------------------------------------------------
+
+  recordExerciseAttempt(a: {
+    userId: string;
+    lessonId: string;
+    index: number;
+    success: boolean;
+    hints: number;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT INTO exercise_attempts (user_id, lesson_id, exercise_index, success, hints, at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.lessonId, a.index, a.success ? 1 : 0, a.hints, a.at);
+  }
+
+  exerciseAttempts(
+    userId: string,
+  ): { lessonId: string; index: number; success: boolean; hints: number; at: number }[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT lesson_id AS lessonId, exercise_index AS idx, success, hints, at
+         FROM exercise_attempts WHERE user_id = ? ORDER BY at`,
+      )
+      .all(userId) as {
+      lessonId: string;
+      idx: number;
+      success: number;
+      hints: number;
+      at: number;
+    }[];
+    return rows.map((r) => ({
+      lessonId: r.lessonId,
+      index: r.idx,
+      success: r.success === 1,
+      hints: r.hints,
+      at: r.at,
+    }));
+  }
+
+  #card(row: (Omit<CardRow, 'mastered'> & { mastered: number }) | undefined): CardRow | undefined {
+    return row && { ...row, mastered: row.mastered === 1 };
+  }
+
+  getCard(userId: string, source: string, ref: string): CardRow | undefined {
+    return this.#card(
+      this.#db
+        .prepare(`${CARD_SELECT} WHERE user_id = ? AND source = ? AND ref = ?`)
+        .get(userId, source, ref) as never,
+    );
+  }
+
+  cards(userId: string): CardRow[] {
+    return (
+      this.#db.prepare(`${CARD_SELECT} WHERE user_id = ? ORDER BY due_at`).all(userId) as never[]
+    ).map((r) => this.#card(r)!);
+  }
+
+  /** Crée ou met à jour une carte ; `reviewedAt` est renseigné pour une révision d'une carte existante. */
+  saveCard(
+    userId: string,
+    card: {
+      source: string;
+      ref: string;
+      skill: string;
+      step: number;
+      dueAt: number;
+      mastered: boolean;
+    },
+    now: number,
+    reviewed: boolean,
+  ): void {
+    this.#db
+      .prepare(
+        `INSERT INTO review_cards (id, user_id, source, ref, skill, step, due_at, mastered,
+           created_at, reviewed_at)
+         VALUES (@id, @userId, @source, @ref, @skill, @step, @dueAt, @mastered, @now, @reviewedAt)
+         ON CONFLICT(user_id, source, ref) DO UPDATE SET skill = @skill, step = @step,
+           due_at = @dueAt, mastered = @mastered,
+           reviewed_at = COALESCE(@reviewedAt, reviewed_at)`,
+      )
+      .run({
+        id: randomUUID(),
+        userId,
+        ...card,
+        mastered: card.mastered ? 1 : 0,
+        now,
+        reviewedAt: reviewed ? now : null,
+      });
+  }
+
+  /** Étapes de la séance du jour cochées par l'utilisateur. */
+  sessionStepsDone(userId: string, day: string): string[] {
+    const row = this.#db
+      .prepare(`SELECT steps_done AS done FROM daily_sessions WHERE user_id = ? AND day = ?`)
+      .get(userId, day) as { done: string } | undefined;
+    try {
+      const parsed: unknown = row ? JSON.parse(row.done) : [];
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  markSessionStep(userId: string, day: string, kind: string): void {
+    const done = new Set(this.sessionStepsDone(userId, day));
+    done.add(kind);
+    this.#db
+      .prepare(
+        `INSERT INTO daily_sessions (user_id, day, steps_done) VALUES (?, ?, ?)
+         ON CONFLICT(user_id, day) DO UPDATE SET steps_done = excluded.steps_done`,
+      )
+      .run(userId, day, JSON.stringify([...done]));
   }
 
   // --- Finales (lot 4b) ----------------------------------------------------------------------

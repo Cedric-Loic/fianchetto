@@ -31,6 +31,8 @@ export interface PuzzleServiceOptions {
    * thèmes faibles, `coach/routes.ts`). Défaut : thème du jour de la phase 1, sans faiblesse.
    */
   themeOfDay?: (userId: string) => string;
+  /** Appelé quand un puzzle « mes erreurs » est jugé (cartes de révision du coach). */
+  onOwnJudged?: (userId: string, puzzleId: string, success: boolean) => void;
   /** Horloge (tests). */
   now?: () => number;
 }
@@ -67,6 +69,7 @@ export class PuzzleService {
   readonly #live = new Map<string, Live>();
   readonly #themeOfDay: (userId: string) => string;
   readonly #now: () => number;
+  readonly #onOwnJudged: PuzzleServiceOptions['onOwnJudged'];
 
   constructor(
     store: GameStore,
@@ -76,6 +79,7 @@ export class PuzzleService {
     this.#store = store;
     this.#evaluate = evaluate;
     this.#now = options.now ?? Date.now;
+    this.#onOwnJudged = options.onOwnJudged;
     this.#themeOfDay =
       options.themeOfDay ?? (() => themeOfDay({ phase: 1, weakThemes: [], date: this.#now() }));
   }
@@ -340,6 +344,7 @@ export class PuzzleService {
       at: this.#now(),
       durationMs: this.#now() - live.shownAt,
     });
+    if (live.source === 'mine') this.#onOwnJudged?.(live.userId, live.puzzleId, success);
     if (success) p.scheduleSuccess(live.userId, live.source, live.puzzleId);
     else p.scheduleFailure(live.userId, live.source, live.puzzleId);
     if (!after) return null;

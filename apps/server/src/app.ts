@@ -21,6 +21,7 @@ import { GameManager, InvalidGameRequest } from './games/manager.js';
 import type { GameSession, Participant } from './games/session.js';
 import { GameStore } from './persistence/db.js';
 import type { JsonFetcher } from './review/chesscom.js';
+import { LearningService } from './coach/learning.js';
 import { CoachService, registerCoachRoutes } from './coach/routes.js';
 import { registerEndgameRoutes } from './endgames/routes.js';
 import { EndgameService } from './endgames/service.js';
@@ -106,11 +107,19 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   });
   const endgames = new EndgameService(store, games);
   const training = new TrainingService((fen) => reviews.evaluate(fen));
-  const lessons = new LessonService(store, (fen) => reviews.evaluate(fen, 400));
   const coach = new CoachService(store, config.botLevels);
+  const learning = new LearningService(store, {
+    phaseOf: (userId) => coach.dashboard(userId).phase.current,
+  });
+  const lessons = new LessonService(
+    store,
+    (fen) => reviews.evaluate(fen, 400),
+    (userId, id, index, solved) => learning.recordExercise(userId, id, index, solved),
+  );
   const openings = new OpeningService(store);
   const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen), {
     themeOfDay: (userId) => coach.themeOfDay(userId),
+    onOwnJudged: (userId, puzzleId, ok) => learning.recordOwnPuzzle(userId, puzzleId, ok),
   });
   coach.attach(puzzles);
   const analysis =
@@ -185,7 +194,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   registerLessonRoutes(app, store, lessons);
   registerEndgameRoutes(app, store, endgames);
   registerOpeningRoutes(app, store, openings);
-  registerCoachRoutes(app, store, coach);
+  registerCoachRoutes(app, store, coach, learning);
   registerAnalysisRoutes(app, store, analysis);
   registerTrainingRoutes(
     app,
