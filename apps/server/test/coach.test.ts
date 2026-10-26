@@ -56,7 +56,7 @@ describe('tableau de bord du coach', () => {
       await http('POST', '/api/puzzles/next', { mode: 'theme', theme: 'hangingPiece' })
     ).json as { attempt: PuzzleAttempt };
     await http('POST', `/api/puzzles/${attempt.attemptId}/move`, { uci: 'c3e5' });
-    await http('POST', '/api/lessons/routine/result', { correct: 3 });
+    await http('POST', '/api/lessons/routine/result', { correct: 6 });
 
     d = (await http('GET', '/api/coach/dashboard')).json as CoachDashboard;
     expect(Object.fromEntries(d.week.tasks.map((t) => [t.id, t.done]))).toEqual({

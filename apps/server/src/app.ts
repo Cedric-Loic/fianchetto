@@ -114,7 +114,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const lessons = new LessonService(
     store,
     (fen) => reviews.evaluate(fen, 400),
-    (userId, id, index, solved) => learning.recordExercise(userId, id, index, solved),
+    (userId, id, index, solved, hints) => learning.recordExercise(userId, id, index, solved, hints),
   );
   const openings = new OpeningService(store);
   const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen), {

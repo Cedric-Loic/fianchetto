@@ -68,16 +68,23 @@ export class LearningService {
   readonly #store: GameStore;
   readonly #phaseOf: (userId: string) => number;
   readonly #now: () => number;
+  readonly #lesson: typeof lessonById;
   /** Exercices échoués pendant l'essai en cours (« du premier coup » = sans échec préalable). */
   readonly #failed = new Map<string, number>();
 
   constructor(
     store: GameStore,
-    options: { phaseOf: (userId: string) => number; now?: () => number },
+    options: {
+      phaseOf: (userId: string) => number;
+      now?: () => number;
+      /** Recherche d'une leçon (injectable pour les tests). */
+      lesson?: typeof lessonById;
+    },
   ) {
     this.#store = store;
     this.#phaseOf = options.phaseOf;
     this.#now = options.now ?? Date.now;
+    this.#lesson = options.lesson ?? lessonById;
   }
 
   // --- Alimentation ----------------------------------------------------------------------------
@@ -89,6 +96,7 @@ export class LearningService {
     ref: string,
     skill: SkillId,
     ok: boolean,
+    hinted = false,
   ) {
     const now = this.#now();
     const card = this.#store.getCard(userId, source, ref);
@@ -97,13 +105,20 @@ export class LearningService {
     } else if (!ok) {
       this.#store.saveCard(userId, { source, ref, skill, ...newCardSchedule(now) }, now, true);
     } else if (card.dueAt <= now) {
-      const next = nextCardSchedule(card.step, true, now);
+      // Réussite avec indice : la carte repart de l'étape 0 (revient demain).
+      const next = hinted ? newCardSchedule(now) : nextCardSchedule(card.step, true, now);
       this.#store.saveCard(userId, { source, ref, skill, ...next }, now, true);
     }
   }
 
   /** Exercice de leçon jugé (`solved` ou `failed`). */
-  recordExercise(userId: string, lessonId: string, index: number, solved: boolean): void {
+  recordExercise(
+    userId: string,
+    lessonId: string,
+    index: number,
+    solved: boolean,
+    hints = 0,
+  ): void {
     const key = `${userId}|${lessonId}|${index}`;
     const failedAt = this.#failed.get(key);
     const retry = failedAt !== undefined && this.#now() - failedAt < RETRY_WINDOW_MS;
@@ -117,10 +132,17 @@ export class LearningService {
       lessonId,
       index,
       success: solved,
-      hints: 0,
+      hints,
       at: this.#now(),
     });
-    this.#schedule(userId, 'exercise', `${lessonId}:${index}`, skillOfLesson(lessonId), solved);
+    this.#schedule(
+      userId,
+      'exercise',
+      `${lessonId}:${index}`,
+      skillOfLesson(lessonId),
+      solved,
+      hints > 0,
+    );
   }
 
   /** Puzzle « mes erreurs » jugé. */
@@ -265,7 +287,7 @@ export class LearningService {
   #resolve(userId: string, source: string, ref: string): { fen: string; prompt: string } | null {
     if (source === 'exercise') {
       const [lessonId = '', index = ''] = ref.split(':');
-      const exercise = lessonById(lessonId)?.exercises[Number(index)];
+      const exercise = this.#lesson(lessonId)?.exercises[Number(index)];
       return exercise ? { fen: exercise.fen, prompt: exercise.prompt } : null;
     }
     if (source === 'mistake') {

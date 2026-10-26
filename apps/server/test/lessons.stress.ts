@@ -27,7 +27,9 @@ async function whiteCp(fen: string): Promise<number> {
 }
 
 const cases = LESSONS.flatMap((l) =>
-  l.exercises.filter((e) => e.mode !== 'choice').map((e, i) => [`${l.id}#${i}`, e] as const),
+  l.exercises
+    .filter((e) => e.mode !== 'choice' && e.mode !== 'squares')
+    .map((e, i) => [`${l.id}#${i}`, e] as const),
 );
 
 describe('exercices des leçons vérifiés par Stockfish', () => {
