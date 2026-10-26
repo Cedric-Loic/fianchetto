@@ -129,14 +129,11 @@
   --shadow-1: 0 1px 2px #03081466, 0 2px 8px #03081440;
   --shadow-2: 0 12px 32px #03081499;
 
-  /* Mise en page : côté de l'échiquier (écran de partie, revue, puzzles). */
+  /* Mise en page : hauteur de la barre de navigation ; côté par défaut d'un échiquier isolé
+     (les écrans à plateau le recalculent : voir « Mise en page plateau »). */
   --nav-height: 56px;
   --side-width: 340px;
-  --board-size: clamp(
-    280px,
-    min(calc(100vh - var(--nav-height) - 150px), calc(100vw - var(--side-width) - 90px)),
-    760px
-  );
+  --board-size: min(560px, calc(100vw - 16px));
 
   color-scheme: dark;
 }
@@ -1253,19 +1250,84 @@ textarea:focus-visible {
   backdrop-filter: blur(8px);
 }
 
-/* --- Partie --- */
-.game {
+/* --- Mise en page plateau (BoardLayout) ---
+   Grand écran : la mise en page occupe toute la hauteur sous la navigation et sert de conteneur
+   de taille ; le plateau prend le plus grand côté qui tient à la fois dans la hauteur (moins les
+   barres joueur) et dans la largeur (moins le panneau à sa largeur minimale et la barre
+   d'évaluation). Le panneau prend le reste de la largeur, jusqu'à --panel-max, et défile en
+   interne. Téléphone : voir la section « Écrans étroits ». */
+.board-layout {
+  --layout-gap: var(--space-5);
+  --panel-min: 300px;
+  --panel-max: 420px;
+  --bar-h: 48px;
+  --col-gap: var(--space-2);
+  --eval-w: 0px;
+  --bars-h: calc(var(--bars-n, 0) * (var(--bar-h) + var(--col-gap)));
+  --board-size: max(
+    200px,
+    min(100cqh - var(--bars-h), 100cqw - var(--layout-gap) - var(--panel-min) - var(--eval-w))
+  );
+  container-type: size;
+  height: calc(100dvh - var(--nav-height));
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  gap: var(--space-5);
-  padding: var(--space-4);
+  gap: var(--layout-gap);
+  padding: var(--space-3) var(--space-4);
+}
+.board-layout.slim-bars {
+  --bar-h: 32px;
+}
+.board-layout.has-eval {
+  /* Barre d'évaluation (30 px au plus) et son écart avec le plateau. */
+  --eval-w: 38px;
 }
 .board-column {
+  flex: none;
+  width: calc(var(--board-size) + var(--eval-w));
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--col-gap);
   min-width: 0;
+}
+.board-bar {
+  height: var(--bar-h);
+  margin-left: var(--eval-w);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.board-bar > .player-bar {
+  min-height: 0;
+}
+.board-bar > .player-bar.simple {
+  padding: 0 2px;
+}
+.board-stage {
+  display: flex;
+  gap: var(--space-2);
+}
+.board-eval {
+  width: 30px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+.board-layout .board {
+  width: var(--board-size);
+}
+/* Échiquier d'analyse : les onglets prennent leur hauteur, la mise en page le reste. */
+.analyse-shell.board-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--nav-height));
+}
+.analyse-shell.board-shell > .board-layout {
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 .player-bar {
   display: flex;
@@ -1353,13 +1415,14 @@ textarea:focus-visible {
   color: var(--text-on-color);
 }
 .side-panel {
-  width: var(--side-width);
-  flex-shrink: 0;
+  flex: 0 1 var(--panel-max);
+  min-width: var(--panel-min);
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: var(--space-4);
-  max-height: calc(var(--board-size) + 112px);
+  /* Même hauteur que la colonne du plateau au plus. */
+  max-height: calc(var(--board-size) + var(--bars-h));
   overflow-y: auto;
 }
 /* Panneau trop rempli (revue, entraînement) : il défile ; seule la liste des coups rétrécit. */
@@ -1464,8 +1527,7 @@ textarea:focus-visible {
 }
 
 /* --- Choix du pion secret --- */
-.handoff,
-.selection {
+.handoff {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1478,21 +1540,13 @@ textarea:focus-visible {
 }
 .selection-header {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-4);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
 }
 .selection-header h2 {
-  font-size: var(--fs-28);
+  font-size: var(--fs-20);
   margin: 0;
-}
-.selection-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-4);
 }
 
 /* --- Fenêtres modales --- */
@@ -1543,12 +1597,25 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  --board-size: min(calc(100vh - 150px), calc(100vw - 32px));
+  /* Plateau maximal : toute la fenêtre moins les pendules fines (--bars-n, posé par l'écran)
+     et la barre d'actions discrète. */
+  container-type: size;
+  padding: var(--space-2) var(--space-4);
+  --focus-bar-h: 44px;
+  --focus-actions-h: 44px;
+  --board-size: max(
+    200px,
+    min(
+      100cqw,
+      100cqh - var(--bars-n, 0) * (var(--focus-bar-h) + 6px) - var(--focus-actions-h) - 6px
+    )
+  );
 }
 .focus-board {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: var(--board-size);
 }
 .focus-clock .player-bar {
   min-height: 0;
@@ -1855,21 +1922,18 @@ textarea:focus-visible {
   flex: 1 1 220px;
   color: var(--text-muted);
 }
+/* Exemples dans le texte : grands, mais jamais plus larges que la colonne de texte. */
 .example-board {
-  --board-size: min(360px, calc(100vw - 64px));
-  max-width: 100%;
+  flex: none;
+  width: min(560px, 100%);
+  --board-size: 100%;
 }
-.exercise {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin-bottom: var(--space-3);
+.exercise .side-panel > .btn-link {
+  align-self: flex-start;
 }
-.exercise-side {
-  flex: 1 1 240px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.exercise-title {
+  margin: 0;
+  font-size: var(--fs-20);
 }
 .lesson-phase h3 {
   margin: 18px 0 var(--space-2);
@@ -2930,25 +2994,44 @@ textarea:focus-visible {
     order: 10;
   }
 
-  /* Partie, revue, puzzles : plateau pleine largeur (8 px de marge), panneau dessous. */
-  .game {
+  /* Écrans à plateau : plateau sur toute la largeur moins une gouttière de 8 px de chaque
+     côté (16 px au total), panneau dessous ; la page défile. */
+  .board-layout {
+    container-type: inline-size;
+    height: auto;
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-3);
     padding: var(--space-2);
+    --eval-w: 0px;
+    --board-size: 100cqw;
   }
-  .game .board-column {
+  .board-layout.has-eval {
+    --eval-w: 0px;
+  }
+  .focus-overlay {
+    padding: var(--space-2);
+  }
+  .analyse-shell.board-shell {
+    display: block;
+    height: auto;
+  }
+  .board-column {
     width: 100%;
-    max-width: 720px;
-    margin: 0 auto;
   }
-  .game .board {
+  .board-bar {
+    height: auto;
+  }
+  .board-stage {
+    flex-direction: column;
+  }
+  .board-eval {
     width: 100%;
   }
   .side-panel {
+    flex: none;
     width: 100%;
-    max-width: 720px;
-    margin: 0 auto;
+    min-width: 0;
     max-height: none;
     overflow: visible;
   }
@@ -2970,8 +3053,6 @@ textarea:focus-visible {
   /* Revue : barre d'évaluation horizontale au-dessus du plateau. */
   .review .eval-bar {
     width: 100%;
-    max-width: 720px;
-    margin: 0 auto;
     height: 10px;
     flex-direction: row;
   }
@@ -3020,18 +3101,6 @@ textarea:focus-visible {
   }
   .handoff {
     padding-top: 12vh;
-  }
-  .selection {
-    padding: var(--space-4) var(--space-2);
-  }
-  .selection .board {
-    width: 100%;
-  }
-  .example-board {
-    --board-size: min(360px, calc(100vw - 48px));
-  }
-  .exercise .example-board {
-    --board-size: min(480px, calc(100vw - 48px));
   }
 }
 

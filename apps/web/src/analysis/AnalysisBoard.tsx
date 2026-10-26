@@ -6,6 +6,7 @@ import { evalLabel, evalValue } from '../lib/eval';
 import { piecesFromFen } from '../lib/fen';
 import { useSettings } from '../lib/settings';
 import { playSound } from '../lib/sound';
+import { BoardLayout } from '../ui/BoardLayout';
 import { IconFirst, IconFlip, IconLast, IconNext, IconPrev } from '../ui/icons';
 import { EnginePanel } from './EnginePanel';
 import { MoveTree } from './MoveTree';
@@ -193,83 +194,85 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
     ) : null;
 
   return (
-    <div className="game review analysis-board" data-testid="analysis-board">
-      <EvalBar value={evalValue(evalShown)} label={evalLabel(evalShown)} />
-      <div className="board-column">
-        {name(orientation === 'w' ? 'b' : 'w')}
-        <div className="board-wrap">
-          <Board
-            pieces={pieces}
-            orientation={orientation}
-            movable={guided ? null : turn}
-            onMove={onMove}
-            lastMove={
-              node.uci
-                ? { from: node.uci.slice(0, 2) as Square, to: node.uci.slice(2, 4) as Square }
-                : null
-            }
-            checkSquare={checkSquare}
-            legalMoves={settings.showLegalMoves && !guided ? tree.legalMoves(current) : null}
-            arrows={arrows}
-            {...(props.marks ? { squareMarks: props.marks } : {})}
-          />
-        </div>
-        {name(orientation)}
-      </div>
-
-      <aside className="panel side-panel">
-        {props.panelTop}
-        {!guided && (
-          <>
-            <EnginePanel
-              fen={node.fen}
-              engine={engine}
-              enabled={settings.engine}
-              onToggle={(on) => settings.update({ engine: on })}
-              onPlay={(ucis) => ctl.playLine(ucis)}
-              onHover={(uci) => setHover(uci ? { fen: node.fen, uci } : null)}
-              threat={{ enabled: threatOn, inCheck: checkSquare !== null, onToggle: setThreatOn }}
-            />
-            <MoveTree
-              tree={tree}
-              version={ctl.version}
-              current={current}
-              onSelect={ctl.select}
-              onPromote={ctl.promote}
-              onDelete={ctl.remove}
-              annotations={annotations}
-              locked={locked}
-              clocks={clocks}
-            />
-            <div className="nav">
-              <button title="Début" aria-label="Début" onClick={() => go(tree.rootId)}>
-                <IconFirst size={20} />
-              </button>
-              <button
-                title="Précédent"
-                aria-label="Précédent"
-                onClick={() => go(tree.prev(current))}
-              >
-                <IconPrev size={20} />
-              </button>
-              <button title="Suivant" aria-label="Suivant" onClick={() => go(tree.next(current))}>
-                <IconNext size={20} />
-              </button>
-              <button title="Fin" aria-label="Fin" onClick={() => go(tree.end(current))}>
-                <IconLast size={20} />
-              </button>
-              <button
-                title="Retourner le plateau (f)"
-                aria-label="Retourner le plateau"
-                onClick={() => setFlipped(!flipped)}
-              >
-                <IconFlip size={20} />
-              </button>
-            </div>
-          </>
-        )}
-        {props.panelBottom}
-      </aside>
-    </div>
+    <BoardLayout
+      className="review analysis-board"
+      testId="analysis-board"
+      slimBars
+      evalBar={<EvalBar value={evalValue(evalShown)} label={evalLabel(evalShown)} />}
+      top={name(orientation === 'w' ? 'b' : 'w')}
+      bottom={name(orientation)}
+      board={
+        <Board
+          pieces={pieces}
+          orientation={orientation}
+          movable={guided ? null : turn}
+          onMove={onMove}
+          lastMove={
+            node.uci
+              ? { from: node.uci.slice(0, 2) as Square, to: node.uci.slice(2, 4) as Square }
+              : null
+          }
+          checkSquare={checkSquare}
+          legalMoves={settings.showLegalMoves && !guided ? tree.legalMoves(current) : null}
+          arrows={arrows}
+          {...(props.marks ? { squareMarks: props.marks } : {})}
+        />
+      }
+      side={
+        <>
+          {props.panelTop}
+          {!guided && (
+            <>
+              <EnginePanel
+                fen={node.fen}
+                engine={engine}
+                enabled={settings.engine}
+                onToggle={(on) => settings.update({ engine: on })}
+                onPlay={(ucis) => ctl.playLine(ucis)}
+                onHover={(uci) => setHover(uci ? { fen: node.fen, uci } : null)}
+                threat={{ enabled: threatOn, inCheck: checkSquare !== null, onToggle: setThreatOn }}
+              />
+              <MoveTree
+                tree={tree}
+                version={ctl.version}
+                current={current}
+                onSelect={ctl.select}
+                onPromote={ctl.promote}
+                onDelete={ctl.remove}
+                annotations={annotations}
+                locked={locked}
+                clocks={clocks}
+              />
+              <div className="nav">
+                <button title="Début" aria-label="Début" onClick={() => go(tree.rootId)}>
+                  <IconFirst size={20} />
+                </button>
+                <button
+                  title="Précédent"
+                  aria-label="Précédent"
+                  onClick={() => go(tree.prev(current))}
+                >
+                  <IconPrev size={20} />
+                </button>
+                <button title="Suivant" aria-label="Suivant" onClick={() => go(tree.next(current))}>
+                  <IconNext size={20} />
+                </button>
+                <button title="Fin" aria-label="Fin" onClick={() => go(tree.end(current))}>
+                  <IconLast size={20} />
+                </button>
+                <button
+                  title="Retourner le plateau (f)"
+                  aria-label="Retourner le plateau"
+                  onClick={() => setFlipped(!flipped)}
+                >
+                  <IconFlip size={20} />
+                </button>
+              </div>
+            </>
+          )}
+          {props.panelBottom}
+        </>
+      }
+    />
   );
 }

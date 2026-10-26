@@ -25,6 +25,7 @@ import { Button } from '../ui/Button';
 import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
+import { BoardLayout } from '../ui/BoardLayout';
 import { IconBulb, IconNext } from '../ui/icons';
 import { RatingDelta, StreakBadge } from '../ui/StreakBadge';
 
@@ -226,183 +227,183 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
   const themeOfDay = stats?.themeOfDay ?? 'fork';
 
   return (
-    <div className="game puzzles">
-      <div className="board-column">
-        <div className="board-wrap">
-          <Board
-            pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
-            orientation={color}
-            movable={playable ? color : null}
-            premoveColor={premoveOn && phase === 'playing' && busy ? color : null}
-            premoves={queue.premoves}
-            onPremove={queue.add}
-            onCancelPremove={queue.clear}
-            legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
-            lastMove={lastMove}
-            highlighted={hint}
-            flash={flash}
-            onMove={(from, to, promotion) =>
-              void onMove(promotion ? { from, to, promotion } : { from, to })
-            }
-          />
-        </div>
-      </div>
-
-      <aside className="panel side-panel">
-        <div className="turn-banner">
-          Puzzles
-          {stats && (
-            <Badge tone="accent" testId="puzzle-rating">
-              Classement {stats.rating} (±{stats.deviation})
-            </Badge>
-          )}
-        </div>
-        <div className="puzzle-stats-row">
-          {stats && (
-            <span className="muted">
-              {stats.solved} réussis sur {stats.attempts}
-            </span>
-          )}
-          <StreakBadge />
-        </div>
-        <Tabs
-          className="tabs-scroll"
-          label="Type de puzzles"
-          value={mode}
-          onChange={setMode}
-          items={MODES.map((m) => ({
-            id: m.mode,
-            testId: `puzzle-mode-${m.mode}`,
-            label: (
-              <>
-                {m.label}
-                {m.mode === 'review' && stats ? ` (${stats.available.due})` : ''}
-                {m.mode === 'mine' && stats ? ` (${stats.available.mine})` : ''}
-              </>
-            ),
-          }))}
+    <BoardLayout
+      className="puzzles"
+      board={
+        <Board
+          pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
+          orientation={color}
+          movable={playable ? color : null}
+          premoveColor={premoveOn && phase === 'playing' && busy ? color : null}
+          premoves={queue.premoves}
+          onPremove={queue.add}
+          onCancelPremove={queue.clear}
+          legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
+          lastMove={lastMove}
+          highlighted={hint}
+          flash={flash}
+          onMove={(from, to, promotion) =>
+            void onMove(promotion ? { from, to, promotion } : { from, to })
+          }
         />
-        {mode === 'theme' && (
-          <label className="theme-select">
-            Thème
-            <select
-              value={theme ?? themeOfDay}
-              data-testid="puzzle-theme"
-              onChange={(e) => setTheme(e.target.value)}
-            >
-              {Object.entries(PUZZLE_THEMES).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                  {key === themeOfDay ? ' (thème du jour)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <div className={`move-card puzzle-status ${phase}`} data-testid="puzzle-status">
-          {phase === 'loading' && <Loading inline label="Chargement du puzzle…" />}
-          {phase === 'no-bank' && (
-            <p>
-              La base de puzzles Lichess n'est pas encore installée. Lance une fois{' '}
-              <code>pnpm puzzles:import</code> (téléchargement d'environ 250 Mo, puis plus aucun
-              accès réseau). En attendant : <strong>Révisions</strong> et{' '}
-              <strong>Mes erreurs</strong>.
-            </p>
-          )}
-          {phase === 'empty' && <p className="muted">{EMPTY_MESSAGE[mode]}</p>}
-          {phase === 'playing' && (
-            <p>
-              {progress
-                ? '✓ Bien vu ! Continue.'
-                : `À toi : trouve le meilleur coup pour les ${SIDE[color]}.`}
-            </p>
-          )}
-          {phase === 'solved' && (
-            <p className="win">
-              ✓ Réussi !{' '}
-              {ratingChange && (
-                <RatingDelta before={ratingChange.before} after={ratingChange.after} />
-              )}
-            </p>
-          )}
-          {phase === 'failed' && (
-            <p className="loss">
-              ✗ Ce n'est pas le bon coup.{' '}
-              {ratingChange && (
-                <RatingDelta before={ratingChange.before} after={ratingChange.after} />
-              )}{' '}
-              Ce puzzle reviendra dans tes révisions.
-            </p>
-          )}
-          {ended && attempt && (
-            <p className="muted">
-              {attempt.rating !== null && `Puzzle ${attempt.rating} · `}
-              {attempt.themes.map(themeLabel).join(', ')}
-              {attempt.origin && (
-                <>
-                  {' · '}
-                  {attempt.origin.url ? (
-                    <a href={attempt.origin.url} target="_blank" rel="noreferrer">
-                      {attempt.origin.label}
-                    </a>
-                  ) : (
-                    attempt.origin.label
-                  )}
-                </>
-              )}
-            </p>
-          )}
-          {!ended && attempt?.origin && attempt.source === 'mine' && (
-            <p className="muted">{attempt.origin.label}</p>
-          )}
-        </div>
-
-        <div className="actions">
-          {phase === 'playing' && (
-            <Button variant="outline" onClick={askHint} disabled={busy} data-testid="puzzle-hint">
-              <IconBulb size={18} />
-              Indice
-            </Button>
-          )}
-          {phase === 'failed' && solution && solution.length > 0 && (
-            <Button onClick={showSolution} data-testid="show-solution">
-              Voir la solution
-            </Button>
-          )}
-          {(ended || phase === 'playing') && (
-            <Button
-              variant={ended ? 'primary' : 'outline'}
-              data-testid="next-puzzle"
-              disabled={busy}
-              onClick={() => {
-                queue.clear();
-                setRound((r) => r + 1);
-              }}
-            >
-              {ended ? 'Puzzle suivant' : 'Passer'}
-              <IconNext size={18} />
-            </Button>
-          )}
-        </div>
-
-        {stats && stats.themes.length > 0 && (
-          <div className="theme-stats">
-            <strong>Tes thèmes</strong>
-            {stats.themes
-              .filter((t) => t.theme in PUZZLE_THEMES)
-              .slice(0, 8)
-              .map((t) => (
-                <div key={t.theme} className="theme-row">
-                  <span>{themeLabel(t.theme)}</span>
-                  <span className="muted">
-                    {Math.round((100 * t.solved) / t.attempts)} % ({t.attempts})
-                  </span>
-                </div>
-              ))}
+      }
+      side={
+        <>
+          <div className="turn-banner">
+            Puzzles
+            {stats && (
+              <Badge tone="accent" testId="puzzle-rating">
+                Classement {stats.rating} (±{stats.deviation})
+              </Badge>
+            )}
           </div>
-        )}
-      </aside>
-    </div>
+          <div className="puzzle-stats-row">
+            {stats && (
+              <span className="muted">
+                {stats.solved} réussis sur {stats.attempts}
+              </span>
+            )}
+            <StreakBadge />
+          </div>
+          <Tabs
+            className="tabs-scroll"
+            label="Type de puzzles"
+            value={mode}
+            onChange={setMode}
+            items={MODES.map((m) => ({
+              id: m.mode,
+              testId: `puzzle-mode-${m.mode}`,
+              label: (
+                <>
+                  {m.label}
+                  {m.mode === 'review' && stats ? ` (${stats.available.due})` : ''}
+                  {m.mode === 'mine' && stats ? ` (${stats.available.mine})` : ''}
+                </>
+              ),
+            }))}
+          />
+          {mode === 'theme' && (
+            <label className="theme-select">
+              Thème
+              <select
+                value={theme ?? themeOfDay}
+                data-testid="puzzle-theme"
+                onChange={(e) => setTheme(e.target.value)}
+              >
+                {Object.entries(PUZZLE_THEMES).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                    {key === themeOfDay ? ' (thème du jour)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <div className={`move-card puzzle-status ${phase}`} data-testid="puzzle-status">
+            {phase === 'loading' && <Loading inline label="Chargement du puzzle…" />}
+            {phase === 'no-bank' && (
+              <p>
+                La base de puzzles Lichess n'est pas encore installée. Lance une fois{' '}
+                <code>pnpm puzzles:import</code> (téléchargement d'environ 250 Mo, puis plus aucun
+                accès réseau). En attendant : <strong>Révisions</strong> et{' '}
+                <strong>Mes erreurs</strong>.
+              </p>
+            )}
+            {phase === 'empty' && <p className="muted">{EMPTY_MESSAGE[mode]}</p>}
+            {phase === 'playing' && (
+              <p>
+                {progress
+                  ? '✓ Bien vu ! Continue.'
+                  : `À toi : trouve le meilleur coup pour les ${SIDE[color]}.`}
+              </p>
+            )}
+            {phase === 'solved' && (
+              <p className="win">
+                ✓ Réussi !{' '}
+                {ratingChange && (
+                  <RatingDelta before={ratingChange.before} after={ratingChange.after} />
+                )}
+              </p>
+            )}
+            {phase === 'failed' && (
+              <p className="loss">
+                ✗ Ce n'est pas le bon coup.{' '}
+                {ratingChange && (
+                  <RatingDelta before={ratingChange.before} after={ratingChange.after} />
+                )}{' '}
+                Ce puzzle reviendra dans tes révisions.
+              </p>
+            )}
+            {ended && attempt && (
+              <p className="muted">
+                {attempt.rating !== null && `Puzzle ${attempt.rating} · `}
+                {attempt.themes.map(themeLabel).join(', ')}
+                {attempt.origin && (
+                  <>
+                    {' · '}
+                    {attempt.origin.url ? (
+                      <a href={attempt.origin.url} target="_blank" rel="noreferrer">
+                        {attempt.origin.label}
+                      </a>
+                    ) : (
+                      attempt.origin.label
+                    )}
+                  </>
+                )}
+              </p>
+            )}
+            {!ended && attempt?.origin && attempt.source === 'mine' && (
+              <p className="muted">{attempt.origin.label}</p>
+            )}
+          </div>
+
+          <div className="actions">
+            {phase === 'playing' && (
+              <Button variant="outline" onClick={askHint} disabled={busy} data-testid="puzzle-hint">
+                <IconBulb size={18} />
+                Indice
+              </Button>
+            )}
+            {phase === 'failed' && solution && solution.length > 0 && (
+              <Button onClick={showSolution} data-testid="show-solution">
+                Voir la solution
+              </Button>
+            )}
+            {(ended || phase === 'playing') && (
+              <Button
+                variant={ended ? 'primary' : 'outline'}
+                data-testid="next-puzzle"
+                disabled={busy}
+                onClick={() => {
+                  queue.clear();
+                  setRound((r) => r + 1);
+                }}
+              >
+                {ended ? 'Puzzle suivant' : 'Passer'}
+                <IconNext size={18} />
+              </Button>
+            )}
+          </div>
+
+          {stats && stats.themes.length > 0 && (
+            <div className="theme-stats">
+              <strong>Tes thèmes</strong>
+              {stats.themes
+                .filter((t) => t.theme in PUZZLE_THEMES)
+                .slice(0, 8)
+                .map((t) => (
+                  <div key={t.theme} className="theme-row">
+                    <span>{themeLabel(t.theme)}</span>
+                    <span className="muted">
+                      {Math.round((100 * t.solved) / t.attempts)} % ({t.attempts})
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </>
+      }
+    />
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   Color,
   DisplayedPiece,
@@ -18,6 +18,7 @@ import { useSession } from '../lib/session';
 import { useSettings } from '../lib/settings';
 import { playSound } from '../lib/sound';
 import { SIDE } from './labels';
+import { BoardLayout } from '../ui/BoardLayout';
 import { Button } from '../ui/Button';
 import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
@@ -55,6 +56,9 @@ function OpeningTrainer(props: {
   onFail: () => void;
   /** Ligne jouée jusqu'au bout ; `clean` : sans aucune erreur. */
   onComplete: (clean: boolean) => void;
+  /** Panneau latéral : retour au répertoire, puis actions (recommencer, ligne suivante). */
+  header: ReactNode;
+  footer: ReactNode;
 }) {
   const { line, steps } = props.drill;
   const san = useSan();
@@ -175,8 +179,10 @@ function OpeningTrainer(props: {
 
   const played = steps.slice(0, ply).map((s) => s.san);
   return (
-    <div className="exercise">
-      <div className="example-board">
+    <BoardLayout
+      className="exercise"
+      testId="opening-trainer"
+      board={
         <Board
           pieces={pieces}
           orientation={line.color}
@@ -186,46 +192,50 @@ function OpeningTrainer(props: {
           flash={flash}
           onMove={(from, to) => onMove(from, to)}
         />
-      </div>
-      <div className="exercise-side">
-        <p>
-          <strong>{line.title}</strong>
-        </p>
-        <p className="muted">
-          Avec les {SIDE[line.color]} · {line.group}
-        </p>
-        <p>{line.idea}</p>
-        <p className="muted" data-testid="opening-played">
-          {played.length > 0 ? lineText(played, san) : 'Position initiale.'}
-        </p>
-        <div
-          className={`move-card puzzle-status ${phase === 'done' ? 'solved' : phase === 'showing' ? 'failed' : 'playing'}`}
-          data-testid="opening-status"
-        >
-          {phase === 'playing' && (
-            <p>
-              {mistake
-                ? 'On recommence la ligne : à toi.'
-                : myTurn(ply)
-                  ? `À toi : coup ${Math.floor(ply / 2) + 1} sur ${Math.ceil(steps.length / 2)}.`
-                  : 'L’adversaire joue…'}
-            </p>
-          )}
-          {phase === 'showing' && mistake && (
-            <p className="loss" data-testid="opening-mistake">
-              ✗ Le répertoire joue {san(mistake)}. On recommence la ligne.
-            </p>
-          )}
-          {phase === 'done' && (
-            <p className="win" data-testid="opening-done">
-              {hadError
-                ? '✓ Ligne terminée. Elle reviendra demain.'
-                : '✓ Ligne réussie sans faute !'}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
+      }
+      side={
+        <>
+          {props.header}
+          <p>
+            <strong>{line.title}</strong>
+          </p>
+          <p className="muted">
+            Avec les {SIDE[line.color]} · {line.group}
+          </p>
+          <p>{line.idea}</p>
+          <p className="muted" data-testid="opening-played">
+            {played.length > 0 ? lineText(played, san) : 'Position initiale.'}
+          </p>
+          <div
+            className={`move-card puzzle-status ${phase === 'done' ? 'solved' : phase === 'showing' ? 'failed' : 'playing'}`}
+            data-testid="opening-status"
+          >
+            {phase === 'playing' && (
+              <p>
+                {mistake
+                  ? 'On recommence la ligne : à toi.'
+                  : myTurn(ply)
+                    ? `À toi : coup ${Math.floor(ply / 2) + 1} sur ${Math.ceil(steps.length / 2)}.`
+                    : 'L’adversaire joue…'}
+              </p>
+            )}
+            {phase === 'showing' && mistake && (
+              <p className="loss" data-testid="opening-mistake">
+                ✗ Le répertoire joue {san(mistake)}. On recommence la ligne.
+              </p>
+            )}
+            {phase === 'done' && (
+              <p className="win" data-testid="opening-done">
+                {hadError
+                  ? '✓ Ligne terminée. Elle reviendra demain.'
+                  : '✓ Ligne réussie sans faute !'}
+              </p>
+            )}
+          </div>
+          {props.footer}
+        </>
+      }
+    />
   );
 }
 
@@ -335,20 +345,20 @@ export function Openings() {
 
   if (drill) {
     return (
-      <div className="page lesson">
-        <div className="panel page-panel" data-testid="opening-trainer">
+      <OpeningTrainer
+        key={attempt}
+        drill={drill}
+        onFail={() => record(drill.line.id, false)}
+        onComplete={(clean) => {
+          if (clean) record(drill.line.id, true);
+          setFinished(true);
+        }}
+        header={
           <Button variant="link" onClick={() => (setDrill(null), reload())}>
             ← Répertoire
           </Button>
-          <OpeningTrainer
-            key={attempt}
-            drill={drill}
-            onFail={() => record(drill.line.id, false)}
-            onComplete={(clean) => {
-              if (clean) record(drill.line.id, true);
-              setFinished(true);
-            }}
-          />
+        }
+        footer={
           <div className="actions">
             <Button onClick={() => open(drill)} data-testid="opening-again">
               <IconRetry size={18} />
@@ -366,8 +376,8 @@ export function Openings() {
               </Button>
             ) : null}
           </div>
-        </div>
-      </div>
+        }
+      />
     );
   }
 

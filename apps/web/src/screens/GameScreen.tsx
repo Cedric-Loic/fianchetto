@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import {
   GENERIC_ILLEGAL_MOVE_MESSAGE,
   type Color,
@@ -28,6 +28,7 @@ import { GameActions, ResignDialog } from '../game/GameActions';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
+import { BoardLayout } from '../ui/BoardLayout';
 import {
   IconBulb,
   IconChart,
@@ -339,7 +340,11 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         </div>
       );
     return (
-      <div className="focus-overlay" data-testid="focus">
+      <div
+        className="focus-overlay"
+        data-testid="focus"
+        style={{ '--bars-n': state.clock ? 2 : 0 } as CSSProperties}
+      >
         <button
           className="focus-close"
           title="Quitter le mode concentration (Échap)"
@@ -453,145 +458,151 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   );
 
   return (
-    <div className={`game${mobile ? ' game-mobile' : ''}`}>
-      <div className="board-column">
-        {bar(top)}
-        <div className="board-wrap">
+    <BoardLayout
+      className={mobile ? 'game-mobile' : ''}
+      top={bar(top)}
+      bottom={bar(bottom)}
+      board={
+        <>
           {boardElement}
           {toastRegion}
-        </div>
-        {bar(bottom)}
-        {mobile && <MoveStrip moves={board.moves} cursor={shownPly} onSelect={setCursor} />}
-      </div>
+        </>
+      }
+      below={mobile && <MoveStrip moves={board.moves} cursor={shownPly} onSelect={setCursor} />}
+      after={
+        <>
+          {mobile && mobileBar}
+          {overlays}
+        </>
+      }
+      side={
+        <>
+          <div className="turn-banner" data-testid="turn-banner">
+            {turnText}
+            <Badge>{VARIANT_LABEL[state.variant]}</Badge>
+            {state.rated && <Badge tone="accent">Classée</Badge>}
+            {state.training && <Badge tone="info">Entraînement</Badge>}
+          </div>
+          {!mobile && <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />}
+          <div className="nav" hidden={mobile}>
+            <button title="Début" aria-label="Début" onClick={() => setCursor(0)}>
+              <IconFirst size={20} />
+            </button>
+            <button
+              title="Précédent"
+              aria-label="Précédent"
+              onClick={() => setCursor(Math.max(0, shownPly - 1))}
+            >
+              <IconPrev size={20} />
+            </button>
+            <button
+              title="Suivant"
+              aria-label="Suivant"
+              onClick={() => setCursor(Math.min(plyCount, shownPly + 1))}
+            >
+              <IconNext size={20} />
+            </button>
+            <button title="Fin" aria-label="Fin" onClick={() => setCursor(null)}>
+              <IconLast size={20} />
+            </button>
+            <button
+              title="Mode concentration"
+              aria-label="Mode concentration"
+              data-testid="focus-button"
+              onClick={enterFocus}
+            >
+              <IconExpand size={20} />
+            </button>
+            <button
+              title="Retourner le plateau"
+              aria-label="Retourner le plateau"
+              onClick={() => setOrientation(top)}
+            >
+              <IconFlip size={20} />
+            </button>
+          </div>
 
-      <aside className="panel side-panel">
-        <div className="turn-banner" data-testid="turn-banner">
-          {turnText}
-          <Badge>{VARIANT_LABEL[state.variant]}</Badge>
-          {state.rated && <Badge tone="accent">Classée</Badge>}
-          {state.training && <Badge tone="info">Entraînement</Badge>}
-        </div>
-        {!mobile && <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />}
-        <div className="nav" hidden={mobile}>
-          <button title="Début" aria-label="Début" onClick={() => setCursor(0)}>
-            <IconFirst size={20} />
-          </button>
-          <button
-            title="Précédent"
-            aria-label="Précédent"
-            onClick={() => setCursor(Math.max(0, shownPly - 1))}
-          >
-            <IconPrev size={20} />
-          </button>
-          <button
-            title="Suivant"
-            aria-label="Suivant"
-            onClick={() => setCursor(Math.min(plyCount, shownPly + 1))}
-          >
-            <IconNext size={20} />
-          </button>
-          <button title="Fin" aria-label="Fin" onClick={() => setCursor(null)}>
-            <IconLast size={20} />
-          </button>
-          <button
-            title="Mode concentration"
-            aria-label="Mode concentration"
-            data-testid="focus-button"
-            onClick={enterFocus}
-          >
-            <IconExpand size={20} />
-          </button>
-          <button
-            title="Retourner le plateau"
-            aria-label="Retourner le plateau"
-            onClick={() => setOrientation(top)}
-          >
-            <IconFlip size={20} />
-          </button>
-        </div>
-
-        {endgame && (
-          <p className="endgame-goal" data-testid="endgame-goal">
-            <strong>{endgame.title}</strong> · {endgame.objective}
-          </p>
-        )}
-        {!ended && state.training && (
-          <div className="training" data-testid="training-panel">
+          {endgame && (
+            <p className="endgame-goal" data-testid="endgame-goal">
+              <strong>{endgame.title}</strong> · {endgame.objective}
+            </p>
+          )}
+          {!ended && state.training && (
+            <div className="training" data-testid="training-panel">
+              <div className="actions">
+                <Button onClick={askHint} disabled={board.turn !== me} data-testid="hint">
+                  <IconBulb size={18} />
+                  {currentHint && currentHint.level < 3 ? 'Indice suivant' : 'Indice'}
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Le coup affiché en attente et les premoves n'ont plus lieu d'être.
+                    setPending(null);
+                    queue.clear();
+                    send({ type: 'takeback' });
+                  }}
+                  disabled={plyCount === 0}
+                  data-testid="takeback"
+                >
+                  <IconUndo size={18} />
+                  Reprendre le coup
+                </Button>
+              </div>
+              {currentHint && (
+                <p className="hint-text" data-testid="hint-text">
+                  {currentHint.text}
+                </p>
+              )}
+            </div>
+          )}
+          {!ended && (
+            <>
+              {!isBot && !classic && (
+                <button
+                  className="peek"
+                  data-testid="peek"
+                  onPointerDown={holdStart}
+                  onPointerUp={holdEnd}
+                  onPointerLeave={holdEnd}
+                  onPointerCancel={holdEnd}
+                >
+                  Voir ma dame secrète ({SIDE[board.turn]}) — maintenir
+                </button>
+              )}
+              {/* Téléphone : nulle et abandon dans la barre du bas, sauf réponse à une offre. */}
+              {(!mobile || state.drawOffer !== null) && actions(false)}
+            </>
+          )}
+          {ended && (
             <div className="actions">
-              <Button onClick={askHint} disabled={board.turn !== me} data-testid="hint">
-                <IconBulb size={18} />
-                {currentHint && currentHint.level < 3 ? 'Indice suivant' : 'Indice'}
+              {endgame ? (
+                <Button variant="primary" onClick={() => void startEndgame(endgame.id)}>
+                  <IconRetry size={18} />
+                  Réessayer
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
+                  <IconRetry size={18} />
+                  Revanche
+                </Button>
+              )}
+              <Button onClick={onLeave}>Nouvelle partie</Button>
+            </div>
+          )}
+          {ended && (
+            <div className="actions">
+              <Button href={`#/review/${state.gameId}`} data-testid="review-link">
+                <IconChart size={18} />
+                Revue de la partie
               </Button>
-              <Button
-                onClick={() => {
-                  // Le coup affiché en attente et les premoves n'ont plus lieu d'être.
-                  setPending(null);
-                  queue.clear();
-                  send({ type: 'takeback' });
-                }}
-                disabled={plyCount === 0}
-                data-testid="takeback"
-              >
-                <IconUndo size={18} />
-                Reprendre le coup
+              <Button href={`/api/games/${state.gameId}/pgn`} download="partie.pgn">
+                <IconDownload size={18} />
+                PGN
               </Button>
             </div>
-            {currentHint && (
-              <p className="hint-text" data-testid="hint-text">
-                {currentHint.text}
-              </p>
-            )}
-          </div>
-        )}
-        {!ended && (
-          <>
-            {!isBot && !classic && (
-              <button
-                className="peek"
-                data-testid="peek"
-                onPointerDown={holdStart}
-                onPointerUp={holdEnd}
-                onPointerLeave={holdEnd}
-                onPointerCancel={holdEnd}
-              >
-                Voir ma dame secrète ({SIDE[board.turn]}) — maintenir
-              </button>
-            )}
-            {/* Téléphone : nulle et abandon dans la barre du bas, sauf réponse à une offre. */}
-            {(!mobile || state.drawOffer !== null) && actions(false)}
-          </>
-        )}
-        {ended && (
-          <div className="actions">
-            {endgame ? (
-              <Button variant="primary" onClick={() => void startEndgame(endgame.id)}>
-                <IconRetry size={18} />
-                Réessayer
-              </Button>
-            ) : (
-              <Button variant="primary" onClick={() => send({ type: 'offer-rematch' })}>
-                <IconRetry size={18} />
-                Revanche
-              </Button>
-            )}
-            <Button onClick={onLeave}>Nouvelle partie</Button>
-          </div>
-        )}
-        {ended && (
-          <div className="actions">
-            <Button href={`#/review/${state.gameId}`} data-testid="review-link">
-              <IconChart size={18} />
-              Revue de la partie
-            </Button>
-            <Button href={`/api/games/${state.gameId}/pgn`} download="partie.pgn">
-              <IconDownload size={18} />
-              PGN
-            </Button>
-          </div>
-        )}
-      </aside>
-      {mobile && mobileBar}
-      {overlays}
-    </div>
+          )}
+        </>
+      }
+    />
   );
 }

@@ -18,6 +18,7 @@ import { playSound } from '../lib/sound';
 import { useStreak } from '../lib/streak';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
+import { BoardLayout } from '../ui/BoardLayout';
 import { Button } from '../ui/Button';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
@@ -129,6 +130,9 @@ function ExerciseBoard(props: {
   index: number;
   exercise: LessonExercise;
   onDone: (firstTry: boolean) => void;
+  /** Panneau latéral : en-tête (retour, titre) et suite (bouton suivant). */
+  header: ReactNode;
+  footer: ReactNode;
 }) {
   const { exercise } = props;
   const showLegalMoves = useSettings((s) => s.showLegalMoves);
@@ -235,8 +239,10 @@ function ExerciseBoard(props: {
   }, [nextPremove]);
 
   return (
-    <div className="exercise">
-      <div className="example-board">
+    <BoardLayout
+      className="exercise"
+      testId="exercises"
+      board={
         <Board
           pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
           orientation={exercise.color}
@@ -252,20 +258,24 @@ function ExerciseBoard(props: {
             void onMove(promotion ? { from, to, promotion } : { from, to })
           }
         />
-      </div>
-      <div className="exercise-side">
-        <p>
-          <strong>{exercise.prompt}</strong>
-        </p>
-        <p className="muted">Trait aux {SIDE[exercise.color]}.</p>
-        <div className={`move-card puzzle-status ${phase}`} data-testid="exercise-status">
-          {phase === 'playing' && <p>{progress ? '✓ Bien vu ! Continue.' : 'À toi de jouer.'}</p>}
-          {phase === 'solved' && <p className="win">✓ Réussi !</p>}
-          {phase === 'failed' && <p className="loss">✗ Ce n'est pas ça. Voici la solution.</p>}
-          {explanation && <p data-testid="exercise-explanation">{explanation}</p>}
-        </div>
-      </div>
-    </div>
+      }
+      side={
+        <>
+          {props.header}
+          <p>
+            <strong>{exercise.prompt}</strong>
+          </p>
+          <p className="muted">Trait aux {SIDE[exercise.color]}.</p>
+          <div className={`move-card puzzle-status ${phase}`} data-testid="exercise-status">
+            {phase === 'playing' && <p>{progress ? '✓ Bien vu ! Continue.' : 'À toi de jouer.'}</p>}
+            {phase === 'solved' && <p className="win">✓ Réussi !</p>}
+            {phase === 'failed' && <p className="loss">✗ Ce n'est pas ça. Voici la solution.</p>}
+            {explanation && <p data-testid="exercise-explanation">{explanation}</p>}
+          </div>
+          {props.footer}
+        </>
+      }
+    />
   );
 }
 
@@ -317,6 +327,44 @@ export function LessonPage({ id }: { id: string }) {
     setAttempt((a) => a + 1);
   };
 
+  if (exercise && current !== null) {
+    return (
+      <ExerciseBoard
+        key={`${attempt}-${current}`}
+        lessonId={lesson.id}
+        index={current}
+        exercise={exercise}
+        onDone={onDone}
+        header={
+          <>
+            <a href="#/lessons" className="back-link">
+              ← Toutes les leçons
+            </a>
+            <div className="puzzle-stats-row">
+              <h2 className="exercise-title">{lesson.title}</h2>
+              <StreakBadge />
+            </div>
+            <p className="muted">
+              Exercice {current + 1} / {total}
+            </p>
+          </>
+        }
+        footer={
+          answered && (
+            <Button
+              variant="primary"
+              onClick={() => setCurrent(current + 1)}
+              data-testid="next-exercise"
+            >
+              {current + 1 < total ? 'Exercice suivant' : 'Voir le bilan'}
+              <IconNext size={18} />
+            </Button>
+          )
+        }
+      />
+    );
+  }
+
   return (
     <div className="page lesson">
       <div className="panel page-panel">
@@ -365,30 +413,6 @@ export function LessonPage({ id }: { id: string }) {
             <Button variant="primary" onClick={() => setCurrent(0)} data-testid="start-exercises">
               Commencer les exercices
             </Button>
-          </>
-        )}
-        {exercise && current !== null && (
-          <>
-            <p className="muted">
-              Exercice {current + 1} / {total}
-            </p>
-            <ExerciseBoard
-              key={`${attempt}-${current}`}
-              lessonId={lesson.id}
-              index={current}
-              exercise={exercise}
-              onDone={onDone}
-            />
-            {answered && (
-              <Button
-                variant="primary"
-                onClick={() => setCurrent(current + 1)}
-                data-testid="next-exercise"
-              >
-                {current + 1 < total ? 'Exercice suivant' : 'Voir le bilan'}
-                <IconNext size={18} />
-              </Button>
-            )}
           </>
         )}
         {finished && (

@@ -163,7 +163,7 @@ function BoardTab({ fen }: { fen: string | null }) {
  */
 export function Analyse({ tab = 'import', fen = null }: { tab?: AnalyseTab; fen?: string | null }) {
   return (
-    <div className="analyse-shell">
+    <div className={`analyse-shell${tab === 'board' ? ' board-shell' : ''}`}>
       <Tabs
         label="Analyse"
         className="analyse-tabs"
