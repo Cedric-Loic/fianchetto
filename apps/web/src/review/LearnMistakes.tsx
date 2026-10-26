@@ -18,6 +18,8 @@ export const REFUTATION_STEP_MS = 650;
 export const REFUTATION_PAUSE_MS = 900;
 /** Longueur de la réfutation montrée après un coup faux (demi-coups, coup proposé exclu). */
 const REFUTATION_PLIES = 3;
+/** Mode quiz : durée d'affichage du verdict « bien joué » avant la révélation du coach. */
+const QUIZ_PAUSE_MS = 1100;
 
 type Phase = 'play' | 'checking' | 'right' | 'wrong';
 /** Bilan d'une position : trouvée du premier coup, trouvée ensuite, ou ratée / passée. */
@@ -42,7 +44,13 @@ export function LearnMistakes(props: {
   moves: readonly ReviewMove[];
   orientation: Color;
   onExit: () => void;
+  /**
+   * Mode quiz : une seule position, sans rappel du coup joué ni solution ; la réponse (juste,
+   * fausse ou « Je ne sais pas ») est rendue au parent, qui révèle ensuite le coach.
+   */
+  quiz?: { progress: string; score: string; onAnswered: (found: boolean) => void };
 }) {
+  const { quiz } = props;
   const { review, moves } = props;
   const san = useSan();
   const [index, setIndex] = useState(0);
@@ -154,6 +162,7 @@ export function LearnMistakes(props: {
             ? ` Le moteur préférait ${san(best.bestMoveSan)}.`
             : '';
         setFeedback({ tone: 'ok', text: `✓ Bien joué : ${san(res.san)}.${preferred}` });
+        if (quiz) later(() => quiz.onAnswered(true), QUIZ_PAUSE_MS);
         return;
       }
       setTainted(true);
@@ -173,6 +182,7 @@ export function LearnMistakes(props: {
       });
       later(
         () => {
+          if (quiz) return quiz.onAnswered(false);
           setFen(startFen);
           setLastMove(null);
           setPhase('play');
@@ -189,8 +199,8 @@ export function LearnMistakes(props: {
 
   const banner = (
     <ModeBanner
-      title="Apprends de tes erreurs"
-      progress={finished ? `${total} / ${total}` : `${index + 1} / ${total}`}
+      title={quiz ? 'Mode quiz' : 'Apprends de tes erreurs'}
+      progress={quiz ? quiz.progress : finished ? `${total} / ${total}` : `${index + 1} / ${total}`}
       onExit={props.onExit}
     />
   );
@@ -288,18 +298,34 @@ export function LearnMistakes(props: {
         <>
           {banner}
           <div className="move-card learn-card" data-testid="learn-card">
-            <p className="muted learn-context">
-              Coup {moveNumber(move)} — tu as joué{' '}
-              <strong>
-                {san(move.san)} {CLASS_SYMBOL[move.classification]}
-              </strong>{' '}
-              <span className={`class-badge ${classCss(move.classification)}`}>
-                {CLASS_LABEL[move.classification]}
-              </span>
-            </p>
+            {quiz && (
+              <p className="muted" data-testid="quiz-score">
+                {quiz.score}
+              </p>
+            )}
+            {!quiz && (
+              <p className="muted learn-context">
+                Coup {moveNumber(move)} — tu as joué{' '}
+                <strong>
+                  {san(move.san)} {CLASS_SYMBOL[move.classification]}
+                </strong>{' '}
+                <span className={`class-badge ${classCss(move.classification)}`}>
+                  {CLASS_LABEL[move.classification]}
+                </span>
+              </p>
+            )}
             <p className="learn-prompt" data-testid="learn-prompt">
-              Trouve un meilleur coup que <strong>{san(move.san)}</strong>
-              {move.color === 'w' ? ' (Blancs au trait)' : ' (Noirs au trait)'}.
+              {quiz ? (
+                <>
+                  Quel coup jouerais-tu ici ?
+                  {move.color === 'w' ? ' (Blancs au trait)' : ' (Noirs au trait)'}
+                </>
+              ) : (
+                <>
+                  Trouve un meilleur coup que <strong>{san(move.san)}</strong>
+                  {move.color === 'w' ? ' (Blancs au trait)' : ' (Noirs au trait)'}.
+                </>
+              )}
             </p>
             {phase === 'checking' && <p className="muted">Vérification…</p>}
             {feedback && (
@@ -322,7 +348,26 @@ export function LearnMistakes(props: {
             )}
           </div>
           <div className="actions">
-            {phase === 'right' ? (
+            {quiz ? (
+              <>
+                <Button
+                  data-testid="learn-hint-button"
+                  disabled={phase !== 'play' || hint || !bestUci}
+                  onClick={showHint}
+                >
+                  <IconBulb size={18} />
+                  Indice
+                </Button>
+                <Button
+                  data-testid="quiz-skip"
+                  disabled={phase !== 'play'}
+                  onClick={() => quiz.onAnswered(false)}
+                >
+                  Je ne sais pas
+                  <IconNext size={18} />
+                </Button>
+              </>
+            ) : phase === 'right' ? (
               <Button variant="primary" data-testid="learn-next" onClick={next}>
                 {index + 1 < total ? 'Suivant' : 'Voir le score'}
                 {index + 1 < total && <IconNext size={18} />}
@@ -351,9 +396,11 @@ export function LearnMistakes(props: {
               </>
             )}
           </div>
-          <p className="muted learn-note">
-            Les positions ratées reviennent dans tes puzzles « Mes erreurs ».
-          </p>
+          {!quiz && (
+            <p className="muted learn-note">
+              Les positions ratées reviennent dans tes puzzles « Mes erreurs ».
+            </p>
+          )}
         </>
       }
     />

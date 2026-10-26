@@ -14,6 +14,7 @@ import { SIDE } from '../screens/labels';
 import {
   guidedSummary,
   MOMENT_LABEL,
+  type QuizScore,
   splitSquares,
   type KeyMoment,
   type MomentTag,
@@ -150,6 +151,8 @@ export interface GuidedPanelProps {
   onRetry: (move: ReviewMove) => void;
   onLearn: () => void;
   onExit: () => void;
+  /** Mode quiz actif : score, et réponse à ce moment (`undefined` : pas un moment du quiz). */
+  quiz?: { score: QuizScore; result: boolean | undefined };
   /** Courbe d'évaluation (placée sous la bulle). */
   chart?: ReactNode;
 }
@@ -168,6 +171,11 @@ export function GuidedPanel(props: GuidedPanelProps) {
       progress={atEnd ? 'Bilan' : `${index + 1} / ${total}`}
       onExit={props.onExit}
     />
+  );
+  const quizLine = props.quiz && props.quiz.score.total > 0 && (
+    <p className="muted quiz-score" data-testid="quiz-score">
+      Quiz : {props.quiz.score.found}/{props.quiz.score.total} trouvés
+    </p>
   );
 
   const nav = (
@@ -201,6 +209,13 @@ export function GuidedPanel(props: GuidedPanelProps) {
       <>
         {banner}
         <div className="move-card guided-summary" data-testid="guided-summary">
+          {props.quiz && props.quiz.score.total > 0 && (
+            <p data-testid="quiz-summary">
+              <strong>Quiz :</strong> {props.quiz.score.found} / {props.quiz.score.total} trouvés
+              {props.quiz.score.found < props.quiz.score.total &&
+                ' — les autres sont à retravailler dans « Apprends de tes erreurs ».'}
+            </p>
+          )}
           <p>
             <strong>Bilan de la partie</strong>
             {total === 0 && <span className="muted"> — aucun moment clé à revoir.</span>}
@@ -259,6 +274,17 @@ export function GuidedPanel(props: GuidedPanelProps) {
   return (
     <>
       {banner}
+      {quizLine}
+      {props.quiz?.result !== undefined && (
+        <p
+          className={`learn-feedback ${props.quiz.result ? 'ok' : 'bad'}`}
+          data-testid="quiz-result"
+        >
+          {props.quiz.result
+            ? '✓ Tu as trouvé un bon coup.'
+            : '✗ Pas cette fois. Voici ce qui s’est passé.'}
+        </p>
+      )}
       <CoachBubble
         moment={moment}
         bestSan={before?.bestMoveSan ?? null}

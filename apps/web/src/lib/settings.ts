@@ -86,6 +86,8 @@ export interface Settings {
   engine: boolean;
   /** Coups affichés en notation française (C, F, T, D, R) au lieu de l'anglaise. */
   frenchNotation: boolean;
+  /** Revue guidée en quiz : on devine ton coup avant que le coach ne l'explique. */
+  quiz: boolean;
   /** Premier lancement guidé terminé (ou passé). */
   onboarded: boolean;
   /** Dernière partie lancée (mode, niveau, couleur, cadence). */
@@ -105,6 +107,7 @@ const DEFAULTS: Settings = {
   premoves: true,
   engine: false,
   frenchNotation: false,
+  quiz: false,
   onboarded: false,
   lastPlay: null,
 };
@@ -131,6 +134,7 @@ export function loadSettings(): Settings {
       premoves: bool(parsed.premoves, DEFAULTS.premoves),
       engine: bool(parsed.engine, DEFAULTS.engine),
       frenchNotation: bool(parsed.frenchNotation, DEFAULTS.frenchNotation),
+      quiz: bool(parsed.quiz, DEFAULTS.quiz),
       onboarded: bool(parsed.onboarded, DEFAULTS.onboarded),
       lastPlay: parseLastPlay(parsed.lastPlay),
       chessComUsername:

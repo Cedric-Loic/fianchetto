@@ -69,6 +69,39 @@ export function keyMoments(review: GameReview, userColor: Color | null): KeyMome
   return [...byPly.values()].sort((a, b) => a.ply - b.ply);
 }
 
+/**
+ * Moment du quiz : coup de l'utilisateur (camp connu) qui est une erreur, une gaffe ou un gain
+ * manqué. Le tournant seul, ou un coup adverse, reste affiché normalement.
+ */
+export function isQuizMoment(moment: KeyMoment, userColor: Color | null): boolean {
+  return (
+    userColor !== null &&
+    moment.move.color === userColor &&
+    moment.tags.some((t) => t === 'blunder' || t === 'mistake' || t === 'missed-win')
+  );
+}
+
+export interface QuizScore {
+  found: number;
+  total: number;
+  /** Positions déjà répondues. */
+  answered: number;
+}
+
+/** Score du quiz ; `results` : ply du moment → trouvé ou non (absent = pas encore répondu). */
+export function quizScore(
+  moments: readonly KeyMoment[],
+  userColor: Color | null,
+  results: Readonly<Record<number, boolean>>,
+): QuizScore {
+  const quiz = moments.filter((m) => isQuizMoment(m, userColor));
+  return {
+    found: quiz.filter((m) => results[m.ply] === true).length,
+    total: quiz.length,
+    answered: quiz.filter((m) => results[m.ply] !== undefined).length,
+  };
+}
+
 /** Conseil du coach selon le type d'erreur. */
 export const TIPS: Record<ExplanationKind, string> = {
   'hanging-piece':

@@ -39,11 +39,11 @@ async function register(page: Page) {
   await expect(page.getByTestId('nav-user')).toBeVisible();
 }
 
-async function shots(page: Page, name: string) {
+async function shots(page: Page, name: string, desktop: [number, number] = [1366, 768]) {
   if (!OUT) return;
   mkdirSync(OUT, { recursive: true });
   for (const [label, width, height] of [
-    ['bureau', 1366, 768],
+    ['bureau', desktop[0], desktop[1]],
     ['mobile', 390, 844],
   ] as const) {
     await page.setViewportSize({ width, height });
@@ -138,6 +138,44 @@ test('revue guidée jusqu’au bilan, puis « Apprends de tes erreurs »', async
   await expect(page.getByTestId('guided-summary')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('start-guided')).toBeVisible();
+});
+
+test('revue guidée en mode quiz : réponse, puis bulle du coach', async ({ page }) => {
+  test.setTimeout(180_000);
+  await register(page);
+  await page.goto('/#/analyse');
+  await page.getByTestId('chesscom-username').fill('moi_cc');
+  await page.getByTestId('pgn-input').fill(PGN);
+  await page.getByRole('button', { name: 'Importer le PGN' }).click();
+  await expect(page.getByTestId('import-message')).toContainText('1 partie importée');
+  await page.getByTestId('imported-games').getByRole('link', { name: 'Analyser' }).click();
+  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+
+  await page.getByTestId('quiz-toggle').check();
+  await page.getByTestId('start-guided').click();
+  // Position AVANT 3. Nxe5 : consigne, ni bulle ni flèche.
+  await expect(page.getByTestId('mode-banner')).toContainText('Mode quiz');
+  await expect(page.getByTestId('learn-prompt')).toContainText('Quel coup jouerais-tu ici ?');
+  await expect(page.getByTestId('guided-moment')).toHaveCount(0);
+  await expect(page.locator('[data-testid="arrows"] g')).toHaveCount(0);
+  await expect(page.locator('img[data-square="f3"]')).toHaveAttribute('alt', 'wn');
+  await shots(page, 'quiz', [1920, 1080]);
+
+  // Mauvaise réponse (3. Ba6 ?? bxa6) : réfutation, puis la bulle du coach.
+  await clickSquare(page, 'f1');
+  await clickSquare(page, 'a6');
+  await expect(page.getByTestId('guided-moment')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('quiz-result')).toContainText('✗');
+  await expect(page.getByTestId('guided-moment')).toContainText('Nxe5');
+  await expect(page.getByTestId('quiz-score')).toContainText('0/1 trouvés');
+  await shots(page, 'quiz-reponse', [1920, 1080]);
+
+  for (let i = 0; i < 20 && (await page.getByTestId('guided-next').isVisible()); i++) {
+    await page.getByTestId('guided-next').click();
+    if (await page.getByTestId('quiz-skip').isVisible())
+      await page.getByTestId('quiz-skip').click();
+  }
+  await expect(page.getByTestId('quiz-summary')).toContainText('0 / 1 trouvés');
 });
 
 test('moteur en direct réel : profondeur ≥ 5, puis menace', async ({ page }) => {

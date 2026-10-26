@@ -22,7 +22,14 @@ import { useSan } from '../lib/notation';
 import { useSettings } from '../lib/settings';
 import { ExplainText, GuidedPanel } from '../review/GuidedReview';
 import { LearnMistakes } from '../review/LearnMistakes';
-import { formatMoveClock, keyMoments, mistakesOf, TIPS } from '../review/moments';
+import {
+  formatMoveClock,
+  isQuizMoment,
+  keyMoments,
+  mistakesOf,
+  quizScore,
+  TIPS,
+} from '../review/moments';
 import { RepertoireNote } from './Openings';
 import { SIDE, VARIANT_LABEL } from './labels';
 import { Badge } from '../ui/Badge';
@@ -233,6 +240,10 @@ function ReviewBoard({
   );
   const { tree, current } = ctl;
   const engineOn = useSettings((s) => s.engine);
+  const quizOn = useSettings((s) => s.quiz);
+  const updateSettings = useSettings((s) => s.update);
+  /** Réponses du quiz : ply du moment → trouvé ou non. */
+  const [quizResults, setQuizResults] = useState<Record<number, boolean>>({});
   const [replayLevel, setReplayLevel] = useState(4);
   const [replayError, setReplayError] = useState<string | null>(null);
   /** Premier nœud de la variante créée par « Voir la ligne » (supprimée au retour). */
@@ -383,6 +394,33 @@ function ReviewBoard({
     setMode((m) => ({ kind: 'learn', moves, back: m.kind === 'learn' ? m.back : m }));
   };
 
+  const quizCurrent = mode.kind === 'guided' ? moments[mode.index] : undefined;
+  if (
+    mode.kind === 'guided' &&
+    quizOn &&
+    quizCurrent &&
+    info.userColor &&
+    isQuizMoment(quizCurrent, info.userColor) &&
+    quizResults[quizCurrent.ply] === undefined
+  ) {
+    const score = quizScore(moments, info.userColor, quizResults);
+    return (
+      <LearnMistakes
+        key={quizCurrent.ply}
+        reviewId={reviewId}
+        review={review}
+        moves={[quizCurrent.move]}
+        orientation={info.userColor}
+        quiz={{
+          progress: `${mode.index + 1} / ${moments.length}`,
+          score: `Quiz : ${score.found}/${score.total} trouvés`,
+          onAnswered: (found) => setQuizResults((r) => ({ ...r, [quizCurrent.ply]: found })),
+        }}
+        onExit={exitMode}
+      />
+    );
+  }
+
   if (mode.kind === 'learn') {
     return (
       <LearnMistakes
@@ -530,6 +568,14 @@ function ReviewBoard({
             index={mode.index}
             onIndex={showMoment}
             onSquare={(sq) => setHoverSquare(sq as Square | null)}
+            {...(quizOn && info.userColor
+              ? {
+                  quiz: {
+                    score: quizScore(moments, info.userColor, quizResults),
+                    result: moments[mode.index] ? quizResults[moments[mode.index]!.ply] : undefined,
+                  },
+                }
+              : {})}
             onShowLine={(m, line) => showLine(m, line)}
             onRetry={(m) => startLearn([m])}
             onLearn={() => startLearn(learnMoves)}
@@ -585,6 +631,23 @@ function ReviewBoard({
               <IconTarget size={18} />
               Apprends de tes erreurs
             </Button>
+            <label
+              className="quiz-toggle"
+              title={
+                info.userColor === null
+                  ? 'Camp inconnu dans cette partie'
+                  : 'Devine ton coup avant l’explication du coach'
+              }
+            >
+              <input
+                type="checkbox"
+                data-testid="quiz-toggle"
+                checked={quizOn && info.userColor !== null}
+                disabled={info.userColor === null}
+                onChange={(e) => updateSettings({ quiz: e.target.checked })}
+              />
+              Mode quiz
+            </label>
           </div>
           <div className="accuracy-row">{(['w', 'b'] as const).map(accuracyCard)}</div>
           {chart}

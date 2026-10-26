@@ -5,7 +5,9 @@ import {
   TIPS,
   formatMoveClock,
   guidedSummary,
+  isQuizMoment,
   keyMoments,
+  quizScore,
   mistakesOf,
   splitSquares,
 } from '../src/review/moments';
@@ -141,5 +143,32 @@ describe('pendule et conseils (lot 4d)', () => {
     ] as const) {
       expect(TIPS[kind].length).toBeGreaterThan(20);
     }
+  });
+});
+
+describe('mode quiz', () => {
+  // Coups 1 (blanc, gaffe, position gagnante), 2 (noir, gaffe), 3 (blanc, tournant sans erreur).
+  const review = reviewOf([
+    { ...mv(1, 'blunder', 80, 40, 'hanging-piece') },
+    mv(2, 'blunder', 60, 95),
+    mv(3, 'good', 90, 30),
+    mv(5, 'mistake', 50, 35),
+  ]);
+  const moments = keyMoments(review, 'w');
+
+  it('ne retient que les coups fautifs de l’utilisateur', () => {
+    expect(moments.map((m) => m.ply)).toEqual([1, 3, 5]);
+    expect(moments.filter((m) => isQuizMoment(m, 'w')).map((m) => m.ply)).toEqual([1, 5]);
+    // Le tournant seul (coup 3) et le camp inconnu restent hors quiz.
+    expect(moments.some((m) => isQuizMoment(m, null))).toBe(false);
+  });
+
+  it('compte les positions trouvées et répondues', () => {
+    expect(quizScore(moments, 'w', {})).toEqual({ found: 0, total: 2, answered: 0 });
+    expect(quizScore(moments, 'w', { 1: true, 5: false })).toEqual({
+      found: 1,
+      total: 2,
+      answered: 2,
+    });
   });
 });

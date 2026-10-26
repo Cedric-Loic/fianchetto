@@ -2369,6 +2369,16 @@ textarea:focus-visible {
   flex: 1 1 auto;
   white-space: nowrap;
 }
+.quiz-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.quiz-score {
+  margin: 0;
+  font-weight: 600;
+}
 .mode-banner {
   display: flex;
   align-items: center;
