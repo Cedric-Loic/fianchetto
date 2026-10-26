@@ -78,3 +78,21 @@ export {
   type OpeningLineStep,
   type OpeningSchedule,
 } from './openings.js';
+export {
+  computeSkills,
+  skillForKind,
+  skillForTheme,
+  weakestSkill,
+  type SkillEvidence,
+} from './skills.js';
+export { newCardSchedule, nextCardSchedule, type CardSchedule } from './cards.js';
+export {
+  CURRICULUM,
+  nextStep,
+  stepDone,
+  type CurriculumModule,
+  type CurriculumProgress,
+  type NextStep,
+  type StepRef,
+} from './curriculum.js';
+export { planToday, stepHref, type PlanInput } from './plan.js';
