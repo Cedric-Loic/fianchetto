@@ -33,6 +33,22 @@ export const LessonSectionSchema = z.discriminatedUnion('kind', [
     arrows: z.array(z.object({ from: SquareSchema, to: SquareSchema })),
     marks: z.array(SquareSchema),
   }),
+  /** Partie commentée pas à pas (étape 14) : chaque pas porte la position APRÈS le coup. */
+  z.object({
+    kind: z.literal('walkthrough'),
+    title: z.string().nullable(),
+    /** Position de départ. */
+    fen: z.string(),
+    steps: z.array(
+      z.object({
+        from: SquareSchema,
+        to: SquareSchema,
+        san: z.string(),
+        fen: z.string(),
+        comment: z.string(),
+      }),
+    ),
+  }),
 ]);
 export type LessonSection = z.infer<typeof LessonSectionSchema>;
 
@@ -42,6 +58,10 @@ export const LessonExerciseSchema = z.object({
   /** Camp qui joue (plateau orienté de son côté). */
   color: ColorSchema,
   legalMoves: z.array(LegalMoveSchema),
+  /** `move` : trouve le coup ; `squares` : désigne la ou les cases (pièce en prise, cible…). */
+  kind: z.enum(['move', 'squares']).default('move'),
+  /** Nombre d'indices progressifs disponibles (0 à 3). */
+  hints: z.number().int().min(0).max(3).default(0),
 });
 export type LessonExercise = z.infer<typeof LessonExerciseSchema>;
 
@@ -64,6 +84,8 @@ export const LessonMoveRequestSchema = z.object({
   /** Indice du coup attendu dans la suite de l'exercice (0, puis 2, 4… après chaque réponse). */
   step: z.number().int().min(0).max(40),
   uci: z.string().regex(/^[a-h][1-8][a-h][1-8][qrbn]?$/),
+  /** Indices consultés avant ce coup : un exercice réussi avec indice ne compte pas « du premier coup ». */
+  hints: z.number().int().min(0).max(3).optional(),
 });
 
 export const LessonMoveResponseSchema = z.object({
@@ -77,3 +99,22 @@ export const LessonMoveResponseSchema = z.object({
 export type LessonMoveResponse = z.infer<typeof LessonMoveResponseSchema>;
 
 export const LessonResultRequestSchema = z.object({ correct: z.number().int().min(0).max(100) });
+
+/** Exercice `squares` : cases désignées par le joueur (ensemble, sans ordre). */
+export const LessonSquaresRequestSchema = z.object({
+  squares: z.array(SquareSchema).min(1).max(8),
+  hints: z.number().int().min(0).max(3).optional(),
+});
+
+export const LessonSquaresResponseSchema = z.object({
+  status: z.enum(['solved', 'failed']),
+  /** Bonnes cases, révélées seulement après un échec. */
+  correct: z.array(SquareSchema).nullable(),
+  explanation: z.string().nullable(),
+});
+export type LessonSquaresResponse = z.infer<typeof LessonSquaresResponseSchema>;
+
+/** Indice progressif (1 = discret, 3 = presque la réponse) ; le texte n'est envoyé qu'à la demande. */
+export const LessonHintRequestSchema = z.object({ level: z.number().int().min(1).max(3) });
+export const LessonHintResponseSchema = z.object({ hint: z.string() });
+export type LessonHintResponse = z.infer<typeof LessonHintResponseSchema>;

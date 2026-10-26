@@ -36,6 +36,36 @@ export const PHASE_1: Lesson[] = [
         arrows: [['d1', 'd5']],
       },
       {
+        kind: 'walkthrough',
+        title: 'La routine en action : le mat du berger',
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        moves: [
+          { uci: 'e2e4', comment: 'Un coup central normal.' },
+          { uci: 'e7e5', comment: 'Les Noirs répondent de la même façon.' },
+          {
+            uci: 'd1h5',
+            comment:
+              'Dernier coup adverse : la dame sort tôt. **Question 3 — menace ?** Elle vise e5 et surtout f7, en coopération avec le fou.',
+          },
+          { uci: 'b8c6', comment: 'Les Noirs défendent e5 mais n’ont pas regardé f7.' },
+          {
+            uci: 'f1c4',
+            comment:
+              'Le fou et la dame visent f7, défendu par le seul roi. **Question 2 — prises ?** Une prise en f7 avec échec serait mortelle.',
+          },
+          {
+            uci: 'g8f6',
+            comment:
+              'La gaffe : les Noirs attaquent la dame au lieu de parer la menace. Ils ont sauté la routine.',
+          },
+          {
+            uci: 'h5f7',
+            comment:
+              'Qxf7 est mat : le roi n’a aucune case et le fou protège la dame. **Question 1 — échecs ?** Les Noirs devaient se demander ce que Blancs pouvaient donner comme échec.',
+          },
+        ],
+      },
+      {
         kind: 'text',
         title: 'Le dernier coup adverse',
         body:
@@ -69,6 +99,50 @@ export const PHASE_1: Lesson[] = [
         explanation:
           'La tour menace Td1, mat du couloir. Un pion du roque (h3, g3…) donne une case de fuite au roi. ' +
           'Fxf7+ ne change rien : après Rxf7, la tour mate quand même en d1.',
+      },
+      {
+        fen: 'rnb1kbnr/pppp1ppp/8/4p3/4P2q/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3',
+        prompt:
+          'Question « prises » : quelles pièces noires peuvent être prises sans qu’aucune ne les défende ? Désigne-les.',
+        mode: 'squares',
+        solution: [],
+        squares: ['e5', 'h4'],
+        hints: [
+          'Compte les attaquants de chaque pièce noire : qui est attaqué par un cavalier blanc ?',
+          'Une des deux pièces est la plus puissante des noires. L’autre est un pion.',
+          'Le cavalier f3 attaque deux pièces noires à la fois.',
+        ],
+        explanation:
+          'Le cavalier f3 attaque la dame h4 et le pion e5, tous deux sans défenseur. Cxh4 gagne la dame.',
+      },
+      {
+        fen: 'rnbqk2r/pppp1ppp/5n2/2b1p3/2B1P1P1/5N2/PPPP1P1P/RNBQK2R b KQkq - 0 4',
+        prompt:
+          'Question « menaces » : quelles pièces blanches sont attaquées et sans défenseur ? Désigne-les.',
+        mode: 'squares',
+        solution: [],
+        squares: ['e4', 'g4'],
+        hints: [
+          'Regarde ce que le cavalier f6 attaque.',
+          'Deux pions blancs sont attaqués, et aucune pièce blanche ne les protège.',
+          'Les deux pions sont sur la 4e rangée.',
+        ],
+        explanation:
+          'Le cavalier f6 attaque e4 et g4, que rien ne défend. Le pion g4 était une avance imprudente.',
+      },
+      {
+        fen: 'r1bqkb1r/pppp1ppp/5n2/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 5',
+        prompt: 'Une seule pièce noire est attaquée et sans défenseur. Laquelle ?',
+        mode: 'squares',
+        solution: [],
+        squares: ['e5'],
+        hints: [
+          'Le cavalier d4 est attaqué, mais un pion le défend.',
+          'Ton cavalier f3 attaque une pièce.',
+          'C’est un pion du centre.',
+        ],
+        explanation:
+          'Le pion e5 n’est défendu par aucune pièce : Cxe5 le gagne. Le cavalier d4, lui, est protégé par ce même pion.',
       },
     ],
   },

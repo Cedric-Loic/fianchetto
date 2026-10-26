@@ -46,8 +46,33 @@ describe('leçons', () => {
     }
   });
 
+  it('les parties commentées sont légales, un commentaire par coup', () => {
+    for (const l of LESSONS)
+      for (const s of l.sections)
+        if (s.kind === 'walkthrough') {
+          expect(legalPosition(s.fen), l.id).toBe(true);
+          expect(
+            playable(
+              s.fen,
+              s.moves.map((m) => m.uci),
+            ),
+            l.id,
+          ).toBe(true);
+          for (const m of s.moves) expect(m.comment.length, l.id).toBeGreaterThan(5);
+        }
+  });
+
   it.each(exercises)('%s : position légale, solution jouable', (_tag, e) => {
     expect(legalPosition(e.fen)).toBe(true);
+    expect(e.hints?.length ?? 0).toBeLessThanOrEqual(3);
+    if (e.mode === 'squares') {
+      // Cases attendues : non vides, occupées par une pièce, pas de coup à jouer.
+      expect(e.solution).toHaveLength(0);
+      expect(e.squares?.length).toBeGreaterThan(0);
+      const chess = new Chess(e.fen);
+      for (const sq of e.squares ?? []) expect(chess.get(sq as never), sq).toBeTruthy();
+      return;
+    }
     expect(e.solution.length).toBeGreaterThan(0);
     expect(playable(e.fen, e.solution)).toBe(true);
     for (const uci of [...(e.accepted ?? []), ...(e.traps ?? [])]) {

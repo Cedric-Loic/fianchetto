@@ -11,9 +11,14 @@ export interface Exercise {
    * - `exact` : `solution` = suite de coups UCI (le joueur, la réponse adverse, le joueur…) ;
    *   un autre coup qui mate est accepté ;
    * - `choice` : un coup parmi `accepted` (principes d'ouverture) ;
-   * - `engine` : tout coup qui ne perd pas plus de `tolerance` points de % de gain (Stockfish).
+   * - `engine` : tout coup qui ne perd pas plus de `tolerance` points de % de gain (Stockfish) ;
+   * - `squares` : le joueur désigne des cases ; `squares` donne l'ensemble attendu (`solution` vide).
    */
-  mode: 'exact' | 'choice' | 'engine';
+  mode: 'exact' | 'choice' | 'engine' | 'squares';
+  /** Mode `squares` : cases attendues (sans ordre). */
+  squares?: string[];
+  /** Indices progressifs (1 à 3), du plus discret au plus explicite : le ton est socratique. */
+  hints?: string[];
   solution: string[];
   accepted?: string[];
   tolerance?: number;
@@ -32,6 +37,13 @@ export type Section =
       /** Flèches [de, vers] et cases marquées pour illustrer l'idée. */
       arrows?: [string, string][];
       marks?: string[];
+    }
+  | {
+      /** Partie ou variante commentée : `moves` en UCI depuis `fen`, un commentaire par coup. */
+      kind: 'walkthrough';
+      title?: string;
+      fen: string;
+      moves: { uci: string; comment: string }[];
     };
 
 export interface Lesson {
