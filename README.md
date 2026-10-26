@@ -101,17 +101,25 @@ docs/
    explore des variantes (← → ↑ ↓, f pour retourner), active le **Moteur** (3 lignes
    cliquables) et la **Menace** (touche x). **▶ Revue guidée** parcourt les moments clés avec
    le coach ; **Apprends de tes erreurs** te fait retrouver le bon coup à chaque erreur.
-8. **Coach** (menu) : ta page d'accueil d'entraînement. Elle dit où tu en es (phase du plan et
+8. **Coach** (menu) : ta page d'accueil d'entraînement. En tête, la **séance du jour** (~28 min :
+   révisions dues, étape du parcours, puzzles sur ta compétence la plus faible, bilan), puis
+   tes **14 compétences** (niveau, tendance) et le **parcours** en modules (ordre conseillé, rien
+   n'est verrouillé). Le reste de la page : où tu en es (phase du plan et
    critères pour passer à la suivante), ce qu'il reste à faire cette semaine, et quoi faire
    maintenant ; les courbes suivent ton Elo chess.com (lu dans tes parties importées), ton
    classement puzzle et ta précision.
-9. **Leçons** (menu) : lis la leçon, regarde les positions commentées, puis fais les exercices ;
-   la leçon est validée à 80 % d'exercices réussis du premier coup.
+9. **Leçons** (menu, 30 + parties classiques commentées) : lis la leçon, suis la partie commentée
+   coup par coup (← →), puis fais les exercices : trouve le coup ou désigne des cases, avec des
+   **indices progressifs** (un exercice réussi avec indice ne compte pas du premier coup) ; la
+   leçon est validée à 80 %. Tes exercices ratés et tes erreurs de parties reviennent dans
+   **Révisions** (`#/reviews`) à 1, 3, 7, 21 puis 60 jours.
 10. **Entraînement** (accueil → Classique → Contre le bot → case « Entraînement avec le coach ») :
     partie non classée et sans pendule ; 💡 Indice (1 clic : l'idée, 2 : la pièce, 3 : le coup),
     ↶ Reprendre le coup, et le coach demande « Es-tu sûr ? » avant une gaffe (désactivable dans
     ⚙ Réglages). À la fin : la revue s'ouvre avec le **bilan du coach** (3 moments clés et un
-    conseil). Dans toute revue, **↺ Rejouer d'ici** relance la partie depuis la position d'avant
+    conseil). La **partie coachée** (réglage actif par défaut, jamais en Secret Queen) te pose une
+    question avant de jouer quand une de tes pièces est menacée ou qu'une pièce adverse est en
+    prise : tu désignes les cases, le coach corrige. Dans toute revue, **↺ Rejouer d'ici** relance la partie depuis la position d'avant
     ton erreur.
 11. **Puzzles** (menu ; lance d'abord `pnpm puzzles:import` une fois) :
 

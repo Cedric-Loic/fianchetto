@@ -246,4 +246,24 @@ describe('tableau de bord', () => {
     );
     expect(d3.phase.current).toBe(3);
   });
+
+  it('critère « compétences clés » seulement si les niveaux sont fournis', () => {
+    const label = (d: ReturnType<typeof buildDashboard>) =>
+      d.phase.criteria.find((c) => c.label.startsWith('Compétences clés'));
+    expect(label(buildDashboard(input()))).toBeUndefined();
+    const skills = (level: number | null) =>
+      (['method', 'piece-safety', 'threats'] as const).map((id) => ({
+        id,
+        label: id,
+        level,
+        trend: null,
+        evidence: level === null ? 0 : 10,
+      }));
+    expect(label(buildDashboard(input({ skills: skills(null) })))).toMatchObject({
+      value: null,
+      met: false,
+    });
+    expect(label(buildDashboard(input({ skills: skills(50) })))?.met).toBe(false);
+    expect(label(buildDashboard(input({ skills: skills(70) })))?.met).toBe(true);
+  });
 });

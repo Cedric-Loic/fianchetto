@@ -17,6 +17,7 @@ import {
   type CoachDashboard,
   type GameConfig,
   type GameSummary,
+  type SkillLevel,
 } from '@sq/shared';
 import { currentUser } from '../auth.js';
 import type { GameStore } from '../persistence/db.js';
@@ -98,6 +99,7 @@ export function dashboardFor(
   userId: string,
   botLevels: BotLevels,
   now = new Date(),
+  skills?: SkillLevel[],
 ): CoachDashboard {
   const games: DashboardGame[] = [];
   for (const row of store.listImported(userId)) {
@@ -151,6 +153,7 @@ export function dashboardFor(
   );
   return buildDashboard({
     now,
+    ...(skills ? { skills } : {}),
     dueOpenings: new OpeningService(store).dueCount(userId),
     games,
     puzzleAttempts: store.puzzles.attempts(userId).map((a) => ({
@@ -194,6 +197,8 @@ export class CoachService {
   readonly #botLevels: BotLevels;
   /** Fixé après coup : le service de puzzles a lui-même besoin du thème du jour. */
   #puzzles: PuzzleService | null = null;
+  /** Niveaux de compétences (LearningService), pour le critère de phase « Compétences clés ». */
+  #skills: ((userId: string) => SkillLevel[]) | null = null;
   /** Garde-fou décidé une fois par partie (la phase peut changer en cours de partie). */
   readonly #guard = new Map<string, boolean>();
 
@@ -202,13 +207,21 @@ export class CoachService {
     this.#botLevels = botLevels;
   }
 
-  attach(puzzles: PuzzleService): void {
+  attach(puzzles: PuzzleService, skills?: (userId: string) => SkillLevel[]): void {
     this.#puzzles = puzzles;
+    this.#skills = skills ?? null;
   }
 
   dashboard(userId: string, now = new Date()): CoachDashboard {
     if (!this.#puzzles) throw new Error('Service de puzzles non branché.');
-    return dashboardFor(this.#store, this.#puzzles, userId, this.#botLevels, now);
+    return dashboardFor(
+      this.#store,
+      this.#puzzles,
+      userId,
+      this.#botLevels,
+      now,
+      this.#skills?.(userId),
+    );
   }
 
   themeOfDay(userId: string): string {

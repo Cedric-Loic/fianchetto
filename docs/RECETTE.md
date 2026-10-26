@@ -148,6 +148,17 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Revue guidée, « Apprends de tes erreurs »                      | ✅     | `apps/web/test/moments.test.ts`, `learn.test.tsx`, `review-retry.test.ts` |
 | chess.js absent de l'écran de partie et du chargement initial  | ✅     | `tests/security/bundle.test.ts`                                           |
 
+## Étape 14 : plateau maximal et coach pédagogique
+
+| Exigence                                                                   | État | Preuve                                                                                       |
+| -------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------- |
+| Plateau à la taille maximale sur chaque écran (3 tailles d'écran)          | ✅   | `tests/e2e/board-size.spec.ts`                                                               |
+| Compétences, répétition espacée, parcours, séance du jour                  | ✅   | `packages/coach/test/{skills,plan}.test.ts`, `apps/server/test/learning.test.ts`             |
+| Cartes de révision alimentées par le serveur (exercices, erreurs)          | ✅   | `apps/server/test/learning.test.ts`, `tests/e2e/coach.spec.ts`                               |
+| Leçons v2 : exercices à cases, indices, parties commentées                 | ✅   | `apps/server/test/lessons-socratic.test.ts`, `tests/e2e/lessons.spec.ts`                     |
+| Leçons de phase 3 et parties classiques, solutions vérifiées par Stockfish | ✅   | `pnpm test:stress` (`apps/server/test/lessons.stress.ts`)                                    |
+| Partie coachée : seulement en entraînement classique, jamais Secret Queen  | ✅   | `apps/server/test/coached.test.ts`, `tests/security/coach-routes.test.ts`, `coached.spec.ts` |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).

@@ -145,3 +145,15 @@ describe('leçons socratiques : routes', () => {
     await app.close();
   });
 });
+
+describe('tableau de bord : compétences clés', () => {
+  it('le critère de phase apparaît', async () => {
+    const { app, http } = await testServer();
+    await http('POST', '/api/auth/register', { username: 'cedric', password: 'motdepasse' });
+    const d = (await http('GET', '/api/coach/dashboard')).json as {
+      phase: { criteria: { label: string }[] };
+    };
+    expect(d.phase.criteria.some((c) => c.label.startsWith('Compétences clés'))).toBe(true);
+    await app.close();
+  });
+});

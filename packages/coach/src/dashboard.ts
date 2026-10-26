@@ -4,6 +4,9 @@ import {
   PUZZLE_THEME_FOR_KIND,
   WEEKLY_MINUTES_TARGET,
   PUZZLE_THEME_LABELS,
+  SKILL_LABELS,
+  type SkillId,
+  type SkillLevel,
   type CoachDashboard,
   type Color,
   type GameReview,
@@ -54,7 +57,16 @@ export interface DashboardGame {
   initialClockMs?: number | null;
 }
 
+/** Niveau minimal des compétences clés d'une phase pour en sortir. */
+export const KEY_SKILL_LEVEL = 60;
+const KEY_SKILLS: Record<number, SkillId[]> = {
+  1: ['method', 'piece-safety', 'threats'],
+  2: ['calculation', 'forks', 'pins-skewers'],
+};
+
 export interface DashboardInput {
+  /** Niveaux par compétence (étape 14) ; sans eux, le critère de compétences est absent. */
+  skills?: SkillLevel[];
   now: Date;
   /** Lignes du répertoire d'ouvertures à réviser aujourd'hui. */
   dueOpenings?: number;
@@ -368,6 +380,21 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
   const phase2Lessons = input.lessons.filter((l) => l.phase === 2);
   const passed2 = phase2Lessons.filter((l) => l.passed).length;
   const enoughGames = last10.length >= 5;
+  /** Critère « compétences clés » : toutes mesurées et au moins KEY_SKILL_LEVEL. */
+  const skillCriterion = (phase: number) => {
+    if (!input.skills) return [];
+    const keys = KEY_SKILLS[phase] ?? [];
+    const levels = keys.map((id) => input.skills!.find((s) => s.id === id)?.level ?? null);
+    const known = levels.filter((l): l is number => l !== null);
+    return [
+      {
+        label: `Compétences clés (${keys.map((id) => SKILL_LABELS[id].toLowerCase()).join(', ')})`,
+        value: known.length === keys.length ? `${Math.min(...known)} au plus bas` : null,
+        target: `au moins ${KEY_SKILL_LEVEL}`,
+        met: known.length === keys.length && Math.min(...known) >= KEY_SKILL_LEVEL,
+      },
+    ];
+  };
   const criteriaByPhase = [
     [
       {
@@ -382,6 +409,7 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         target: 'au moins 8',
         met: passed1 >= 8,
       },
+      ...skillCriterion(1),
       {
         label: 'Puzzles réussis',
         value: String(solvedPuzzles),
@@ -414,6 +442,7 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         target: 'au moins 8',
         met: passed2 >= 8,
       },
+      ...skillCriterion(2),
     ],
     [
       {

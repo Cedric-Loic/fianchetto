@@ -122,7 +122,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     themeOfDay: (userId) => coach.themeOfDay(userId),
     onOwnJudged: (userId, puzzleId, ok) => learning.recordOwnPuzzle(userId, puzzleId, ok),
   });
-  coach.attach(puzzles);
+  coach.attach(puzzles, (userId) => learning.skills(userId));
   const analysis =
     options.createAnalysisEngine === null
       ? null
