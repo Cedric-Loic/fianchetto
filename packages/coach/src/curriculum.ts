@@ -107,6 +107,36 @@ export const CURRICULUM: CurriculumModule[] = [
     steps: [lesson('pieges-italienne'), lesson('pieges-noirs')],
   },
   {
+    id: 'm-plans',
+    phase: 3,
+    title: 'Jouer avec un plan',
+    skill: 'plans',
+    steps: [
+      lesson('activite-pieces'),
+      lesson('cases-faibles-avant-postes'),
+      lesson('colonnes-ouvertes'),
+      lesson('prophylaxie'),
+    ],
+  },
+  {
+    id: 'm-structures',
+    phase: 3,
+    title: 'Structures de pions',
+    skill: 'plans',
+    steps: [lesson('pion-isole'), lesson('pion-passe'), lesson('bon-fou-mauvais-fou')],
+  },
+  {
+    id: 'm-convert',
+    phase: 3,
+    title: 'Convertir et finir',
+    skill: 'rook-endgames',
+    steps: [
+      lesson('roi-roque-attaque'),
+      lesson('convertir-avantage'),
+      lesson('finales-tours-pratiques'),
+    ],
+  },
+  {
     id: 'm-rooks',
     phase: 3,
     title: 'Finales de tours',
