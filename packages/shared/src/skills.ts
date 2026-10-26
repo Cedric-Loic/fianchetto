@@ -106,6 +106,8 @@ export const CARD_MASTERED_STEP = 3;
 export const ReviewCardSchema = z.object({
   id: z.string(),
   source: CardSourceSchema,
+  /** Référence du contenu : `leçon:index` (exercice) ou id du puzzle personnel (erreur). */
+  ref: z.string(),
   skill: SkillIdSchema,
   /** Position de départ de l'exercice à rejouer. */
   fen: z.string(),
