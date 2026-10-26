@@ -3612,3 +3612,25 @@ button.skill-row:hover {
   width: 100vw;
   margin: var(--space-3) 0 var(--space-3) calc(50% - 50vw);
 }
+
+/* Partie coachée : encart de question dans le panneau latéral. */
+.coach-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+.coach-ask h3 {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.coach-ask p {
+  margin: 0;
+}

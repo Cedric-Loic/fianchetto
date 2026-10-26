@@ -1,6 +1,8 @@
 import type {
   BotLevelInfo,
   CardsResponse,
+  CoachAnswerResponse,
+  CoachPromptResponse,
   CurriculumResponse,
   DailySessionResponse,
   CoachDashboard,
@@ -167,6 +169,11 @@ export const api = {
     call<HintResponse>('POST', `/api/games/${gameId}/hint`, { level }),
   checkMove: (gameId: string, uci: string) =>
     call<CheckMoveResponse>('POST', `/api/games/${gameId}/check-move`, { uci }),
+  // Partie coachée : question avant de jouer, puis réponse (cases) corrigée par le serveur.
+  coachPrompt: (gameId: string) =>
+    call<CoachPromptResponse>('POST', `/api/games/${gameId}/coach-prompt`),
+  coachAnswer: (gameId: string, ply: number, squares: string[]) =>
+    call<CoachAnswerResponse>('POST', `/api/games/${gameId}/coach-answer`, { ply, squares }),
   // Coach : revues et imports.
   review: (id: string, signal?: AbortSignal) =>
     request<ReviewResponse>('GET', `/api/reviews/${id}`, undefined, { signal }),

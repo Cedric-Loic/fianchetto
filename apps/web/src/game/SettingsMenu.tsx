@@ -103,6 +103,15 @@ export function SettingsPanel(props: { onClose: () => void }) {
       <label>
         <input
           type="checkbox"
+          data-testid="setting-coached"
+          checked={settings.coached}
+          onChange={(e) => settings.update({ coached: e.target.checked })}
+        />{' '}
+        Entraînement : partie coachée (questions du coach)
+      </label>
+      <label>
+        <input
+          type="checkbox"
           data-testid="setting-premoves"
           checked={settings.premoves}
           onChange={(e) => settings.update({ premoves: e.target.checked })}

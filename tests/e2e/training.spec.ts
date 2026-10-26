@@ -52,6 +52,8 @@ test('entraînement : non classée, indices progressifs, reprise de coup', async
 });
 
 test('garde-fou avant une gaffe, mat, bilan du coach', async ({ page }) => {
+  // Partie coachée désactivée : ce test porte sur le garde-fou, pas sur les questions du coach.
+  await page.addInitScript(() => localStorage.setItem('sq-settings', '{"coached":false}'));
   await register(page);
   // Coup du berger, Blancs au trait : Qxf7# gagne, Qg4 ?? perd la dame.
   const res = await page.request.post('/api/games', {

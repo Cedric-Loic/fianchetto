@@ -78,6 +78,8 @@ export interface Settings {
   chessComUsername: string;
   /** Entraînement : demander confirmation avant une gaffe. */
   trainingGuard: boolean;
+  /** Entraînement classique contre le bot : le coach pose une question avant ton coup. */
+  coached: boolean;
   /** Coups anticipés (premoves) : partout sauf à deux sur le même écran. */
   premoves: boolean;
   /** Analyse : moteur en direct (désactivé par défaut). */
@@ -99,6 +101,7 @@ const DEFAULTS: Settings = {
   showLegalMoves: true,
   chessComUsername: '',
   trainingGuard: true,
+  coached: true,
   premoves: true,
   engine: false,
   frenchNotation: false,
@@ -124,6 +127,7 @@ export function loadSettings(): Settings {
       autoFlip: bool(parsed.autoFlip, DEFAULTS.autoFlip),
       showLegalMoves: bool(parsed.showLegalMoves, DEFAULTS.showLegalMoves),
       trainingGuard: bool(parsed.trainingGuard, DEFAULTS.trainingGuard),
+      coached: bool(parsed.coached, DEFAULTS.coached),
       premoves: bool(parsed.premoves, DEFAULTS.premoves),
       engine: bool(parsed.engine, DEFAULTS.engine),
       frenchNotation: bool(parsed.frenchNotation, DEFAULTS.frenchNotation),

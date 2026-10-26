@@ -10,6 +10,7 @@ import { api } from '../lib/api';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { Board } from '../game/Board';
 import { usePremoves } from '../game/usePremoves';
+import { useCoach } from '../game/useCoach';
 import { MoveList, MoveStrip } from '../game/MoveList';
 import { MOBILE_QUERY, useMediaQuery } from '../lib/media';
 import { PlayerBar } from '../game/PlayerBar';
@@ -82,6 +83,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const autoFlip = useSettings((s) => s.autoFlip);
   const showLegalMoves = useSettings((s) => s.showLegalMoves);
   const guardOn = useSettings((s) => s.trainingGuard);
+  const coachedOn = useSettings((s) => s.coached);
   // Entraînement : indice de la position courante (niveau 1 à 3), et coup en attente de
   // confirmation après un avertissement du garde-fou.
   const [hint, setHint] = useState<{ ply: number; data: HintResponse } | null>(null);
@@ -138,6 +140,19 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   // À mon tour, le premier premove part (un refus reçoit le message générique, comme un coup,
   // et annule les suivants).
   const myTurn = board?.turn === me && state.phase === 'playing';
+  // Partie coachée : seulement en entraînement classique contre le bot, jamais classée.
+  const coach = useCoach(
+    state.gameId,
+    plyCount,
+    coachedOn &&
+      !!state.training &&
+      classic &&
+      isBot &&
+      !state.rated &&
+      myTurn &&
+      !pending &&
+      cursor === null,
+  );
   const nextPremove = myTurn && !pending ? queue.next : undefined;
   const shiftPremove = queue.shift;
   useEffect(() => {
@@ -204,7 +219,7 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   }
   // Mon camp peut jouer (mode bot : seulement à mon tour ; hot-seat : le camp au trait).
   const movable =
-    ended || !live || pending || checking || guard
+    ended || !live || pending || checking || guard || coach.blocking
       ? null
       : isBot
         ? board.turn === me
@@ -262,9 +277,17 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           ? [{ from: currentHint.from as Square, to: currentHint.to as Square, kind: 'hint' }]
           : []
       }
-      squareMarks={live && currentHint?.marks ? currentHint.marks : []}
+      squareMarks={[
+        ...(live && currentHint?.marks ? currentHint.marks : []),
+        ...(coach.prompt
+          ? coach.result
+            ? coach.result.squares.map((square) => ({ square, kind: 'correct' as const }))
+            : coach.picked.map((square) => ({ square, kind: 'pick' as const }))
+          : []),
+      ]}
       checkSquare={checkSquare}
       crowns={crowns}
+      onSquareClick={coach.blocking && !coach.result ? coach.toggle : undefined}
       onMove={(from, to, promotion) => play(promotion ? { from, to, promotion } : { from, to })}
     />
   );
@@ -483,6 +506,42 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
             {state.rated && <Badge tone="accent">Classée</Badge>}
             {state.training && <Badge tone="info">Entraînement</Badge>}
           </div>
+          {coach.prompt && (
+            <div className="coach-ask" data-testid="coach-ask">
+              <h3>Le coach te demande</h3>
+              <p data-testid="coach-question">
+                <strong>{coach.prompt.question}</strong>
+              </p>
+              {coach.result ? (
+                <>
+                  <p className={coach.result.correct ? 'win' : 'loss'} data-testid="coach-verdict">
+                    {coach.result.correct ? '✓ Juste' : '✗ Pas tout à fait'}
+                  </p>
+                  <p data-testid="coach-explanation">{coach.result.explanation}</p>
+                  <Button variant="primary" onClick={coach.next} data-testid="coach-continue">
+                    Continuer
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="muted">Clique les cases (re-clic pour retirer).</p>
+                  <div className="actions">
+                    <Button
+                      variant="primary"
+                      disabled={coach.busy || coach.picked.length === 0}
+                      onClick={coach.validate}
+                      data-testid="coach-validate"
+                    >
+                      Valider
+                    </Button>
+                    <Button disabled={coach.busy} onClick={coach.skip} data-testid="coach-skip">
+                      Je passe
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {!mobile && <MoveList moves={board.moves} cursor={shownPly} onSelect={setCursor} />}
           <div className="nav" hidden={mobile}>
             <button title="Début" aria-label="Début" onClick={() => setCursor(0)}>
