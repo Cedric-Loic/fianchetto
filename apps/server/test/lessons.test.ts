@@ -19,7 +19,7 @@ describe('leçons', () => {
 
     const { app, http } = await server();
     const { lessons } = (await http('GET', '/api/lessons')).json as LessonsResponse;
-    expect(lessons).toHaveLength(30);
+    expect(lessons).toHaveLength(36);
     expect(lessons[0]).toMatchObject({ id: 'routine', phase: 1, best: null, passed: false });
     const view = (await http('GET', '/api/lessons/fourchette')).json as LessonView;
     expect(view.exercises[0]).toMatchObject({ color: 'w' });
@@ -71,8 +71,8 @@ describe('leçons', () => {
     const post = async (correct: number) =>
       (await http('POST', '/api/lessons/fourchette/result', { correct })).json as LessonSummary;
     expect(await post(1)).toMatchObject({ best: 1, passed: false });
-    expect(await post(3)).toMatchObject({ best: 3, passed: true });
-    expect(await post(0)).toMatchObject({ best: 3, passed: true });
+    expect(await post(6)).toMatchObject({ best: 6, passed: true });
+    expect(await post(0)).toMatchObject({ best: 6, passed: true });
     await app.close();
   });
 });

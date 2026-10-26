@@ -107,6 +107,13 @@ export const CURRICULUM: CurriculumModule[] = [
     steps: [lesson('pieges-italienne'), lesson('pieges-noirs')],
   },
   {
+    id: 'm-classics-2',
+    phase: 2,
+    title: 'Parties classiques : tactique et développement',
+    skill: 'calculation',
+    steps: [lesson('classique-opera'), lesson('classique-legal'), lesson('classique-reti')],
+  },
+  {
     id: 'm-plans',
     phase: 3,
     title: 'Jouer avec un plan',
@@ -116,6 +123,17 @@ export const CURRICULUM: CurriculumModule[] = [
       lesson('cases-faibles-avant-postes'),
       lesson('colonnes-ouvertes'),
       lesson('prophylaxie'),
+    ],
+  },
+  {
+    id: 'm-classics-3',
+    phase: 3,
+    title: 'Parties classiques : attaque et plans',
+    skill: 'plans',
+    steps: [
+      lesson('classique-lasker-bauer'),
+      lesson('classique-immortelle'),
+      lesson('classique-evergreen'),
     ],
   },
   {
