@@ -22,7 +22,6 @@ export interface CurriculumModule {
 
 const lesson = (id: string): StepRef => ({ type: 'lesson', id });
 const endgame = (id: string): StepRef => ({ type: 'endgame', id });
-const opening = (id: string): StepRef => ({ type: 'opening', id });
 
 export const CURRICULUM: CurriculumModule[] = [
   {
