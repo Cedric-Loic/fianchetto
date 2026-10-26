@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SquareSchema } from './chess.js';
 
 /*
  * Étape 14 — Coach pédagogique : compétences, cartes de révision, séance du jour.
@@ -191,3 +192,31 @@ export type DailySessionResponse = z.infer<typeof DailySessionResponseSchema>;
 
 /** Étape de la séance marquée comme faite (le serveur déduit aussi les étapes de l'activité). */
 export const SessionProgressRequestSchema = z.object({ kind: SessionStepKindSchema });
+
+// --- Partie coachée (parties d'entraînement classiques contre le bot) -------------------------------
+
+/** Question posée avant que le joueur ne joue. La réponse n'est jamais envoyée avec la question. */
+export const CoachPromptResponseSchema = z.object({
+  prompt: z
+    .object({
+      /** Nombre de demi-coups de la position (identifie la question). */
+      ply: z.number().int().nonnegative(),
+      kind: z.enum(['threat', 'chance']),
+      question: z.string(),
+    })
+    .nullable(),
+});
+export type CoachPromptResponse = z.infer<typeof CoachPromptResponseSchema>;
+
+export const CoachAnswerRequestSchema = z.object({
+  ply: z.number().int().nonnegative(),
+  squares: z.array(SquareSchema).max(16),
+});
+
+export const CoachAnswerResponseSchema = z.object({
+  correct: z.boolean(),
+  /** Bonnes cases, révélées après la réponse. */
+  squares: z.array(SquareSchema),
+  explanation: z.string(),
+});
+export type CoachAnswerResponse = z.infer<typeof CoachAnswerResponseSchema>;

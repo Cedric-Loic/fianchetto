@@ -96,3 +96,4 @@ export {
   type StepRef,
 } from './curriculum.js';
 export { planToday, stepHref, type PlanInput } from './plan.js';
+export { coachAnswerCorrect, coachPrompt, type CoachPromptData } from './coached.js';
