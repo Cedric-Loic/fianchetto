@@ -1,4 +1,12 @@
-import { Fragment, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type {
   DisplayedPiece,
   LegalMove,
@@ -124,8 +132,49 @@ export function Lessons() {
   );
 }
 
-/** Un exercice « trouve le coup » : le serveur valide chaque coup. */
-function ExerciseBoard(props: {
+/** Indices progressifs : textes cumulés, demandés un à un au serveur. */
+function useHints(lessonId: string, index: number, available: number) {
+  const [texts, setTexts] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const ask = useCallback(async () => {
+    if (loading || texts.length >= available) return;
+    setLoading(true);
+    const res = await api.lessonHint(lessonId, index, texts.length + 1);
+    setLoading(false);
+    if (res) setTexts((t) => (t.length === texts.length ? [...t, res.hint] : t));
+  }, [loading, texts.length, available, lessonId, index]);
+  return { texts, ask, loading, left: available - texts.length };
+}
+
+type Hints = ReturnType<typeof useHints>;
+
+/** Bouton « Indice (n restants) » et indices déjà obtenus. */
+function HintPanel({ hints, active }: { hints: Hints; active: boolean }) {
+  return (
+    <>
+      {active && hints.left > 0 && (
+        <Button
+          size="s"
+          variant="outline"
+          disabled={hints.loading}
+          onClick={() => void hints.ask()}
+          data-testid="exercise-hint"
+        >
+          Indice ({hints.left} restant{hints.left > 1 ? 's' : ''})
+        </Button>
+      )}
+      {hints.texts.length > 0 && (
+        <ul className="hint-list" data-testid="hint-list">
+          {hints.texts.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+type ExerciseProps = {
   lessonId: string;
   index: number;
   exercise: LessonExercise;
@@ -133,7 +182,92 @@ function ExerciseBoard(props: {
   /** Panneau latéral : en-tête (retour, titre) et suite (bouton suivant). */
   header: ReactNode;
   footer: ReactNode;
-}) {
+};
+
+/** Exercice « désigne les cases » : sélection multiple, validation par le serveur. */
+function SquaresBoard(props: ExerciseProps) {
+  const { exercise } = props;
+  const [picked, setPicked] = useState<Square[]>([]);
+  const [phase, setPhase] = useState<'playing' | 'solved' | 'failed'>('playing');
+  const [correct, setCorrect] = useState<Square[]>([]);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const record = useStreak((s) => s.record);
+  const hints = useHints(props.lessonId, props.index, exercise.hints);
+  const playing = phase === 'playing';
+
+  const toggle = (sq: Square) => {
+    if (!playing || busy) return;
+    setPicked((p) => (p.includes(sq) ? p.filter((x) => x !== sq) : p.length < 8 ? [...p, sq] : p));
+  };
+  const validate = async () => {
+    if (!playing || busy || picked.length === 0) return;
+    setBusy(true);
+    const res = await api.lessonSquares(props.lessonId, props.index, picked, hints.texts.length);
+    setBusy(false);
+    if (!res) return;
+    setExplanation(res.explanation);
+    const ok = res.status === 'solved';
+    setCorrect(res.correct ?? []);
+    setPhase(ok ? 'solved' : 'failed');
+    playSound(ok ? 'success' : 'failure');
+    record(ok);
+    props.onDone(ok && hints.texts.length === 0);
+  };
+
+  const marks = [
+    ...(playing ? picked.map((square) => ({ square, kind: 'pick' as const })) : []),
+    ...(phase === 'failed' ? correct.map((square) => ({ square, kind: 'correct' as const })) : []),
+  ];
+  return (
+    <BoardLayout
+      className="exercise"
+      testId="exercises"
+      board={
+        <Board
+          pieces={piecesFromFen(exercise.fen)}
+          orientation={exercise.color}
+          movable={null}
+          onSquareClick={toggle}
+          squareMarks={marks}
+        />
+      }
+      side={
+        <>
+          {props.header}
+          <p>
+            <strong>{exercise.prompt}</strong>
+          </p>
+          <p className="muted">Clique les cases concernées (re-clic pour retirer).</p>
+          <HintPanel hints={hints} active={playing} />
+          {playing && (
+            <Button
+              variant="primary"
+              disabled={busy || picked.length === 0}
+              onClick={() => void validate()}
+              data-testid="squares-validate"
+            >
+              Valider
+            </Button>
+          )}
+          {!playing && (
+            <div className={`move-card puzzle-status ${phase}`} data-testid="exercise-status">
+              {phase === 'solved' && <p className="win">✓ Réussi !</p>}
+              {phase === 'failed' && (
+                <p className="loss">✗ Pas tout à fait. Les bonnes cases sont marquées en vert.</p>
+              )}
+              {explanation && <p data-testid="exercise-explanation">{explanation}</p>}
+            </div>
+          )}
+          {props.footer}
+        </>
+      }
+    />
+  );
+}
+
+/** Un exercice « trouve le coup » : le serveur valide chaque coup. */
+function ExerciseBoard(props: ExerciseProps) {
   const { exercise } = props;
   const showLegalMoves = useSettings((s) => s.showLegalMoves);
   const [pieces, setPieces] = useState<DisplayedPiece[]>(() => piecesFromFen(exercise.fen));
@@ -151,6 +285,9 @@ function ExerciseBoard(props: {
     id: number;
   } | null>(null);
   const record = useStreak((s) => s.record);
+  const hints = useHints(props.lessonId, props.index, exercise.hints);
+  /** Coups refusés : après deux, le premier indice est proposé d'office. */
+  const refused = useRef(0);
   /** Mon coup envoyé, affiché tout de suite en attendant la réponse du serveur. */
   const [pending, setPending] = useState<LocalMove | null>(null);
   // Premoves pendant la réponse adverse, oubliés dès que l'exercice est terminé.
@@ -179,12 +316,17 @@ function ExerciseBoard(props: {
       props.index,
       step,
       `${move.from}${move.to}${move.promotion ?? ''}`,
+      hints.texts.length,
     );
     setPending(null);
     if (!res || res.status === 'illegal') {
       // Coup (ou premove) refusé : la pièce revient, les premoves suivants sont annulés.
       queue.clear();
       setBusy(false);
+      refused.current += 1;
+      if (refused.current === 2 && hints.texts.length === 0 && exercise.hints > 0) {
+        void hints.ask();
+      }
       return;
     }
     const failed = res.status === 'failed';
@@ -214,7 +356,7 @@ function ExerciseBoard(props: {
         record(true);
         setExplanation(res.explanation);
         setPhase('solved');
-        props.onDone(true);
+        props.onDone(hints.texts.length === 0);
       } else setProgress(true);
       setBusy(false);
     };
@@ -272,6 +414,7 @@ function ExerciseBoard(props: {
             {phase === 'failed' && <p className="loss">✗ Ce n'est pas ça. Voici la solution.</p>}
             {explanation && <p data-testid="exercise-explanation">{explanation}</p>}
           </div>
+          <HintPanel hints={hints} active={phase === 'playing'} />
           {props.footer}
         </>
       }
@@ -280,10 +423,10 @@ function ExerciseBoard(props: {
 }
 
 /** Une leçon : explications et exemples, puis les exercices un par un, puis le bilan. */
-export function LessonPage({ id }: { id: string }) {
+export function LessonPage({ id, only = null }: { id: string; only?: number | null }) {
   const user = useSession((s) => s.user);
   const [lesson, setLesson] = useState<LessonView | null | undefined>(undefined);
-  const [current, setCurrent] = useState<number | null>(null);
+  const [current, setCurrent] = useState<number | null>(only);
   const [results, setResults] = useState<boolean[]>([]);
   const [summary, setSummary] = useState<LessonSummary | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -316,7 +459,8 @@ export function LessonPage({ id }: { id: string }) {
   const onDone = (firstTry: boolean) => {
     const next = [...results, firstTry];
     setResults(next);
-    if (next.length === total) {
+    // Exercice isolé (révisions) : le serveur a déjà jugé et replanifié la carte, pas de bilan.
+    if (only === null && next.length === total) {
       void api.lessonResult(lesson.id, next.filter(Boolean).length).then(setSummary);
     }
   };
@@ -328,8 +472,9 @@ export function LessonPage({ id }: { id: string }) {
   };
 
   if (exercise && current !== null) {
+    const Exercise = exercise.kind === 'squares' ? SquaresBoard : ExerciseBoard;
     return (
-      <ExerciseBoard
+      <Exercise
         key={`${attempt}-${current}`}
         lessonId={lesson.id}
         index={current}
@@ -337,8 +482,8 @@ export function LessonPage({ id }: { id: string }) {
         onDone={onDone}
         header={
           <>
-            <a href="#/lessons" className="back-link">
-              ← Toutes les leçons
+            <a href={only === null ? '#/lessons' : '#/reviews'} className="back-link">
+              {only === null ? '← Toutes les leçons' : '← Révisions'}
             </a>
             <div className="puzzle-stats-row">
               <h2 className="exercise-title">{lesson.title}</h2>
@@ -350,7 +495,12 @@ export function LessonPage({ id }: { id: string }) {
           </>
         }
         footer={
-          answered && (
+          answered &&
+          (only !== null ? (
+            <Button variant="primary" href="#/reviews" data-testid="back-to-reviews">
+              Retour aux révisions
+            </Button>
+          ) : (
             <Button
               variant="primary"
               onClick={() => setCurrent(current + 1)}
@@ -359,7 +509,7 @@ export function LessonPage({ id }: { id: string }) {
               {current + 1 < total ? 'Exercice suivant' : 'Voir le bilan'}
               <IconNext size={18} />
             </Button>
-          )
+          ))
         }
       />
     );
@@ -382,6 +532,8 @@ export function LessonPage({ id }: { id: string }) {
               {s.title && <h3>{s.title}</h3>}
               <RichText text={s.body} />
             </div>
+          ) : s.kind === 'walkthrough' ? (
+            <Walkthrough key={i} section={s} />
           ) : (
             <figure key={i} className="lesson-example">
               <div className="example-board">
@@ -435,6 +587,110 @@ export function LessonPage({ id }: { id: string }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+type WalkthroughSection = Extract<LessonView['sections'][number], { kind: 'walkthrough' }>;
+
+/** Partie commentée : plateau, commentaire, ←/→, liste des coups cliquable, lecture auto. */
+function Walkthrough({ section }: { section: WalkthroughSection }) {
+  const [n, setN] = useState(0);
+  const [auto, setAuto] = useState(false);
+  const max = section.steps.length;
+  const step = n > 0 ? section.steps[n - 1] : undefined;
+  const fen = step?.fen ?? section.fen;
+
+  useEffect(() => {
+    if (!auto) return;
+    if (n >= max) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fin de la lecture automatique
+      setAuto(false);
+      return;
+    }
+    const t = setTimeout(() => setN((x) => x + 1), 2200);
+    return () => clearTimeout(t);
+  }, [auto, n, max]);
+
+  // Touches ←/→ sur toute la page (sauf quand le plateau a le focus : elles y déplacent le curseur).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest('[role="grid"], input, textarea')) return;
+      if (e.key === 'ArrowLeft') setN((x) => Math.max(0, x - 1));
+      else if (e.key === 'ArrowRight') setN((x) => Math.min(max, x + 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [max]);
+
+  return (
+    <div className="walkthrough-block" data-testid="walkthrough">
+      <BoardLayout
+        className="walkthrough"
+        board={
+          <Board
+            pieces={piecesFromFen(fen)}
+            orientation={section.fen.split(' ')[1] === 'b' ? 'b' : 'w'}
+            movable={null}
+            lastMove={step ? { from: step.from, to: step.to } : null}
+            arrows={step ? [{ from: step.from, to: step.to, kind: 'played' as const }] : []}
+          />
+        }
+        side={
+          <>
+            {section.title && <h3>{section.title}</h3>}
+            <p className="muted">
+              Coup {n} / {max}
+            </p>
+            <div className="move-card" data-testid="walkthrough-comment" aria-live="polite">
+              {step ? (
+                <RichText text={`**${step.san}** ${step.comment}`} />
+              ) : (
+                <p>Position de départ. Avance coup par coup (touches ← →).</p>
+              )}
+            </div>
+            <div className="btn-row">
+              <Button
+                size="s"
+                disabled={n === 0}
+                onClick={() => setN(n - 1)}
+                data-testid="walkthrough-prev"
+              >
+                Précédent
+              </Button>
+              <Button
+                size="s"
+                variant="primary"
+                disabled={n >= max}
+                onClick={() => setN(n + 1)}
+                data-testid="walkthrough-next"
+              >
+                Suivant
+              </Button>
+              <Button size="s" variant="outline" onClick={() => setAuto((a) => !a)}>
+                {auto ? 'Pause' : 'Lecture auto'}
+              </Button>
+            </div>
+            <div className="wt-moves" data-testid="walkthrough-moves">
+              {section.steps.map((s, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={n === i + 1 ? 'active' : ''}
+                  aria-current={n === i + 1 ? 'step' : undefined}
+                  onClick={() => {
+                    setAuto(false);
+                    setN(i + 1);
+                  }}
+                >
+                  {i % 2 === 0 ? `${i / 2 + 1}. ` : ''}
+                  {s.san}
+                </button>
+              ))}
+            </div>
+          </>
+        }
+      />
     </div>
   );
 }

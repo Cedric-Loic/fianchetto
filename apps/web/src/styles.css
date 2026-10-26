@@ -1186,6 +1186,17 @@ textarea:focus-visible {
 .square-mark.mark-user::before {
   opacity: 1;
 }
+.square-mark.mark-pick {
+  --mark: var(--accent);
+  box-shadow: inset 0 0 0 clamp(3px, 0.6vw, 6px) var(--mark);
+}
+.square-mark.mark-pick::before {
+  opacity: 0.3;
+}
+.square-mark.mark-correct {
+  --mark: var(--success, #4caf7d);
+  box-shadow: inset 0 0 0 clamp(3px, 0.6vw, 6px) var(--mark);
+}
 .square-mark.mark-hanging {
   --mark: var(--mark-hanging);
 }
@@ -3458,4 +3469,146 @@ textarea:focus-visible {
 .tc-locked .icon {
   margin-right: 4px;
   opacity: 0.8;
+}
+
+/* --- Coach : séance, compétences, parcours, révisions --- */
+.session-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.session-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.session-steps li a {
+  flex: 1;
+  color: var(--text);
+  cursor: pointer;
+}
+.session-steps li.done a {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.skill-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 2fr 130px;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+button.skill-row {
+  cursor: pointer;
+}
+button.skill-row:hover {
+  background: var(--surface-3);
+}
+.skill-level {
+  text-align: right;
+}
+.path-module {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+}
+.path-module.highlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+.path-module h3 {
+  margin-top: 0;
+}
+.path-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.path-steps li {
+  display: flex;
+  gap: var(--space-2);
+}
+.path-steps li.done a {
+  color: var(--text-muted);
+}
+.path-steps li.next a {
+  color: var(--accent);
+  font-weight: 650;
+}
+.review-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+.review-card .review-text {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .skill-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .skill-row .progress {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+
+/* Leçons v2 : indices, exercices de cases, partie commentée. */
+.hint-list {
+  margin: var(--space-2) 0;
+  padding-left: 1.2rem;
+}
+.hint-list li {
+  margin: 0.25rem 0;
+}
+.walkthrough .wt-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.walkthrough .wt-moves button {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border, #ffffff22);
+  cursor: pointer;
+}
+.walkthrough .wt-moves button.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+.walkthrough .btn-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.lesson .walkthrough-block {
+  /* Sort de la colonne de texte : le plateau prend toute la hauteur disponible. */
+  width: 100vw;
+  margin: var(--space-3) 0 var(--space-3) calc(50% - 50vw);
 }

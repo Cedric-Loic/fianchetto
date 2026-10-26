@@ -27,7 +27,7 @@ export interface Arrow {
 /** Case marquée imposée : type du contrat (`hanging`…) ou `user` (surlignage simple). */
 export interface BoardMark {
   square: Square;
-  kind: SquareMarkKind | 'user';
+  kind: SquareMarkKind | 'user' | 'pick' | 'correct';
 }
 
 export interface BoardProps {
@@ -42,6 +42,8 @@ export interface BoardProps {
   /** Case mise en avant (pion choisi pendant la sélection). */
   highlighted?: Square | null;
   onMove?: (from: Square, to: Square, promotion?: PromotionPiece) => void;
+  /** Exercice « désigne les cases » : clic gauche sur une case (aucun déplacement de pièce). */
+  onSquareClick?: (square: Square) => void;
   /** Mode bot : ma dame secrète (pas de fenêtre de promotion pour elle). */
   ownSecretSquare?: Square | null;
   /** Mode sélection : clic sur une pièce au lieu d'un déplacement. */
@@ -272,6 +274,7 @@ export function Board(props: BoardProps) {
     setArrows([]);
     setMarks([]);
     setCursor(square);
+    if (props.onSquareClick) return props.onSquareClick(square);
     const piece = bySquare.get(square);
     if (props.onPieceClick) {
       if (piece) props.onPieceClick(piece);
@@ -342,6 +345,7 @@ export function Board(props: BoardProps) {
     e.preventDefault();
     const square = current;
     const piece = bySquare.get(square);
+    if (props.onSquareClick) return props.onSquareClick(square);
     if (props.onPieceClick) {
       if (piece) props.onPieceClick(piece);
       return;

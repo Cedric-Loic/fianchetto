@@ -11,6 +11,7 @@ import { Openings } from './screens/Openings';
 import { Login } from './screens/Login';
 import { LessonPage, Lessons } from './screens/Lessons';
 import { Profile } from './screens/Profile';
+import { Reviews } from './screens/Reviews';
 import { Puzzles } from './screens/Puzzles';
 import { Selection } from './screens/Selection';
 import { NavBar, type NavSection } from './ui/NavBar';
@@ -32,7 +33,8 @@ type Route =
   | { page: 'lessons' }
   | { page: 'endgames' }
   | { page: 'openings' }
-  | { page: 'lesson'; id: string }
+  | { page: 'reviews' }
+  | { page: 'lesson'; id: string; exercise: number | null }
   | { page: 'review'; id: string; guided: boolean }
   | { page: 'game'; gameId: string };
 
@@ -67,8 +69,10 @@ function parseHash(h: string): Route {
   if (h === '#/lessons') return { page: 'lessons' };
   if (h === '#/endgames') return { page: 'endgames' };
   if (h === '#/openings') return { page: 'openings' };
-  m = /^#\/lessons\/([\w-]+)$/.exec(h);
-  if (m?.[1]) return { page: 'lesson', id: m[1] };
+  if (h === '#/reviews') return { page: 'reviews' };
+  // #/lessons/<id>?exercise=n : un seul exercice (révisions), retour à #/reviews ensuite.
+  m = /^#\/lessons\/([\w-]+)(?:\?exercise=(\d+))?$/.exec(h);
+  if (m?.[1]) return { page: 'lesson', id: m[1], exercise: m[2] ? Number(m[2]) : null };
   if (h === '#/login') return { page: 'login' };
   if (h === '#/leaderboard') return { page: 'leaderboard' };
   return { page: 'home' };
@@ -80,6 +84,8 @@ function sectionOf(route: Route): NavSection {
     case 'home':
     case 'game':
       return 'play';
+    case 'reviews':
+      return 'coach';
     case 'lessons':
     case 'lesson':
     case 'endgames':
@@ -138,10 +144,12 @@ export function App() {
       <Puzzles key={hash} initialMode={route.mode ?? 'rated'} initialTheme={route.theme ?? null} />
     );
   } else if (route.page === 'coach') content = <Coach />;
+  else if (route.page === 'reviews') content = <Reviews />;
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'endgames') content = <Endgames />;
   else if (route.page === 'openings') content = <Openings />;
-  else if (route.page === 'lesson') content = <LessonPage key={route.id} id={route.id} />;
+  else if (route.page === 'lesson')
+    content = <LessonPage key={hash} id={route.id} only={route.exercise} />;
   else if (route.page === 'review')
     content = <Review key={hash} id={route.id} guided={route.guided} />;
   else if (route.page === 'home') {

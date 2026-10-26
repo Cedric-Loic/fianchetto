@@ -8,6 +8,7 @@ import { Button } from '../ui/Button';
 import { IconCheck, IconFlame, IconPuzzle, IconTarget } from '../ui/icons';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
+import { CoachPlan } from './CoachPlan';
 
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
 
@@ -52,6 +53,8 @@ export function Coach() {
 
   return (
     <div className="page coach">
+      <CoachPlan />
+
       <section
         className="panel banner coach-next"
         data-testid="coach-next"

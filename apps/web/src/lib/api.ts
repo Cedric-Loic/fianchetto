@@ -1,5 +1,8 @@
 import type {
   BotLevelInfo,
+  CardsResponse,
+  CurriculumResponse,
+  DailySessionResponse,
   CoachDashboard,
   CheckMoveResponse,
   EndgameStartResponse,
@@ -8,7 +11,9 @@ import type {
   ImportedGamesResponse,
   ImportResult,
   LeaderboardResponse,
+  LessonHintResponse,
   LessonMoveResponse,
+  LessonSquaresResponse,
   LessonsResponse,
   LessonSummary,
   LessonView,
@@ -18,6 +23,8 @@ import type {
   PuzzleNextResponse,
   PuzzleStats,
   ReviewResponse,
+  SessionStep,
+  SkillsResponse,
   RetryMoveResponse,
   UserPublic,
   Variant,
@@ -176,12 +183,29 @@ export const api = {
     request<ImportResult>('POST', '/api/imports/chesscom', { username, max }),
   deleteImport: (id: string) => call<{ ok: true }>('DELETE', `/api/imports/${id}`),
   reviewAll: () => call<{ queued: number }>('POST', '/api/imports/review-all'),
+  coachSkills: () => call<SkillsResponse>('GET', '/api/coach/skills'),
+  coachCurriculum: () => call<CurriculumResponse>('GET', '/api/coach/curriculum'),
+  coachSession: () => call<DailySessionResponse>('GET', '/api/coach/session'),
+  coachProgress: (kind: SessionStep['kind']) =>
+    call<DailySessionResponse>('POST', '/api/coach/session/progress', { kind }),
+  reviewCards: () => call<CardsResponse>('GET', '/api/reviews/cards'),
   dashboard: () => call<CoachDashboard>('GET', '/api/coach/dashboard'),
   // Leçons.
   lessons: () => call<LessonsResponse>('GET', '/api/lessons'),
   lesson: (id: string) => call<LessonView>('GET', `/api/lessons/${id}`),
-  lessonMove: (id: string, index: number, step: number, uci: string) =>
-    call<LessonMoveResponse>('POST', `/api/lessons/${id}/exercises/${index}/move`, { step, uci }),
+  lessonMove: (id: string, index: number, step: number, uci: string, hints = 0) =>
+    call<LessonMoveResponse>('POST', `/api/lessons/${id}/exercises/${index}/move`, {
+      step,
+      uci,
+      hints,
+    }),
+  lessonSquares: (id: string, index: number, squares: string[], hints = 0) =>
+    call<LessonSquaresResponse>('POST', `/api/lessons/${id}/exercises/${index}/squares`, {
+      squares,
+      hints,
+    }),
+  lessonHint: (id: string, index: number, level: number) =>
+    call<LessonHintResponse>('POST', `/api/lessons/${id}/exercises/${index}/hint`, { level }),
   lessonResult: (id: string, correct: number) =>
     call<LessonSummary>('POST', `/api/lessons/${id}/result`, { correct }),
   // Finales contre le bot.

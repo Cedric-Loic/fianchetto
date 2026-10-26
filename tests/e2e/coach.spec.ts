@@ -59,3 +59,32 @@ test('import PGN, analyse, revue avec explication, point de départ', async ({ p
   await expect(page.getByTestId('baseline')).toContainText('1parties analysées');
   await page.screenshot({ path: 'test-results/analyse-imports.png', fullPage: true });
 });
+
+test('page Coach : séance du jour, compétences, parcours ; écran Révisions vide', async ({
+  page,
+}) => {
+  await page.goto('/#/login');
+  await page.getByRole('button', { name: 'Pas de compte ? Créer un compte' }).click();
+  await page.getByLabel('Pseudo').fill(`cp${Date.now() % 1_000_000_000}`);
+  await page.getByLabel('Mot de passe').fill('motdepasse');
+  await page.getByRole('button', { name: "S'inscrire" }).click();
+  await expect(page.getByTestId('nav-user')).toBeVisible();
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/#/coach');
+  const session = page.getByTestId('coach-session');
+  await expect(session).toContainText('Séance du jour');
+  await expect(session.locator('.session-steps li').first()).toBeVisible();
+  await expect(page.getByTestId('session-start')).toHaveText('Commencer');
+  await expect(page.locator('[data-testid^="skill-"]')).toHaveCount(14);
+  await expect(page.getByTestId('coach-skills')).toContainText('pas encore mesuré');
+  await expect(page.getByTestId('coach-path')).toContainText('Parcours');
+  await page.screenshot({
+    path: '/tmp/claude-0/-home-user-fianchetto/f669a99c-69be-5c7c-a668-8806c175000f/scratchpad/coach.png',
+  });
+
+  await page.getByTestId('to-reviews').click();
+  await expect(page).toHaveURL(/#\/reviews$/);
+  await expect(page.getByTestId('reviews-count')).toContainText('0 carte due');
+  await expect(page.getByTestId('reviews')).toContainText('Rien à réviser');
+});

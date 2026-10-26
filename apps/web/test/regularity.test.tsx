@@ -19,6 +19,12 @@ vi.mock('../src/lib/api', () => ({
     botLevels: vi.fn(),
     activeGame: vi.fn(),
     createGame: vi.fn(),
+    // Plan du coach (CoachPlan) : sans réponse, il reste vide.
+    coachSession: vi.fn().mockResolvedValue(null),
+    coachSkills: vi.fn().mockResolvedValue(null),
+    coachCurriculum: vi.fn().mockResolvedValue(null),
+    reviewCards: vi.fn().mockResolvedValue(null),
+    coachProgress: vi.fn().mockResolvedValue(null),
   },
   summarizePgn: vi.fn(),
 }));
