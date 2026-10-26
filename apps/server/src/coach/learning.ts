@@ -145,6 +145,17 @@ export class LearningService {
     );
   }
 
+  /** Question de partie coachée : preuve de compétence seulement, aucune carte de révision. */
+  recordCoachPrompt(
+    userId: string,
+    gameId: string,
+    ply: number,
+    kind: 'threat' | 'chance',
+    correct: boolean,
+  ): void {
+    this.#store.recordCoachPrompt({ userId, gameId, ply, kind, correct, at: this.#now() });
+  }
+
   /** Puzzle « mes erreurs » jugé. */
   recordOwnPuzzle(userId: string, puzzleId: string, success: boolean): void {
     const own = this.#store.puzzles.getOwn(puzzleId);
@@ -170,6 +181,10 @@ export class LearningService {
     }
     for (const a of this.#store.exerciseAttempts(userId)) {
       evidence.push({ skill: skillOfLesson(a.lessonId), success: a.success, at: a.at });
+    }
+    for (const p of this.#store.coachPrompts(userId)) {
+      const skill: SkillId = p.kind === 'threat' ? 'threats' : 'piece-safety';
+      evidence.push({ skill, success: p.correct, at: p.at });
     }
     evidence.push(...this.#reviewEvidence(userId));
     return computeSkills(evidence, this.#now());

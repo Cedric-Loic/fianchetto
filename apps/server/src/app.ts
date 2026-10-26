@@ -33,6 +33,7 @@ import { registerPuzzleRoutes } from './puzzles/routes.js';
 import { PuzzleService } from './puzzles/service.js';
 import { registerReviewRoutes } from './review/routes.js';
 import { ReviewService, type ReviewEngine } from './review/service.js';
+import { registerCoachedRoutes } from './training/coached.js';
 import { registerTrainingRoutes } from './training/routes.js';
 import { TrainingService } from './training/service.js';
 import { serializeOutgoing } from './send.js';
@@ -203,6 +204,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     (session) =>
       !session.ownerId || coach.guardActiveFor(session.id, session.ownerId, session.startedAt),
   );
+  registerCoachedRoutes(app, store, learning, (id, request) => viewable(id, request));
   registerReviewRoutes(app, {
     store,
     reviews,

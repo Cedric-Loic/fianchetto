@@ -446,12 +446,14 @@ export class GameSession {
    * Entraînement : position où le joueur doit jouer (indices, garde-fou), sinon `null`. Jamais
    * en Secret Queen.
    */
-  trainingPosition(): { fen: string; color: Color } | null {
+  trainingPosition(): { fen: string; color: Color; ply: number } | null {
     const game = this.#game;
     if (!this.training || !(game instanceof ClassicGame) || this.#phase !== 'playing') return null;
     const human = this.botColor === null ? null : opposite(this.botColor);
     const fen = game.positions().at(-1);
-    return human !== null && game.turn === human && fen ? { fen, color: human } : null;
+    return human !== null && game.turn === human && fen
+      ? { fen, color: human, ply: game.plyCount }
+      : null;
   }
 
   /** Hot-seat : case de la dame secrète du camp au trait, à la demande (bouton maintenu). */

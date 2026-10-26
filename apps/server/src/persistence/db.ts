@@ -241,6 +241,16 @@ export class GameStore {
         at             INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS exercise_attempts_user ON exercise_attempts (user_id, at);
+      -- Parties coachées : réponses aux questions socratiques (une par partie et demi-coup).
+      CREATE TABLE IF NOT EXISTS coach_prompts (
+        user_id TEXT NOT NULL REFERENCES users(id),
+        game_id TEXT NOT NULL,
+        ply     INTEGER NOT NULL,
+        kind    TEXT NOT NULL,
+        correct INTEGER NOT NULL,
+        at      INTEGER NOT NULL,
+        PRIMARY KEY (user_id, game_id, ply)
+      );
       CREATE TABLE IF NOT EXISTS review_cards (
         id          TEXT PRIMARY KEY,
         user_id     TEXT NOT NULL REFERENCES users(id),
@@ -486,6 +496,30 @@ export class GameStore {
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .run(a.userId, a.lessonId, a.index, a.success ? 1 : 0, a.hints, a.at);
+  }
+
+  /** Réponse à une question de partie coachée ; la première réponse par position fait foi. */
+  recordCoachPrompt(a: {
+    userId: string;
+    gameId: string;
+    ply: number;
+    kind: string;
+    correct: boolean;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO coach_prompts (user_id, game_id, ply, kind, correct, at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.gameId, a.ply, a.kind, a.correct ? 1 : 0, a.at);
+  }
+
+  coachPrompts(userId: string): { kind: string; correct: boolean; at: number }[] {
+    const rows = this.#db
+      .prepare('SELECT kind, correct, at FROM coach_prompts WHERE user_id = ? ORDER BY at')
+      .all(userId) as { kind: string; correct: number; at: number }[];
+    return rows.map((r) => ({ kind: r.kind, correct: r.correct === 1, at: r.at }));
   }
 
   exerciseAttempts(
