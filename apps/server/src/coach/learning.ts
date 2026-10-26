@@ -273,6 +273,7 @@ export class LearningService {
       if (!resolved) continue; // la source a disparu
       due.push({
         id: c.id,
+        ref: c.ref,
         source: c.source as ReviewCard['source'],
         skill: c.skill as SkillId,
         ...resolved,

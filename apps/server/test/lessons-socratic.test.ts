@@ -104,7 +104,11 @@ describe('leçons socratiques', () => {
     const { lessons, learning, store, advance } = setup();
     lessons.squares('fake', 0, ['d2', 'h1'], 0, 'u1');
     advance(DAY + 1000);
-    expect(learning.cards('u1').due[0]).toMatchObject({ source: 'exercise', step: 0 });
+    expect(learning.cards('u1').due[0]).toMatchObject({
+      source: 'exercise',
+      ref: 'fake:0',
+      step: 0,
+    });
     expect(learning.cards('u1').due[0]?.fen).toContain('4k3');
     // Due : réussite sans indice -> étape 1 ; avec indice -> reste à l'étape 0, demain.
     lessons.squares('fake', 0, ['d2', 'h1'], 1, 'u1');
