@@ -10,6 +10,15 @@ async function clickSquare(page: Page, square: string) {
   await page.mouse.click(box.x + (x + 0.5) * size, box.y + (y + 0.5) * size);
 }
 
+async function signUp(page: Page) {
+  await page.goto('/#/login');
+  await page.getByRole('button', { name: 'Pas de compte ? Créer un compte' }).click();
+  await page.getByLabel('Pseudo').fill(`fi${Date.now() % 1_000_000_000}`);
+  await page.getByLabel('Mot de passe').fill('motdepasse');
+  await page.getByRole('button', { name: "S'inscrire" }).click();
+  await expect(page.getByTestId('nav-user')).toBeVisible();
+}
+
 test('finale contre le bot : ouvrir depuis Apprendre, le bot répond, échec puis Réessayer', async ({
   page,
 }) => {
@@ -48,4 +57,57 @@ test('finale contre le bot : ouvrir depuis Apprendre, le bot répond, échec pui
 
   await page.goto('/#/endgames');
   await expect(page.getByTestId('endgame-lucena')).toContainText('1 essai');
+});
+
+test('cours de finales : paliers, lien vers le cours, coups restants et indices', async ({
+  page,
+}) => {
+  await signUp(page);
+  await page.goto('/#/endgames');
+
+  // Sections par palier avec leur compteur, finale jamais tentée : le cours d'abord.
+  await expect(page.getByTestId('endgame-stage-1')).toBeVisible();
+  await expect(page.getByTestId('endgame-stage-1-count')).toContainText('0 /');
+  await expect(page.getByTestId('endgame-stage-2')).toBeVisible();
+  const card = page.getByTestId('endgame-lucena');
+  await expect(card).toContainText('en 35 coups max');
+  await expect(card).toContainText('1. Cours');
+  await expect(card).toContainText('2. Joue-la');
+  const course = page.getByTestId('endgame-course-lucena').getByRole('link', {
+    name: 'Commence par le cours',
+  });
+  await expect(course).toHaveAttribute('href', '#/lessons/finales-tours-pratiques');
+  await page.getByTestId('endgame-play-lucena').click();
+
+  // Barre « coups restants » : se décrémente au coup joué, se réajuste à la reprise.
+  const moves = page.getByTestId('endgame-moves-text');
+  await expect(moves).toHaveText('Coups restants : 35 / 35');
+  await clickSquare(page, 'c1');
+  await clickSquare(page, 'd1');
+  await expect(page.getByTestId('move-list').locator('button.move')).toHaveCount(2, {
+    timeout: 30_000,
+  });
+  await expect(moves).toHaveText('Coups restants : 34 / 35');
+  await page.getByTestId('takeback').click();
+  await expect(moves).toHaveText('Coups restants : 35 / 35');
+
+  // Indices propres à la finale : un par clic, progressifs.
+  const hint = page.getByTestId('endgame-hint');
+  await hint.click();
+  await expect(page.getByTestId('endgame-hint-text').locator('li')).toHaveCount(1);
+  await hint.click();
+  await expect(page.getByTestId('endgame-hint-text').locator('li')).toHaveCount(2);
+  await hint.click();
+  await expect(page.getByTestId('endgame-hint-text').locator('li')).toHaveCount(3);
+  await expect(hint).toBeDisabled();
+
+  // Échec : le verdict propose de revoir le cours.
+  await page.getByTestId('resign').click();
+  await page.getByTestId('confirm-resign').click();
+  const modal = page.getByTestId('end-modal');
+  await expect(modal.getByTestId('endgame-verdict')).toContainText('Objectif non atteint');
+  await expect(modal.getByTestId('endgame-course-link')).toHaveAttribute(
+    'href',
+    '#/lessons/finales-tours-pratiques',
+  );
 });

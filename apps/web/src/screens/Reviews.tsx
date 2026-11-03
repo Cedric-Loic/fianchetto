@@ -12,6 +12,13 @@ function exerciseHref(card: ReviewCard): string | null {
   return m?.[1] ? `#/lessons/${m[1]}?exercise=${m[2]}` : null;
 }
 
+const SOURCE_LABEL: Record<ReviewCard['source'], string> = {
+  mistake: 'Erreur de partie',
+  exercise: 'Exercice de leçon',
+  endgame: 'Finale à rejouer',
+  opening: "Exercice d'ouverture",
+};
+
 /** Repli (serveur ancien, `ref` absent) : retrouve l'exercice par sa position et sa consigne. */
 async function exerciseHrefByFen(card: ReviewCard): Promise<string | null> {
   const list = await api.lessons();
@@ -41,6 +48,11 @@ export function Reviews() {
   const open = async (card: ReviewCard) => {
     if (card.source === 'mistake') {
       location.hash = '#/puzzles/mine';
+      return;
+    }
+    if (card.source === 'endgame') {
+      // `ref` = id de finale : le cours de finales permet de la rejouer.
+      location.hash = '#/endgames';
       return;
     }
     setBusy(true);
@@ -90,12 +102,11 @@ export function Reviews() {
                     <strong>{c.prompt}</strong>
                     <br />
                     <span className="muted">
-                      {SKILL_LABELS[c.skill]} ·{' '}
-                      {c.source === 'mistake' ? 'Erreur de partie' : 'Exercice de leçon'}
+                      {SKILL_LABELS[c.skill]} · {SOURCE_LABEL[c.source]}
                     </span>
                   </span>
                   <Button size="s" disabled={busy} onClick={() => void open(c)}>
-                    Réviser
+                    {c.source === 'endgame' ? 'Rejouer la finale' : 'Réviser'}
                   </Button>
                 </li>
               ))}

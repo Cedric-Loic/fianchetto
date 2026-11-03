@@ -7,6 +7,7 @@ import type {
   DailySessionResponse,
   CoachDashboard,
   CheckMoveResponse,
+  EndgameHintResponse,
   EndgameStartResponse,
   EndgamesResponse,
   HintResponse,
@@ -218,6 +219,9 @@ export const api = {
   // Finales contre le bot.
   endgames: () => call<EndgamesResponse>('GET', '/api/endgames'),
   startEndgame: (id: string) => call<EndgameStartResponse>('POST', `/api/endgames/${id}/start`),
+  /** Indice propre à la finale (niveau 1 à 3) ; compté côté serveur. */
+  endgameHint: (id: string, level: number) =>
+    call<EndgameHintResponse>('POST', `/api/endgames/${id}/hint`, { level }),
   // Puzzles.
   puzzleStats: () => call<PuzzleStats>('GET', '/api/puzzles/stats'),
   puzzleNext: (mode: PuzzleMode, theme: string | null) =>

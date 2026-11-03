@@ -2000,11 +2000,77 @@ textarea:focus-visible {
 .endgame-card .lesson-body {
   flex-basis: 220px;
 }
+.endgame-stage {
+  margin-top: var(--space-4);
+}
+.endgame-stage-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+.endgame-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: 2px;
+}
+.endgame-badges .badge,
+.endgame-stage-title .badge {
+  margin-left: 0;
+}
+/* Les deux temps d'une finale : « 1. Cours » puis « 2. Joue-la ». */
+.endgame-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex-basis: 100%;
+}
+.endgame-step {
+  display: flex;
+  flex: 1 1 200px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-s);
+}
+.endgame-step-first {
+  border: 1px solid var(--accent-line);
+  background: var(--surface-2);
+}
+.endgame-step-title {
+  font-weight: 650;
+  white-space: nowrap;
+}
 .endgame-goal {
   margin: 0;
 }
 .endgame-verdict {
   font-weight: 600;
+}
+/* Pendant la partie : objectif, indice de finale et coups restants. */
+.endgame-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+}
+.endgame-moves {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.endgame-moves.low .progress-bar {
+  background: var(--warning);
+}
+.endgame-moves.over .progress-bar {
+  background: var(--danger);
 }
 .back-link {
   display: inline-block;

@@ -53,6 +53,17 @@ const SCREENS: Screen[] = [
     },
   },
   {
+    // Partie de finale : bandeau d'objectif, coups restants et indice dans le panneau latéral.
+    name: 'finale',
+    bars: 2 * (48 + 8),
+    evalWidth: 0,
+    open: async (page) => {
+      await page.goto('/#/endgames');
+      await page.getByTestId('endgame-play-lucena').click();
+      await expect(page.getByTestId('endgame-moves')).toBeVisible();
+    },
+  },
+  {
     name: 'puzzles',
     bars: 0,
     evalWidth: 0,

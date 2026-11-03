@@ -48,6 +48,31 @@ import {
   IconUndo,
 } from '../ui/icons';
 
+/** Barre « coups restants » d'une finale à limite de coups (coups du joueur dans la liste). */
+function MovesLeft({ used, max }: { used: number; max: number }) {
+  const left = Math.max(0, max - used);
+  const tone = used > max ? ' over' : left <= 3 ? ' low' : '';
+  return (
+    <div className={`endgame-moves${tone}`} data-testid="endgame-moves">
+      <span data-testid="endgame-moves-text">
+        {used > max
+          ? `Limite dépassée : ${used} / ${max} coups`
+          : `Coups restants : ${left} / ${max}`}
+      </span>
+      <span
+        className="progress"
+        role="progressbar"
+        aria-label="Coups restants"
+        aria-valuemin={0}
+        aria-valuemax={max}
+        aria-valuenow={left}
+      >
+        <span className="progress-bar" style={{ width: `${(left / max) * 100}%` }} />
+      </span>
+    </div>
+  );
+}
+
 /**
  * Écran de partie (classique ou Secret Queen, à deux ou contre le bot) : plateau, barres joueur,
  * coups, actions, révélation de fin (Secret Queen).
@@ -91,6 +116,12 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
     null,
   );
   const [checking, setChecking] = useState(false);
+  // Finale : indices propres à la finale déjà consultés (1 à 3), pour cette partie.
+  const [endgameHints, setEndgameHints] = useState<{ gameId: string; texts: string[] }>({
+    gameId: state.gameId,
+    texts: [],
+  });
+  const [hintBusy, setHintBusy] = useState(false);
   // Téléphone : bande de coups sous le plateau et barre d'actions fixe en bas.
   const mobile = useMediaQuery(MOBILE_QUERY);
 
@@ -126,6 +157,18 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
         setGuard({ move, warning: res.warning, ply: plyCount });
       } else {
         send({ type: 'move', clientMoveId: crypto.randomUUID(), move });
+      }
+    });
+  };
+  const shownEndgameHints = endgameHints.gameId === state.gameId ? endgameHints.texts : [];
+  const askEndgameHint = () => {
+    if (!endgame || hintBusy || shownEndgameHints.length >= endgame.hints) return;
+    setHintBusy(true);
+    const level = shownEndgameHints.length + 1;
+    void api.endgameHint(endgame.id, level).then((res) => {
+      setHintBusy(false);
+      if (res) {
+        setEndgameHints({ gameId: state.gameId, texts: [...shownEndgameHints, res.hint] });
       }
     });
   };
@@ -582,9 +625,37 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
           </div>
 
           {endgame && (
-            <p className="endgame-goal" data-testid="endgame-goal">
-              <strong>{endgame.title}</strong> · {endgame.objective}
-            </p>
+            <div className="endgame-panel" data-testid="endgame-panel">
+              <p className="endgame-goal" data-testid="endgame-goal">
+                <strong>{endgame.title}</strong> · {endgame.objective}
+              </p>
+              {endgame.maxMoves !== null && (
+                <MovesLeft
+                  used={board.moves.filter((m) => m.color === endgame.color).length}
+                  max={endgame.maxMoves}
+                />
+              )}
+              {!ended && (
+                <Button
+                  onClick={askEndgameHint}
+                  disabled={
+                    hintBusy || endgame.hints === 0 || shownEndgameHints.length >= endgame.hints
+                  }
+                  data-testid="endgame-hint"
+                >
+                  <IconBulb size={18} />
+                  Indice de la finale
+                  {endgame.hints > 0 && ` (${shownEndgameHints.length}/${endgame.hints})`}
+                </Button>
+              )}
+              {shownEndgameHints.length > 0 && (
+                <ol className="endgame-hints hint-text" data-testid="endgame-hint-text">
+                  {shownEndgameHints.map((text, i) => (
+                    <li key={i}>{text}</li>
+                  ))}
+                </ol>
+              )}
+            </div>
           )}
           {!ended && state.training && (
             <div className="training" data-testid="training-panel">

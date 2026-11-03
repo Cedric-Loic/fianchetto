@@ -17,6 +17,39 @@ function bannerText(outcome: Outcome, result: GameResult, state: ViewerGameState
     : 'Victoire !';
 }
 
+/**
+ * Verdict d'une finale : réussie, trop de coups (bon résultat mais limite dépassée) ou objectif
+ * non atteint ; dans les deux cas d'échec, renvoie vers le cours.
+ */
+function EndgameVerdict(props: {
+  endgame: EndgameSummary;
+  result: GameResult;
+  state: ViewerGameState;
+}) {
+  const { endgame, result, state } = props;
+  // Coups du joueur tels qu'affichés dans la liste (les coups repris n'y figurent plus).
+  const moves = (state.board?.moves ?? []).filter((m) => m.color === endgame.color).length;
+  const goodResult = endgameSucceeded(endgame, result);
+  const tooMany = goodResult && endgame.maxMoves !== null && moves > endgame.maxMoves;
+  const success = goodResult && !tooMany;
+  return (
+    <div className="endgame-verdict-block">
+      <p className={`endgame-verdict ${success ? 'win' : 'loss'}`} data-testid="endgame-verdict">
+        {success
+          ? `Finale réussie : ${endgame.goal === 'win' ? 'tu as gagné' : 'tu as tenu la nulle'} !`
+          : tooMany
+            ? `Trop de coups : ${moves} > ${endgame.maxMoves}. Le résultat est bon, mais la finale se joue en ${endgame.maxMoves} coups maximum.`
+            : `Objectif non atteint : ${endgame.objective}`}
+      </p>
+      {!success && endgame.lesson && (
+        <Button href={`#/lessons/${endgame.lesson}`} data-testid="endgame-course-link">
+          Revoir le cours
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** Écart d'Elo : compteur animé de l'ancien classement vers le nouveau. */
 function EloChange(props: { variant: ViewerGameState['variant']; before: number; after: number }) {
   const shown = useCountUp(props.after, props.before);
@@ -77,16 +110,7 @@ export function EndDialog(props: {
         {state.rated && before !== null && props.ratingAfter !== null && (
           <EloChange variant={state.variant} before={before} after={props.ratingAfter} />
         )}
-        {props.endgame && (
-          <p
-            className={`endgame-verdict ${endgameSucceeded(props.endgame, result) ? 'win' : 'loss'}`}
-            data-testid="endgame-verdict"
-          >
-            {endgameSucceeded(props.endgame, result)
-              ? `Finale réussie : ${props.endgame.goal === 'win' ? 'tu as gagné' : 'tu as tenu la nulle'} !`
-              : `Objectif non atteint : ${props.endgame.objective}`}
-          </p>
-        )}
+        {props.endgame && <EndgameVerdict endgame={props.endgame} result={result} state={state} />}
         {board?.reveal && <h3>Les dames secrètes</h3>}
         {(['w', 'b'] as const).map((c) => {
           const s = board?.reveal?.secrets[c];
