@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { START_FEN } from '../analysis/tree';
 import type { LessonSummary, LessonView } from '@sq/shared';
 import {
   ExercisePlayer,
@@ -8,6 +9,7 @@ import {
 import { Board } from '../game/Board';
 import { api } from '../lib/api';
 import { piecesFromFen } from '../lib/fen';
+import { MOBILE_QUERY, useMediaQuery } from '../lib/media';
 import { useSession } from '../lib/session';
 import { BoardLayout } from '../ui/BoardLayout';
 import { Button } from '../ui/Button';
@@ -229,44 +231,10 @@ export function LessonPage({ id, only = null }: { id: string; only?: number | nu
   }
 
   return (
-    <div className="page lesson">
-      <div className="panel page-panel">
-        <a href="#/lessons" className="back-link">
-          ← Toutes les leçons
-        </a>
-        <h2>{lesson.title}</h2>
-        <p className="muted">
-          {PHASES[lesson.phase]} · {lesson.minutes} min
-          {lesson.passed && <span className="win"> · ✓ Validée</span>}
-        </p>
-        {lesson.sections.map((s, i) =>
-          s.kind === 'text' ? (
-            <div key={i} className="lesson-text">
-              {s.title && <h3>{s.title}</h3>}
-              <RichText text={s.body} />
-            </div>
-          ) : s.kind === 'walkthrough' ? (
-            <Walkthrough key={i} section={s} />
-          ) : (
-            <figure key={i} className="lesson-example">
-              <div className="example-board">
-                <Board
-                  pieces={piecesFromFen(s.fen)}
-                  orientation={s.fen.split(' ')[1] === 'b' ? 'b' : 'w'}
-                  movable={null}
-                  arrows={s.arrows.map((a) => ({ ...a, kind: 'line' as const }))}
-                  squareMarks={s.marks.map((square) => ({ square, kind: 'user' as const }))}
-                />
-              </div>
-              <figcaption>{s.caption}</figcaption>
-            </figure>
-          ),
-        )}
-      </div>
-
-      <div className="panel page-panel" data-testid="exercises">
+    <LessonReader lesson={lesson}>
+      <div className="lesson-exercises" data-testid="exercises">
         <div className="puzzle-stats-row">
-          <h2>Exercices</h2>
+          <h3>Exercices</h3>
           <StreakBadge />
         </div>
         {current === null && (
@@ -300,110 +268,229 @@ export function LessonPage({ id, only = null }: { id: string; only?: number | nu
           </div>
         )}
       </div>
-    </div>
+    </LessonReader>
   );
 }
 
+type ExampleSection = Extract<LessonView['sections'][number], { kind: 'example' }>;
 type WalkthroughSection = Extract<LessonView['sections'][number], { kind: 'walkthrough' }>;
 
-/** Partie commentée : plateau, commentaire, ←/→, liste des coups cliquable, lecture auto. */
-function Walkthrough({ section }: { section: WalkthroughSection }) {
-  const [n, setN] = useState(0);
+/** Vrai pour les sections qui s'affichent sur le plateau (exemple, partie commentée). */
+function hasBoard(s: LessonView['sections'][number]): s is ExampleSection | WalkthroughSection {
+  return s.kind !== 'text';
+}
+
+/**
+ * Lecture d'une leçon : le plateau (fixe, toute la hauteur) montre la section active, exemple
+ * ou partie commentée ; le panneau latéral contient tout le texte, qui défile. Les touches ←/→
+ * font avancer la partie commentée active.
+ */
+function LessonReader({ lesson, children }: { lesson: LessonView; children: ReactNode }) {
+  const { sections } = lesson;
+  const [active, setActive] = useState<number | null>(() => {
+    const first = sections.findIndex(hasBoard);
+    return first < 0 ? null : first;
+  });
+  // Coup affiché de chaque partie commentée (indice de section) : on retrouve sa place en revenant.
+  const [steps, setSteps] = useState<Record<number, number>>({});
   const [auto, setAuto] = useState(false);
-  const max = section.steps.length;
-  const step = n > 0 ? section.steps[n - 1] : undefined;
-  const fen = step?.fen ?? section.fen;
+  const mobile = useMediaQuery(MOBILE_QUERY);
+  const columnRef = useRef<HTMLDivElement>(null);
+
+  const candidate = active === null ? undefined : sections[active];
+  const section = candidate && hasBoard(candidate) ? candidate : undefined;
+  const walk = section?.kind === 'walkthrough' ? section : undefined;
+  const max = walk?.steps.length ?? 0;
+  const n = active === null ? 0 : (steps[active] ?? 0);
+  const go = (to: number) => {
+    if (active === null) return;
+    setSteps((m) => ({ ...m, [active]: Math.max(0, Math.min(max, to)) }));
+  };
 
   useEffect(() => {
-    if (!auto) return;
+    if (!auto || !walk || active === null) return;
     if (n >= max) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- fin de la lecture automatique
       setAuto(false);
       return;
     }
-    const t = setTimeout(() => setN((x) => x + 1), 2200);
+    const t = setTimeout(() => setSteps((m) => ({ ...m, [active]: n + 1 })), 2200);
     return () => clearTimeout(t);
-  }, [auto, n, max]);
+  }, [auto, walk, active, n, max]);
 
   // Touches ←/→ sur toute la page (sauf quand le plateau a le focus : elles y déplacent le curseur).
   useEffect(() => {
+    if (!walk || active === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement | null)?.closest('[role="grid"], input, textarea')) return;
-      if (e.key === 'ArrowLeft') setN((x) => Math.max(0, x - 1));
-      else if (e.key === 'ArrowRight') setN((x) => Math.min(max, x + 1));
+      if (e.target instanceof Element && e.target.closest('[role="grid"], input, textarea')) return;
+      const at = (d: number) =>
+        setSteps((m) => ({ ...m, [active]: Math.max(0, Math.min(max, (m[active] ?? 0) + d)) }));
+      if (e.key === 'ArrowLeft') at(-1);
+      else if (e.key === 'ArrowRight') at(1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [max]);
+  }, [walk, active, max]);
+
+  const show = (i: number) => {
+    setActive(i);
+    setAuto(false);
+    // Téléphone : le plateau est au-dessus du texte, on y remonte.
+    if (mobile) columnRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
+  // Plateau : section active, sinon position du premier exercice (lecture seule).
+  const fallback = lesson.exercises[0];
+  const step = walk && n > 0 ? walk.steps[n - 1] : undefined;
+  const view =
+    section?.kind === 'example'
+      ? {
+          fen: section.fen,
+          arrows: section.arrows.map((a) => ({ ...a, kind: 'line' as const })),
+          marks: section.marks.map((square) => ({ square, kind: 'user' as const })),
+          lastMove: null,
+        }
+      : walk
+        ? {
+            fen: step?.fen ?? walk.fen,
+            arrows: step ? [{ from: step.from, to: step.to, kind: 'played' as const }] : [],
+            marks: [],
+            lastMove: step ? { from: step.from, to: step.to } : null,
+          }
+        : { fen: fallback?.fen ?? START_FEN, arrows: [], marks: [], lastMove: null };
+  // Orienté du côté qui a le trait dans la position de départ de la section.
+  const orientation = section
+    ? section.fen.split(' ')[1] === 'b'
+      ? 'b'
+      : 'w'
+    : (fallback?.color ?? 'w');
 
   return (
-    <div className="walkthrough-block" data-testid="walkthrough">
-      <BoardLayout
-        className="walkthrough"
-        board={
+    <BoardLayout
+      wide
+      className="lesson-reader"
+      testId="lesson-reader"
+      board={
+        <div ref={columnRef}>
           <Board
-            pieces={piecesFromFen(fen)}
-            orientation={section.fen.split(' ')[1] === 'b' ? 'b' : 'w'}
+            pieces={piecesFromFen(view.fen)}
+            orientation={orientation}
             movable={null}
-            lastMove={step ? { from: step.from, to: step.to } : null}
-            arrows={step ? [{ from: step.from, to: step.to, kind: 'played' as const }] : []}
+            lastMove={view.lastMove}
+            arrows={view.arrows}
+            squareMarks={view.marks}
           />
-        }
-        side={
-          <>
-            {section.title && <h3>{section.title}</h3>}
-            <p className="muted">
-              Coup {n} / {max}
-            </p>
-            <div className="move-card" data-testid="walkthrough-comment" aria-live="polite">
-              {step ? (
-                <RichText text={`**${step.san}** ${step.comment}`} />
-              ) : (
-                <p>Position de départ. Avance coup par coup (touches ← →).</p>
-              )}
-            </div>
-            <div className="btn-row">
-              <Button
-                size="s"
-                disabled={n === 0}
-                onClick={() => setN(n - 1)}
-                data-testid="walkthrough-prev"
+        </div>
+      }
+      side={
+        <>
+          <a href="#/lessons" className="back-link">
+            ← Toutes les leçons
+          </a>
+          <h2 className="lesson-title">{lesson.title}</h2>
+          <p className="muted">
+            {PHASES[lesson.phase]} · {lesson.minutes} min
+            {lesson.passed && <span className="win"> · ✓ Validée</span>}
+          </p>
+          {sections.map((sec, i) => {
+            if (sec.kind === 'text') {
+              return (
+                <div key={i} className="lesson-text">
+                  {sec.title && <h3>{sec.title}</h3>}
+                  <RichText text={sec.body} />
+                </div>
+              );
+            }
+            const isActive = active === i;
+            const title = sec.kind === 'example' ? sec.caption : sec.title;
+            return (
+              <div
+                key={i}
+                className={`lesson-section-card${isActive ? ' active' : ''}`}
+                data-testid={`lesson-section-${i}`}
               >
-                Précédent
-              </Button>
-              <Button
-                size="s"
-                variant="primary"
-                disabled={n >= max}
-                onClick={() => setN(n + 1)}
-                data-testid="walkthrough-next"
-              >
-                Suivant
-              </Button>
-              <Button size="s" variant="outline" onClick={() => setAuto((a) => !a)}>
-                {auto ? 'Pause' : 'Lecture auto'}
-              </Button>
-            </div>
-            <div className="wt-moves" data-testid="walkthrough-moves">
-              {section.steps.map((s, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={n === i + 1 ? 'active' : ''}
-                  aria-current={n === i + 1 ? 'step' : undefined}
-                  onClick={() => {
-                    setAuto(false);
-                    setN(i + 1);
-                  }}
-                >
-                  {i % 2 === 0 ? `${i / 2 + 1}. ` : ''}
-                  {s.san}
-                </button>
-              ))}
-            </div>
-          </>
-        }
-      />
-    </div>
+                {sec.kind === 'example' ? (
+                  <>
+                    <p>{title}</p>
+                    {!isActive && (
+                      <Button size="s" onClick={() => show(i)} data-testid={`section-show-${i}`}>
+                        Voir sur l'échiquier
+                      </Button>
+                    )}
+                  </>
+                ) : isActive ? (
+                  <div className="walkthrough" data-testid="walkthrough">
+                    {title && <h3>{title}</h3>}
+                    <p className="muted">
+                      Coup {n} / {max}
+                    </p>
+                    <div className="move-card" data-testid="walkthrough-comment" aria-live="polite">
+                      {step ? (
+                        <RichText text={`**${step.san}** ${step.comment}`} />
+                      ) : (
+                        <p>Position de départ. Avance coup par coup (touches ← →).</p>
+                      )}
+                    </div>
+                    <div className="btn-row">
+                      <Button
+                        size="s"
+                        disabled={n === 0}
+                        onClick={() => go(n - 1)}
+                        data-testid="walkthrough-prev"
+                      >
+                        Précédent
+                      </Button>
+                      <Button
+                        size="s"
+                        variant="primary"
+                        disabled={n >= max}
+                        onClick={() => go(n + 1)}
+                        data-testid="walkthrough-next"
+                      >
+                        Suivant
+                      </Button>
+                      <Button size="s" variant="outline" onClick={() => setAuto((a) => !a)}>
+                        {auto ? 'Pause' : 'Lecture auto'}
+                      </Button>
+                    </div>
+                    <div className="wt-moves" data-testid="walkthrough-moves">
+                      {sec.steps.map((st, k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          className={n === k + 1 ? 'active' : ''}
+                          aria-current={n === k + 1 ? 'step' : undefined}
+                          onClick={() => {
+                            setAuto(false);
+                            go(k + 1);
+                          }}
+                        >
+                          {k % 2 === 0 ? `${k / 2 + 1}. ` : ''}
+                          {st.san}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {title && <h3>{title}</h3>}
+                    <p className="muted">Partie commentée · {sec.steps.length} coups</p>
+                    <Button
+                      size="s"
+                      variant="primary"
+                      onClick={() => show(i)}
+                      data-testid={`walkthrough-open-${i}`}
+                    >
+                      Ouvrir la partie
+                    </Button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+          {children}
+        </>
+      }
+    />
   );
 }

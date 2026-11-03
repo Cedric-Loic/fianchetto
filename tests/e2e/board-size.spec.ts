@@ -110,6 +110,16 @@ const SCREENS: Screen[] = [
     },
   },
   {
+    // Lecture d'une leçon : plateau fixe à gauche, tout le texte dans le panneau (élargi à 560 px).
+    name: 'lecon-lecture',
+    bars: 0,
+    evalWidth: 0,
+    open: async (page) => {
+      await page.goto('/#/lessons/routine');
+      await expect(page.getByTestId('lesson-reader')).toBeVisible();
+    },
+  },
+  {
     name: 'lecon',
     bars: 0,
     evalWidth: 0,
