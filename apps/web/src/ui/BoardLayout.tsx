@@ -17,6 +17,8 @@ export interface BoardLayoutProps {
   side?: ReactNode;
   /** Éléments rendus après le panneau (barre d'actions fixe du téléphone, fenêtres). */
   after?: ReactNode;
+  /** Panneau élargi (jusqu'à 560 px) pour les écrans riches en texte (leçons). */
+  wide?: boolean;
   className?: string;
   testId?: string;
   sideTestId?: string;
@@ -24,7 +26,9 @@ export interface BoardLayoutProps {
 
 /**
  * Mise en page commune des écrans avec échiquier : colonne du plateau (barres, évaluation) et
- * panneau latéral. Le côté du plateau (`--board-size`) est calculé en CSS par requêtes de
+ * panneau latéral. Règle : tout écran où l'on interagit avec un échiquier passe par ce composant ;
+ * sur grand écran rien n'est placé au-dessus ni au-dessous du plateau (titres, textes, onglets et
+ * boutons vont dans `side`), pour que le plateau garde toute la hauteur. Le côté du plateau (`--board-size`) est calculé en CSS par requêtes de
  * conteneur : sur grand écran, toute la hauteur disponible, le panneau prenant le reste de la
  * largeur ; sur téléphone, toute la largeur moins la gouttière (styles.css, « Mise en page
  * plateau »).
@@ -40,6 +44,7 @@ export function BoardLayout(props: BoardLayoutProps) {
     'board-layout',
     props.evalBar ? 'has-eval' : '',
     props.slimBars ? 'slim-bars' : '',
+    props.wide ? 'wide' : '',
     props.className ?? '',
   ]
     .filter(Boolean)

@@ -1290,6 +1290,11 @@ textarea:focus-visible {
 .board-layout.slim-bars {
   --bar-h: 32px;
 }
+.board-layout.wide {
+  /* Écrans riches en texte (leçons) : panneau plus large, le plateau reste prioritaire. */
+  --panel-min: 340px;
+  --panel-max: 560px;
+}
 .board-layout.has-eval {
   /* Barre d'évaluation (30 px au plus) et son écart avec le plateau. */
   --eval-w: 38px;
