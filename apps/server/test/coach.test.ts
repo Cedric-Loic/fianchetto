@@ -71,7 +71,7 @@ describe('tableau de bord du coach', () => {
       { date: games[0]?.date, value: 980 },
     ]);
     expect(d.curves.find((c) => c.id === 'puzzle')?.points).toHaveLength(1);
-    expect(d.phase.criteria.find((c) => c.label.startsWith('Leçons'))?.value).toBe('1 / 10');
+    expect(d.phase.criteria.find((c) => c.label.startsWith('Leçons'))?.value).toBe('1 / 17');
     // Lot 4d : pendule relue dans le PGN ; dès le coup 4, les Blancs ont moins de 90 s (10 %).
     const reviewed = (await http('GET', `/api/reviews/${games[0]?.id ?? ''}`))
       .json as ReviewResponse;

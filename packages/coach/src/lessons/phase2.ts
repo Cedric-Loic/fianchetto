@@ -803,19 +803,32 @@ export const PHASE_2: Lesson[] = [
         title: 'Escorter le pion',
         fen: '8/3k4/8/3K4/3P4/8/8/8 b - - 0 1',
         moves: [
-          { uci: 'd7c7', comment: 'Les Noirs doivent céder l’opposition : leur roi s’écarte.' },
           {
-            uci: 'd5e6',
+            uci: 'd7e7',
+            comment: 'Les Noirs ont le trait : ils doivent céder l’opposition, leur roi s’écarte.',
+          },
+          {
+            uci: 'd5c6',
             comment:
-              'Le roi blanc avance : il passe en e6 sans que le roi noir puisse l’en empêcher.',
+              'Le roi blanc contourne le roi noir et monte sur la 6e rangée, devant son pion.',
           },
-          { uci: 'c7c6', comment: 'Le roi noir tente de se rapprocher du pion.' },
-          { uci: 'd4d5', comment: 'd5+ : le pion avance avec échec, soutenu par le roi.' },
-          { uci: 'c6c5', comment: 'Le roi noir recule, mais le pion avance et reste protégé.' },
+          { uci: 'e7e8', comment: 'Le roi noir se replie sur la dernière rangée.' },
           {
-            uci: 'e6e5',
-            comment: 'Re5 : le pion est escorté, la promotion approche. Les Blancs gagnent.',
+            uci: 'c6c7',
+            comment:
+              'Le roi blanc gagne la 7e rangée : il couvre d8, la case de promotion du pion d.',
           },
+          { uci: 'e8f7', comment: 'Le roi noir tente de revenir par l’autre côté.' },
+          {
+            uci: 'd4d5',
+            comment: 'Maintenant le pion peut avancer : le roi blanc est déjà devant lui.',
+          },
+          { uci: 'f7f6', comment: 'Le roi noir se rapproche du pion.' },
+          { uci: 'd5d6', comment: 'Le pion arrive en 6e rangée, protégé par le roi c7.' },
+          { uci: 'f6e5', comment: 'Le roi noir attaque le pion, mais il est protégé.' },
+          { uci: 'd6d7', comment: 'Le pion arrive en 7e rangée, la promotion est imparable.' },
+          { uci: 'e5d5', comment: 'Le roi noir n’a plus rien à faire.' },
+          { uci: 'd7d8q', comment: 'd8=D+ : le pion devient dame avec échec. Les Blancs gagnent.' },
         ],
       },
       {

@@ -94,8 +94,7 @@ function classify(db: Uint8Array, wk: number, bk: number, stm: number, psq: numb
     if (rank(psq) < 6) {
       const push = psq + 8;
       r |= db[index(BLACK, bk, wk, push)]!;
-      if (rank(psq) === 1 && push !== wk && push !== bk)
-        r |= db[index(BLACK, bk, wk, push + 8)]!;
+      if (rank(psq) === 1 && push !== wk && push !== bk) r |= db[index(BLACK, bk, wk, push + 8)]!;
     }
     return r & WIN ? WIN : r & UNKNOWN ? UNKNOWN : DRAW;
   }

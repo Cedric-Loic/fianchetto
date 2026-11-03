@@ -1102,36 +1102,36 @@ export const PHASE_3: Lesson[] = [
     ],
     exercises: [
       {
-        fen: 'r4rk1/pp3ppp/2q1p3/8/8/2Q1P3/PPP2PPP/R4RK1 w - - 0 1',
-        prompt: 'Tu as un pion de plus et les dames se font face. Que fais-tu ?',
+        fen: '4r1k1/pp3ppp/4p3/8/8/2P1P3/PP3PPP/4R1K1 w - - 0 1',
+        prompt: 'Tu as un pion de plus et la colonne e est bloquée. Quel plan simple choisis-tu ?',
         mode: 'engine',
-        solution: ['c3c6'],
+        solution: ['e1d1'],
         tolerance: 4,
-        traps: ['c3b3', 'f2f4'],
+        traps: ['f2f4', 'e1b1'],
         hints: [
-          'Quand tu es mieux, quel type d’échange réduit le contre-jeu de l’adversaire ?',
-          'Les dames sont sur la même colonne et rien ne gêne.',
-          'Dxc6 bxc6 : la finale est gagnante.',
+          'Quand tu es mieux, ta tour doit être active et tes pions du roque doivent rester en place.',
+          'La colonne d est ouverte : elle appartient à celui qui l’occupe.',
+          'Td1.',
         ],
         explanation:
-          'Dxc6 bxc6 simplifie vers une finale où le pion de plus décidera. Esquiver l’échange (Db3, f4) laisse ' +
-          'les Noirs échanger à leur manière ou chercher le contre-jeu.',
+          'Td1 prend la colonne ouverte et prépare l’entrée en d7 ou d8 : tu convertis en améliorant ta pièce la plus ' +
+          'passive. f4 ? affaiblit ton roi et le pion e3, Tb1 ? rend la tour passive : l’avantage fond.',
       },
       {
-        fen: '2r2rk1/pp3ppp/2q1p3/8/2Q5/4P3/PPP2PPP/R2R2K1 w - - 0 1',
-        prompt: 'Même situation : un pion de plus, la dame noire est en face de la tienne.',
+        fen: 'r4rk1/1p3ppp/p1n1p3/8/3P4/2N1P3/PP3PPP/R4RK1 w - - 0 1',
+        prompt: 'Tu as un pion de plus et rien ne presse. Améliore ta position sans l’affaiblir.',
         mode: 'engine',
-        solution: ['c4c6'],
+        solution: ['a1c1'],
         tolerance: 4,
-        traps: ['b2b3', 'g1f1'],
+        traps: ['b2b4', 'c3b1'],
         hints: [
-          'Les dames sont sur la même colonne.',
-          'Un échange de dames ne coûte rien et simplifie.',
-          'Dxc6 bxc6, puis tes tours prennent les colonnes ouvertes.',
+          'Quelle colonne ouverte peut occuper une de tes tours ?',
+          'La colonne c est libre : une tour y gagne de la place.',
+          'Tac1.',
         ],
         explanation:
-          'Dxc6 bxc6 : encore une fois, l’échange des dames est le coup le plus simple. Les coups lents laissent ' +
-          'les Noirs échanger eux-mêmes ou doubler leurs tours avec activité.',
+          'Tac1 occupe la colonne ouverte sans rien lâcher. b4 ? affaiblit ta structure et perd le contrôle des cases ' +
+          'noires, Cb1 ? ramène le cavalier dans sa case de départ : des temps perdus.',
       },
       {
         fen: 'r1bq1rk1/pp3ppp/2nbpn2/3p4/2PP4/2N1PN2/PP2BPPP/R1BQ1RK1 w - - 0 1',
@@ -1163,20 +1163,21 @@ export const PHASE_3: Lesson[] = [
           'La dame d5 touche seize cases. L’échanger (Cxd5) réduit le jeu de l’adversaire à presque rien.',
       },
       {
-        fen: '1r3rk1/pp3ppp/2q1p3/8/8/2Q1P3/PPP2PPP/R2R2K1 w - - 0 1',
-        prompt: 'Toujours un pion de plus. Cette fois, ne cherche pas autre chose : échange.',
+        fen: 'r4rk1/pp3ppp/4pn2/3p4/3P1B2/2P1PN2/PP3PPP/R4RK1 w - - 0 1',
+        prompt:
+          'Tu as une pièce de plus. Joue un coup solide : vérifie que rien de ce que tu joues n’est en prise.',
         mode: 'engine',
-        solution: ['c3c6'],
+        solution: ['f1d1'],
         tolerance: 4,
-        traps: ['c3d3', 'g1f1'],
+        traps: ['f4h6', 'f4b8'],
         hints: [
-          'Quelle pièce adverse est la plus active ?',
-          'La dame noire : l’échanger enlève tout son contre-jeu.',
-          'Dxc6 bxc6, avec un pion de plus et une structure noire abîmée.',
+          'Avant de jouer, demande-toi : quelle pièce adverse peut prendre ce que je viens de poser ?',
+          'Un fou qui va sur le bord de l’échiquier peut se faire prendre sans compensation.',
+          'Tfd1 (ou Cd2, h3, Tac1) : un coup tranquille.',
         ],
         explanation:
-          'Dxc6 bxc6 : l’échange des dames est de nouveau le meilleur plan. Ne pas le faire laisse les Noirs ' +
-          'choisir le moment de l’échange, ou doubler leurs tours sur ta position.',
+          'Tfd1 est un coup tranquille et utile. Fh6 ? et Fb8 ? offrent le fou : être mieux ne dispense pas de ' +
+          'vérifier les menaces avant chaque coup.',
       },
     ],
   },

@@ -6,6 +6,7 @@ import {
   endgameById,
   endgameColor,
   endgameSucceeded,
+  kpkResult,
   lessonById,
 } from '../src/index.js';
 
@@ -37,6 +38,44 @@ describe('finales', () => {
     if (e.lesson) expect(lessonById(e.lesson), e.lesson).toBeDefined();
     expect(endgameById(e.id)).toBe(e);
     expect(endgameByFen(e.fen)).toBe(e);
+  });
+
+  it('chapitres : palier, indices, limite de coups cohérents', () => {
+    for (const e of ENDGAMES) {
+      expect([1, 2, 3], e.id).toContain(e.stage);
+      expect(e.hints, e.id).toHaveLength(3);
+      for (const h of e.hints ?? []) expect(h.length, e.id).toBeGreaterThan(5);
+      // Une victoire a une limite de coups ; une nulle à tenir peut ne pas en avoir (durée laissée au bot).
+      if (e.goal === 'win') expect(e.maxMoves, e.id).toBeGreaterThan(0);
+      expect(
+        e.objective.split(/[.!?]/).filter((x) => x.trim()).length,
+        e.id,
+      ).toBeGreaterThanOrEqual(2);
+    }
+    // Palier 1 : dix chapitres, chacun relié à un cours.
+    const stage1 = ENDGAMES.filter((e) => e.stage === 1);
+    expect(stage1.length).toBeGreaterThanOrEqual(10);
+    for (const e of stage1) expect(e.lesson, e.id).toBeDefined();
+  });
+
+  it('finales roi et pion contre roi : l’objectif correspond à la base KPK', () => {
+    let checked = 0;
+    for (const e of ENDGAMES) {
+      const result = kpkResult(e.fen);
+      if (result === null) continue;
+      checked++;
+      const pawnColor = /P/.test(e.fen.split(' ')[0] ?? '') ? 'w' : 'b';
+      if (endgameColor(e) === pawnColor) {
+        // Le joueur a le pion : il doit pouvoir gagner (l'objectif « nulle » n'aurait pas de sens).
+        expect(result, e.id).toBe('win');
+        expect(e.goal, e.id).toBe('win');
+      } else {
+        // Le joueur défend : la nulle est le meilleur résultat possible, et elle doit exister.
+        expect(result, e.id).toBe('draw');
+        expect(e.goal, e.id).toBe('draw');
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(6);
   });
 
   it('réussite selon l’objectif', () => {
