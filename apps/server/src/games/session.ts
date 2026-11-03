@@ -50,6 +50,8 @@ export interface SessionRecord {
   phase: GamePhase;
   chooser: Color;
   clockMs: Record<Color, number> | null;
+  /** Temps restant (ms) du joueur qui vient de jouer, après chaque demi-coup (public). Absent : anciennes parties. */
+  plyClocksMs?: number[];
   drawOffer: Color | null;
   rematchOffer: Color | null;
   nextGameId: string | null;
@@ -150,6 +152,8 @@ export class GameSession {
   #selectionTimer: NodeJS.Timeout | null = null;
   #game: SecretQueenGame | ClassicGame | null = null;
   #clock: ClockData | null;
+  /** Temps restant du camp qui vient de jouer, après chaque demi-coup (parties à pendule). */
+  #plyClocks: number[] = [];
   #flagTimer: NodeJS.Timeout | null = null;
   #drawOffer: Color | null = null;
   #drawBlocked: Record<Color, boolean> = { w: false, b: false };
@@ -391,6 +395,7 @@ export class GameSession {
     this.#drawOffer = null;
     this.#drawBlocked[color] = false;
     this.#switchClock(color);
+    if (this.#clock) this.#plyClocks.push(Math.round(this.#clock.remainingMs[color]));
     const event: GameEvent = { kind: 'move', move: outcome.move };
     if (outcome.result !== null) this.#finish(outcome.result, event);
     else this.#broadcast(event);
@@ -658,6 +663,7 @@ export class GameSession {
         clockMs: this.#clock
           ? { w: this.#liveRemaining('w', now), b: this.#liveRemaining('b', now) }
           : null,
+        plyClocksMs: [...this.#plyClocks],
         drawOffer: this.#drawOffer,
         rematchOffer: this.#rematchOffer,
         nextGameId: this.#nextGameId,
@@ -704,6 +710,7 @@ export class GameSession {
     session.#rematchOffer = record.rematchOffer;
     session.#nextGameId = record.nextGameId;
     if (session.#clock && record.clockMs) session.#clock.remainingMs = { ...record.clockMs };
+    session.#plyClocks = [...(record.plyClocksMs ?? [])];
     if (secrets.game) {
       session.#game =
         variant === 'classic'
@@ -754,6 +761,16 @@ export class GameSession {
       positions: [reveal.realInitialFen, ...reveal.plies.map((p) => p.realFenAfter)],
       moves: board.moves.map((m, i) => ({ uci: uci(m), san: reveal.plies[i]?.realSan ?? m.san })),
     };
+  }
+
+  /**
+   * Temps restant (ms) après chaque demi-coup d'une partie terminée (`[ply - 1]`), `null` sans
+   * pendule ou pour une partie enregistrée sans ces temps. Données publiques.
+   */
+  plyClocks(): number[] | null {
+    if (this.#phase !== 'ended' || !this.#clock) return null;
+    const n = this.plyCount;
+    return n > 0 && this.#plyClocks.length === n ? [...this.#plyClocks] : null;
   }
 
   /** Vue complète pour un spectateur : seule la projection du moteur décrit l'échiquier. */

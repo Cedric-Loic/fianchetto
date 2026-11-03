@@ -54,6 +54,7 @@ function localTarget(session: GameSession): Target {
             : '0-1',
       date: session.startedAt.slice(0, 10),
       url: null,
+      clocks: session.plyClocks(),
     },
     load: () => session.reviewInput(),
   };
