@@ -26,7 +26,7 @@ test('tableau de bord : phase, semaine, profil, courbes, lien vers les puzzles',
 
   // Tableau de bord vide : phase 1, invitation à analyser.
   await page.locator('nav').getByRole('link', { name: 'Progrès', exact: true }).click();
-  await expect(page.getByTestId('coach-phase')).toContainText('Phase 1 · Ne plus rien donner');
+  await expect(page.getByTestId('coach-phase')).toContainText('Palier 1 · Ne plus rien donner');
   await expect(page.getByTestId('coach-reco').getByRole('link').first()).toHaveAttribute(
     'href',
     '#/analyse',

@@ -109,3 +109,47 @@ test('390×844 : menu repliable à six rubriques', async ({ page }) => {
   }));
   expect(size.scroll).toBeLessThanOrEqual(size.client);
 });
+
+test("structure : titre d'onglet, main, h1 et lien d'évitement", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await register(page);
+  await page.goto('/#/train');
+  await expect(page).toHaveTitle("S'entraîner · Fianchetto");
+  await expect(page.locator('main#main')).toHaveCount(1);
+  await expect(page.locator('h1')).toHaveText("S'entraîner");
+  await page.goto('/#/learn');
+  await expect(page).toHaveTitle('Apprendre · Fianchetto');
+
+  // Lien d'évitement : atteint au clavier, il déplace le focus sans changer d'adresse.
+  await page.reload();
+  await page.keyboard.press('Tab');
+  const skip = page.getByRole('link', { name: 'Aller au contenu' });
+  await expect(skip).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('main#main')).toBeFocused();
+  await expect(page).toHaveURL(/#\/learn$/);
+});
+
+test('Apprendre : un palier à la fois, onglets P1 à P3', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await register(page);
+  await page.goto('/#/learn');
+  await expect(page.getByTestId('stage-P1')).toBeVisible();
+  await expect(page.getByTestId('stage-P2')).toHaveCount(0);
+  await page.getByTestId('stage-tab-P2').click();
+  await expect(page.getByTestId('stage-P2')).toBeVisible();
+  await expect(page.getByTestId('stage-P1')).toHaveCount(0);
+  await expect(page.getByTestId('exam-card-P2')).toBeVisible();
+  // Page plus courte qu'avant (≈ 9 400 px pour les trois paliers et le parcours dépliés).
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(height).toBeLessThan(4500);
+});
+
+test('partie introuvable : message et retour, pas de chargement sans fin', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await register(page);
+  await page.goto('/#/game/introuvable');
+  await expect(page.getByTestId('game-missing')).toContainText('Partie introuvable');
+  await page.getByRole('link', { name: "Retour à l'accueil" }).click();
+  await expect(page).toHaveURL(/#\/$/);
+});

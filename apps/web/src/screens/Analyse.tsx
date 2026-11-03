@@ -280,11 +280,16 @@ function Imports() {
           </div>
           <div className="import-box">
             <h3>Fichier ou texte PGN</h3>
-            <input
-              type="file"
-              accept=".pgn,text/plain"
-              onChange={(e) => onFile(e.target.files?.[0])}
-            />
+            {/* Champ natif masqué : son libellé anglais « Choose File » n'est pas traduisible. */}
+            <label className="btn file-pick">
+              Choisir un fichier PGN
+              <input
+                type="file"
+                className="sr-only"
+                accept=".pgn,text/plain"
+                onChange={(e) => onFile(e.target.files?.[0])}
+              />
+            </label>
             <textarea
               rows={6}
               placeholder="Colle ici une ou plusieurs parties au format PGN"
@@ -337,7 +342,13 @@ function Imports() {
             Récupère tes parties chess.com ou colle un PGN ci-dessus.
           </EmptyState>
         )}
-        <div className="table-scroll" hidden={!games?.length}>
+        <div
+          className="table-scroll"
+          role="region"
+          tabIndex={0}
+          aria-label="Parties importées"
+          hidden={!games?.length}
+        >
           <table className="table" data-testid="imported-games">
             <thead>
               <tr>

@@ -18,10 +18,10 @@ import { StreakBadge } from '../ui/StreakBadge';
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 const PHASES: Record<number, string> = {
-  1: 'Phase 1 · Ne plus rien donner',
-  2: 'Phase 2 · Calculer et punir',
-  3: 'Phase 3 · Jouer avec un plan',
-  4: 'Phase 4 · Programme personnalisé',
+  1: 'Palier 1 · Ne plus rien donner',
+  2: 'Palier 2 · Calculer et punir',
+  3: 'Palier 3 · Jouer avec un plan',
+  4: 'Palier 4 · Programme personnalisé',
 };
 
 /** Texte des leçons : paragraphes (une ligne = un paragraphe) et **gras**. */
@@ -106,7 +106,7 @@ export function Lessons() {
         )}
         {phases.map((phase) => (
           <div key={phase} className="lesson-phase">
-            <h3>{PHASES[phase] ?? `Phase ${phase}`}</h3>
+            <h3>{PHASES[phase] ?? `Palier ${phase}`}</h3>
             <div className="lesson-list">
               {lessons
                 .filter((l) => l.phase === phase)

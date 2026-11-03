@@ -19,6 +19,8 @@ interface GameStore {
   /** Instant de réception du dernier snapshot (pour faire tourner les pendules localement). */
   receivedAt: number;
   toast: string | null;
+  /** Le serveur ne connaît pas (ou refuse) cette partie : l'écran de chargement n'a plus d'objet. */
+  gameMissing: boolean;
   /** Nombre de coups refusés reçus (sert à annuler l'affichage optimiste et les premoves). */
   rejections: number;
   /** Mode concentration : seul l'échiquier est affiché. */
@@ -60,6 +62,7 @@ export const useGame = create<GameStore>((set, get) => ({
   lastCause: null,
   receivedAt: 0,
   toast: null,
+  gameMissing: false,
   rejections: 0,
   focus: false,
   setFocus(focus) {
@@ -92,6 +95,9 @@ export const useGame = create<GameStore>((set, get) => ({
         if (get().peekHeld) set({ peek: { color: message.color, square: message.square } });
         return;
       case 'error':
+        if (message.code === 'GAME_NOT_FOUND' || message.code === 'FORBIDDEN') {
+          set({ gameMissing: true });
+        }
         set({
           toast:
             message.code === 'GAME_NOT_FOUND'
@@ -118,6 +124,13 @@ export const useGame = create<GameStore>((set, get) => ({
     set({ toast: null });
   },
   reset() {
-    set({ state: null, lastCause: null, toast: null, peek: null, peekHeld: false });
+    set({
+      state: null,
+      lastCause: null,
+      toast: null,
+      gameMissing: false,
+      peek: null,
+      peekHeld: false,
+    });
   },
 }));

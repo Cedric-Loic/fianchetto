@@ -266,7 +266,6 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
             <StreakBadge />
           </div>
           <Tabs
-            className="tabs-scroll"
             label="Type de puzzles"
             value={mode}
             onChange={setMode}

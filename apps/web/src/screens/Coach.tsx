@@ -102,12 +102,12 @@ export function Coach({ footer }: { footer?: ReactNode }) {
       <div className="panel page-panel" data-testid="coach-phase">
         <p className="muted">Ton programme</p>
         <h2>
-          Phase {phase.current} · {phase.title}
+          Palier {phase.current} · {phase.title}
         </h2>
         <p>{phase.focus}</p>
         {phase.criteria.length > 0 && (
           <>
-            <h3>Pour passer à la phase suivante</h3>
+            <h3>Pour passer au palier suivant</h3>
             <ul className="criteria">
               {phase.criteria.map((c) => (
                 <li key={c.label} className={c.met ? 'met' : ''}>
@@ -345,7 +345,12 @@ export function Coach({ footer }: { footer?: ReactNode }) {
 
       <div className="panel page-panel" data-testid="coach-targets">
         <h2>Objectifs du plan</h2>
-        <div className="table-scroll">
+        <div
+          className="table-scroll"
+          role="region"
+          tabIndex={0}
+          aria-label="Indicateurs de départ et cibles"
+        >
           <table className="table">
             <thead>
               <tr>
@@ -353,7 +358,9 @@ export function Coach({ footer }: { footer?: ReactNode }) {
                 <th>Départ</th>
                 <th>Actuel</th>
                 <th>Cible</th>
-                <th />
+                <th>
+                  <span className="sr-only">Statut</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -386,7 +393,12 @@ export function Coach({ footer }: { footer?: ReactNode }) {
       <div className="panel page-panel" data-testid="coach-months">
         <h2>Bilan mensuel</h2>
         <MonthVerdictCard months={data.months} />
-        <div className="table-scroll">
+        <div
+          className="table-scroll"
+          role="region"
+          tabIndex={0}
+          aria-label="Bilan mensuel, tableau"
+        >
           <table className="table">
             <thead>
               <tr>

@@ -41,6 +41,9 @@ import { onboardingWanted } from '../lib/onboarding';
 /** Mode choisi sur l'accueil : une variante, ou l'entraînement (classique contre le bot). */
 type Mode = Variant | 'training';
 
+/** Cadence présélectionnée quand le verrou du coach interdit la cadence par défaut. */
+const UNLOCKED_DEFAULT_TC: TimeControlId = 'rapid-10+0';
+
 /**
  * Choix de la cadence. `locked` : verrou souple du coach, un cadenas sur le blitz et le bullet
  * (le clic reste possible, la confirmation est demandée par l'appelant). `slow` : propose en plus
@@ -330,6 +333,11 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
       if (d?.suggestedBotLevel && useSettings.getState().lastPlay === null) {
         setLevel(d.suggestedBotLevel);
       }
+      // Première partie : on ne présélectionne pas une cadence que le verrou du coach bloquerait.
+      if (d?.blitzLocked && useSettings.getState().lastPlay === null) {
+        setBotTc((tc) => (isFastTimeControl(tc) ? UNLOCKED_DEFAULT_TC : tc));
+        setSeatTc((tc) => (isFastTimeControl(tc) ? UNLOCKED_DEFAULT_TC : tc));
+      }
     });
     return () => {
       cancelled = true;
@@ -370,7 +378,14 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
 
   // Bouton « Jouer » : la dernière configuration ; sans compte, une partie contre le bot
   // devient une partie à deux sur cet écran (même variante et cadence).
-  const remembered = useSettings((s) => s.lastPlay) ?? DEFAULT_LAST_PLAY;
+  const lastPlay = useSettings((s) => s.lastPlay);
+  const defaultLocked =
+    lastPlay === null && !blitzOk && blitzLockApplies(coach, DEFAULT_LAST_PLAY.timeControl);
+  const remembered =
+    lastPlay ??
+    (defaultLocked
+      ? { ...DEFAULT_LAST_PLAY, timeControl: UNLOCKED_DEFAULT_TC }
+      : DEFAULT_LAST_PLAY);
   const quick: LastPlay =
     remembered.mode === 'bot' && !user
       ? {

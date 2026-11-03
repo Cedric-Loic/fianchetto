@@ -7,13 +7,15 @@ import { EmptyState } from '../ui/EmptyState';
 import { IconBook } from '../ui/icons';
 import { ProgressBar as Bar } from '../ui/ProgressBar';
 import { Loading } from '../ui/Spinner';
+import { Tabs } from '../ui/Tabs';
 import { useCoachPlan } from '../lib/coachPlan';
 import { PathCard } from './CoachPlan';
 import { LessonCard } from './Lessons';
 
 /** Paliers du parcours : les phases 1 à 3 du plan, rangées par classe Elo. */
+const FIRST_STAGE = { phase: 1, id: 'P1', elo: '1000-1200', title: 'Ne plus rien donner' };
 const STAGES = [
-  { phase: 1, id: 'P1', elo: '1000-1200', title: 'Ne plus rien donner' },
+  FIRST_STAGE,
   { phase: 2, id: 'P2', elo: '1200-1400', title: 'Calculer et punir' },
   { phase: 3, id: 'P3', elo: '1400-1600', title: 'Jouer avec un plan' },
 ];
@@ -80,6 +82,8 @@ export function Learn({ module = null }: { module?: string | null }) {
   const [endgames, setEndgames] = useState<EndgameSummary[]>([]);
   const [exams, setExams] = useState<ExamSummary[]>([]);
   const plan = useCoachPlan(user !== null, { curriculum: true });
+  // Palier affiché : celui du plan du coach tant que le joueur n'en a pas choisi un autre.
+  const [picked, setPicked] = useState<string | null>(null);
   useEffect(() => {
     if (!user) return;
     void api.lessons().then((r) => setLessons(r?.lessons ?? []));
@@ -121,6 +125,21 @@ export function Learn({ module = null }: { module?: string | null }) {
   if (lessons === null) return <Loading label="Chargement du parcours…" />;
 
   const extra = lessons.filter((l) => !STAGES.some((s) => s.phase === l.phase));
+  const planned = STAGES.find((s) => s.phase === plan.curriculum?.phase) ?? FIRST_STAGE;
+  const stage = STAGES.find((s) => s.id === picked) ?? planned;
+  const stats = (phase: number) => {
+    const inStage = lessons.filter((l) => l.phase === phase);
+    const stageEndgames = endgames.filter((e) => e.stage === phase);
+    return {
+      inStage,
+      stageEndgames,
+      done: inStage.filter((l) => l.passed).length + stageEndgames.filter((e) => e.passed).length,
+      total: inStage.length + stageEndgames.length,
+    };
+  };
+  const { inStage, stageEndgames, done, total } = stats(stage.phase);
+  const courses = inStage.filter((l) => !isClassic(l));
+  const classics = inStage.filter(isClassic);
   return (
     <div className="page learn" data-testid="learn">
       <section className="panel page-panel">
@@ -142,71 +161,84 @@ export function Learn({ module = null }: { module?: string | null }) {
             Répertoire d’ouvertures
           </a>
         </p>
+        <Tabs
+          label="Paliers"
+          value={stage.id}
+          onChange={setPicked}
+          items={STAGES.map((st) => {
+            const n = stats(st.phase);
+            return {
+              id: st.id,
+              testId: `stage-tab-${st.id}`,
+              label: (
+                <>
+                  {st.id} · {st.elo}{' '}
+                  <span className="muted">
+                    {n.done}/{n.total}
+                  </span>
+                </>
+              ),
+            };
+          })}
+        />
       </section>
 
-      {STAGES.map((stage) => {
-        const inStage = lessons.filter((l) => l.phase === stage.phase);
-        const courses = inStage.filter((l) => !isClassic(l));
-        const classics = inStage.filter(isClassic);
-        const stageEndgames = endgames.filter((e) => e.stage === stage.phase);
-        const done =
-          inStage.filter((l) => l.passed).length + stageEndgames.filter((e) => e.passed).length;
-        const total = inStage.length + stageEndgames.length;
-        return (
-          <section
-            key={stage.id}
-            className="panel page-panel"
-            data-testid={`stage-${stage.id}`}
-            aria-label={`Palier ${stage.id}`}
-          >
-            <div className="puzzle-stats-row">
-              <h2>
-                {stage.id} · {stage.elo}
-              </h2>
-              <span className="muted">
-                {done} / {total}
-              </span>
+      <section
+        key={stage.id}
+        className="panel page-panel"
+        data-testid={`stage-${stage.id}`}
+        role="tabpanel"
+        aria-label={`Palier ${stage.id}`}
+      >
+        <div className="puzzle-stats-row">
+          <h2>
+            {stage.id} · {stage.elo}
+          </h2>
+          <span className="muted">
+            {done} / {total}
+          </span>
+        </div>
+        <p className="muted">
+          {stage.title}
+          {stage.id === planned.id && ' · ton palier actuel'}
+        </p>
+        <Bar label={`Progression du palier ${stage.id}`} done={done} total={total} />
+
+        <h3>Leçons</h3>
+        {courses.length === 0 ? (
+          <EmptyState icon={<IconBook size={32} />} title="Aucune leçon dans ce palier" />
+        ) : (
+          <div className="lesson-list">
+            {courses.map((l, i) => (
+              <LessonCard key={l.id} lesson={l} number={i + 1} />
+            ))}
+          </div>
+        )}
+
+        {classics.length > 0 && (
+          <>
+            <h3>Parties commentées</h3>
+            <div className="lesson-list">
+              {classics.map((l, i) => (
+                <LessonCard key={l.id} lesson={l} number={i + 1} />
+              ))}
             </div>
-            <p className="muted">{stage.title}</p>
-            <Bar label={`Progression du palier ${stage.id}`} done={done} total={total} />
+          </>
+        )}
 
-            <h3>Leçons</h3>
-            {courses.length === 0 ? (
-              <EmptyState icon={<IconBook size={32} />} title="Aucune leçon dans ce palier" />
-            ) : (
-              <div className="lesson-list">
-                {courses.map((l, i) => (
-                  <LessonCard key={l.id} lesson={l} number={i + 1} />
-                ))}
-              </div>
-            )}
+        <h3>Finales</h3>
+        <p className="muted" data-testid={`stage-${stage.id}-endgames`}>
+          {stageEndgames.filter((e) => e.passed).length} / {stageEndgames.length} réussie
+          {stageEndgames.length > 1 ? 's' : ''} contre le bot.{' '}
+          <a href="#/endgames">Ouvrir le cours de finales</a>
+        </p>
 
-            {classics.length > 0 && (
-              <>
-                <h3>Parties commentées</h3>
-                <div className="lesson-list">
-                  {classics.map((l, i) => (
-                    <LessonCard key={l.id} lesson={l} number={i + 1} />
-                  ))}
-                </div>
-              </>
-            )}
-
-            <h3>Finales</h3>
-            <p className="muted" data-testid={`stage-${stage.id}-endgames`}>
-              {stageEndgames.filter((e) => e.passed).length} / {stageEndgames.length} réussie
-              {stageEndgames.length > 1 ? 's' : ''} contre le bot.{' '}
-              <a href="#/endgames">Ouvrir le cours de finales</a>
-            </p>
-
-            <ExamCard
-              stage={stage.phase}
-              id={stage.id}
-              exam={exams.find((e) => e.stage === stage.phase)}
-            />
-          </section>
-        );
-      })}
+        <ExamCard
+          stage={stage.phase}
+          id={stage.id}
+          exam={exams.find((e) => e.stage === stage.phase)}
+        />
+      </section>
 
       {extra.length > 0 && (
         <section className="panel page-panel" data-testid="stage-extra">

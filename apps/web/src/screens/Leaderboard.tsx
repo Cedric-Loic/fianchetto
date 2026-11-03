@@ -52,7 +52,7 @@ export function Leaderboard({ embedded = false }: { embedded?: boolean }) {
           Le classement apparaît après la première partie classée contre le bot.
         </EmptyState>
       ) : (
-        <div className="table-scroll">
+        <div className="table-scroll" role="region" tabIndex={0} aria-label="Classement, tableau">
           <table className="table">
             <thead>
               <tr>

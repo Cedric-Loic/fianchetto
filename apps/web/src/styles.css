@@ -47,6 +47,7 @@
   --highlight: #e2c27d;
   --info: #6e9bff;
   --info-soft: #6e9bff26;
+  --info-text: #8fb1ff;
   --overlay: #050a16b3;
   --overlay-strong: #050a16eb;
   --focus-ring: #ddbb72;
@@ -489,7 +490,7 @@ button:disabled {
 }
 .badge-info {
   background: var(--info-soft);
-  color: var(--info);
+  color: var(--info-text);
 }
 .badge-danger {
   background: var(--danger-soft);
@@ -550,6 +551,24 @@ button:disabled {
 }
 .loss {
   color: var(--danger);
+}
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: -4rem;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: var(--space-3);
+}
+main:focus {
+  outline: none;
 }
 .sr-only {
   position: absolute;
@@ -1065,7 +1084,8 @@ textarea:focus-visible {
 .sq.drag-over {
   box-shadow: inset 0 0 0 4px var(--square-drag-over);
 }
-.coord {
+.sq[data-rank]::before,
+.sq[data-file]::after {
   position: absolute;
   font-size: clamp(11px, 1.7vw, 14px);
   font-weight: 700;
@@ -1073,17 +1093,21 @@ textarea:focus-visible {
   pointer-events: none;
   opacity: 0.95;
 }
-.sq.light .coord {
+.sq.light[data-rank]::before,
+.sq.light[data-file]::after {
   color: var(--square-dark);
 }
-.sq.dark .coord {
+.sq.dark[data-rank]::before,
+.sq.dark[data-file]::after {
   color: var(--square-light);
 }
-.coord.rank {
+.sq[data-rank]::before {
+  content: attr(data-rank);
   top: 4px;
   left: 4px;
 }
-.coord.file {
+.sq[data-file]::after {
+  content: attr(data-file);
   bottom: 4px;
   right: 5px;
 }
@@ -3886,4 +3910,36 @@ button.skill-row:hover {
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+/* --- Parcours conseillé (replié) et étiquettes de type d'étape --- */
+.path-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin: var(--space-3) 0;
+}
+.path-kind {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: var(--fs-12);
+  color: var(--text-muted);
+}
+
+.file-pick {
+  position: relative;
+  align-self: flex-start;
+}
+.file-pick:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Le lien « Application : … » de la séance peut être long : il passe à la ligne. */
+.actions .btn-link {
+  white-space: normal;
+  text-align: left;
+  min-width: 0;
 }
