@@ -69,6 +69,7 @@ test('anciennes adresses : redirigées ou toujours valides, rubrique parente sur
     ['/#/lessons', 'lesson-routine', 'Apprendre'],
     ['/#/lessons/routine', 'start-exercises', 'Apprendre'],
     ['/#/endgames', 'endgame-lucena', 'Apprendre'],
+    ['/#/exam/1', 'exam-intro', 'Apprendre'],
     ['/#/openings', 'openings-due', 'Apprendre'],
     ['/#/puzzles', 'puzzle-rating', "S'entraîner"],
     ['/#/calc', 'calc-depth', "S'entraîner"],

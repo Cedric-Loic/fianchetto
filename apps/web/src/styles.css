@@ -3771,3 +3771,51 @@ button.skill-row:hover {
   flex-direction: column;
   gap: var(--space-2);
 }
+
+/* --- Examens de palier --- */
+.exam-card {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface-1);
+}
+.exam-card h3 {
+  margin: 0 0 var(--space-1);
+}
+.exam-card p {
+  margin: var(--space-1) 0;
+}
+.exam-mini {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.exam .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.exam-score {
+  font-size: 1.4rem;
+}
+.exam-skills {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.exam-skills li {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(80px, 2fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+.exam-skills li.weakest .skill-name {
+  color: var(--warning);
+  font-weight: 700;
+}

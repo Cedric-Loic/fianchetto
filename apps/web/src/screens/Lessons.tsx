@@ -1,10 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LessonSummary, LessonView } from '@sq/shared';
-import {
-  ExercisePlayer,
-  type ExerciseAnswer,
-  type ExerciseVerdict,
-} from '../exercise/ExercisePlayer';
+import { ExercisePlayer } from '../exercise/ExercisePlayer';
+import { judgeLesson } from '../exercise/judge';
 import { Board } from '../game/Board';
 import { api } from '../lib/api';
 import { piecesFromFen } from '../lib/fen';
@@ -122,22 +119,6 @@ export function Lessons() {
       </div>
     </div>
   );
-}
-
-/** Jugement d'une réponse d'exercice de leçon par le serveur (coup ou cases). */
-async function judgeLesson(
-  lessonId: string,
-  index: number,
-  answer: ExerciseAnswer,
-  hints: number,
-): Promise<ExerciseVerdict | null> {
-  if (answer.kind === 'move') {
-    return api.lessonMove(lessonId, index, answer.step, answer.uci, hints);
-  }
-  if (answer.kind === 'squares') {
-    return api.lessonSquares(lessonId, index, answer.squares, hints);
-  }
-  return null; // pas de QCM dans les leçons pour l'instant
 }
 
 /** Une leçon : explications et exemples, puis les exercices un par un, puis le bilan. */

@@ -11,6 +11,10 @@ import type {
   CoachDashboard,
   CheckMoveResponse,
   EndgameHintResponse,
+  ExamKind,
+  ExamResultResponse,
+  ExamStartResponse,
+  ExamsResponse,
   EndgameStartResponse,
   EndgamesResponse,
   HintResponse,
@@ -240,6 +244,12 @@ export const api = {
   /** Indice propre à la finale (niveau 1 à 3) ; compté côté serveur. */
   endgameHint: (id: string, level: number) =>
     call<EndgameHintResponse>('POST', `/api/endgames/${id}/hint`, { level }),
+  // Examens de palier (20 questions) et mini-test de finales (5 questions).
+  exams: () => call<ExamsResponse>('GET', '/api/exams'),
+  startExam: (stage: number, kind: ExamKind) =>
+    request<ExamStartResponse>('POST', `/api/exams/${stage}/start`, { kind }),
+  examResult: (stage: number, kind: ExamKind, correct: number) =>
+    call<ExamResultResponse>('POST', `/api/exams/${stage}/result`, { kind, correct }),
   // Puzzles.
   puzzleStats: () => call<PuzzleStats>('GET', '/api/puzzles/stats'),
   puzzleNext: (mode: PuzzleMode, theme: string | null) =>

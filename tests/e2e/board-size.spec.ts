@@ -130,6 +130,34 @@ const SCREENS: Screen[] = [
     },
   },
   {
+    // Question d'examen : même lecteur que les leçons (questions simulées, jugement non utilisé).
+    name: 'examen',
+    bars: 0,
+    evalWidth: 0,
+    open: async (page) => {
+      const exercise = {
+        fen: '6k1/p4ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1',
+        prompt: 'Trouve le meilleur coup.',
+        color: 'w',
+        legalMoves: [],
+        kind: 'move',
+        hints: 0,
+      };
+      await page.route('**/api/exams/1/start', (route) =>
+        route.fulfill({
+          json: {
+            stage: 1,
+            kind: 'stage',
+            questions: [{ lesson: 'routine', index: 0, skill: 'method', exercise }],
+          },
+        }),
+      );
+      await page.goto('/#/exam/1');
+      await page.getByTestId('exam-start').click();
+      await expect(page.getByTestId('exam-header')).toBeVisible();
+    },
+  },
+  {
     name: 'ouvertures',
     bars: 0,
     evalWidth: 0,

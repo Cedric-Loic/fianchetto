@@ -3,6 +3,7 @@ import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
 import { Calc } from './screens/Calc';
+import { Exam } from './screens/Exam';
 import { Endgames } from './screens/Endgames';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
@@ -43,6 +44,7 @@ type Route =
   | { page: 'endgames' }
   | { page: 'openings' }
   | { page: 'reviews' }
+  | { page: 'exam'; stage: number; kind: 'stage' | 'mini' }
   | { page: 'lesson'; id: string; exercise: number | null }
   | { page: 'review'; id: string; guided: boolean }
   | { page: 'game'; gameId: string };
@@ -92,6 +94,9 @@ function parseHash(h: string): Route {
   // #/lessons/<id>?exercise=n : un seul exercice (révisions), retour à #/reviews ensuite.
   m = /^#\/lessons\/([\w-]+)(?:\?exercise=(\d+))?$/.exec(h);
   if (m?.[1]) return { page: 'lesson', id: m[1], exercise: m[2] ? Number(m[2]) : null };
+  // Examen de palier (#/exam/1) ou mini-test de finales (#/exam/1/mini).
+  m = /^#\/exam\/([123])(\/mini)?$/.exec(h);
+  if (m?.[1]) return { page: 'exam', stage: Number(m[1]), kind: m[2] ? 'mini' : 'stage' };
   if (h === '#/login') return { page: 'login' };
   if (h === '#/leaderboard') return { page: 'leaderboard' };
   return { page: 'home' };
@@ -109,6 +114,7 @@ function sectionOf(route: Route): NavSection {
     case 'learn':
     case 'lessons':
     case 'lesson':
+    case 'exam':
     case 'endgames':
     case 'openings':
       return 'learn';
@@ -187,6 +193,8 @@ export function App() {
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'endgames') content = <Endgames />;
   else if (route.page === 'openings') content = <Openings />;
+  else if (route.page === 'exam')
+    content = <Exam key={hash} stage={route.stage} kind={route.kind} />;
   else if (route.page === 'lesson')
     content = <LessonPage key={hash} id={route.id} only={route.exercise} />;
   else if (route.page === 'review')

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EndgameSummary } from '@sq/shared';
+import type { EndgameSummary, ExamSummary } from '@sq/shared';
 import { api } from '../lib/api';
 import { startEndgame } from '../lib/endgame';
 import { useSession } from '../lib/session';
@@ -30,8 +30,11 @@ export function Endgames() {
   const [endgames, setEndgames] = useState<EndgameSummary[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const [exam, setExam] = useState<ExamSummary | null>(null);
   useEffect(() => {
-    if (user) void api.endgames().then((r) => setEndgames(r?.endgames ?? []));
+    if (!user) return;
+    void api.endgames().then((r) => setEndgames(r?.endgames ?? []));
+    void api.exams().then((r) => setExam(r?.exams.find((e) => e.stage === 1) ?? null));
   }, [user]);
   if (!user) {
     return <LoginRequired title="Finales" text="Connecte-toi pour suivre ta progression." />;
@@ -77,6 +80,23 @@ export function Endgames() {
                   </span>
                 </Badge>
               </h3>
+              {stage === 1 && (
+                <div className="exam-mini" data-testid="exam-mini">
+                  <Button
+                    size="s"
+                    variant="secondary"
+                    href="#/exam/1/mini"
+                    data-testid="exam-mini-start"
+                  >
+                    Mini-test : 5 questions
+                  </Button>
+                  {exam?.miniPassed && (
+                    <Badge tone="accent" testId="exam-mini-passed">
+                      ✓ Mini-test réussi
+                    </Badge>
+                  )}
+                </div>
+              )}
               <div className="lesson-list">
                 {list.map((e, i) => (
                   <EndgameCard

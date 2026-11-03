@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { EndgameSummary, LessonSummary } from '@sq/shared';
+import type { EndgameSummary, ExamSummary, LessonSummary } from '@sq/shared';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { IconBook } from '../ui/icons';
+import { ProgressBar as Bar } from '../ui/ProgressBar';
 import { Loading } from '../ui/Spinner';
 import { useCoachPlan } from '../lib/coachPlan';
 import { PathCard } from './CoachPlan';
@@ -20,18 +21,51 @@ const STAGES = [
 /** Les parties commentées sont des leçons dont l'identifiant commence par « classique- ». */
 const isClassic = (l: LessonSummary) => l.id.startsWith('classique-');
 
-function Bar({ label, done, total }: { label: string; done: number; total: number }) {
+/** Carte « Examen du palier » : jamais passé, meilleur score ou validé ; grisée si indisponible. */
+function ExamCard({
+  stage,
+  id,
+  exam,
+}: {
+  stage: number;
+  id: string;
+  exam: ExamSummary | undefined;
+}) {
+  if (!exam) return null;
+  const state = exam.passed
+    ? `✓ Validé · ${exam.best ?? exam.total} / ${exam.total}`
+    : exam.best !== null
+      ? `Meilleur score : ${exam.best} / ${exam.total}`
+      : 'Jamais passé';
   return (
-    <span
-      className="progress"
-      role="meter"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={total}
-      aria-valuenow={done}
-    >
-      <span className="progress-bar" style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
-    </span>
+    <div className="exam-card" data-testid={`exam-card-${id}`}>
+      <h3>Examen du palier</h3>
+      <p className="muted">
+        20 questions mêlant finales, calcul, tactique et stratégie · 80 % pour valider, conseillé
+        mais jamais bloquant.
+      </p>
+      <p className={exam.passed ? 'win' : 'muted'} data-testid={`exam-state-${id}`}>
+        {state}
+      </p>
+      {exam.available ? (
+        <Button
+          variant={exam.passed ? 'secondary' : 'primary'}
+          href={`#/exam/${stage}`}
+          data-testid={`exam-start-${id}`}
+        >
+          {exam.passed ? "Repasser l'examen" : "Passer l'examen"}
+        </Button>
+      ) : (
+        <>
+          <Button disabled data-testid={`exam-start-${id}`}>
+            Passer l'examen
+          </Button>
+          <p className="muted" data-testid={`exam-unavailable-${id}`}>
+            Pas encore disponible : ce palier n'a pas assez d'exercices pour composer un examen.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -44,11 +78,13 @@ export function Learn({ module = null }: { module?: string | null }) {
   const user = useSession((s) => s.user);
   const [lessons, setLessons] = useState<LessonSummary[] | null>(null);
   const [endgames, setEndgames] = useState<EndgameSummary[]>([]);
+  const [exams, setExams] = useState<ExamSummary[]>([]);
   const plan = useCoachPlan(user !== null, { curriculum: true });
   useEffect(() => {
     if (!user) return;
     void api.lessons().then((r) => setLessons(r?.lessons ?? []));
     void api.endgames().then((r) => setEndgames(r?.endgames ?? []));
+    void api.exams().then((r) => setExams(r?.exams ?? []));
   }, [user]);
 
   // Arrivée depuis une compétence (Progrès) : le module du parcours est centré et surligné.
@@ -162,6 +198,12 @@ export function Learn({ module = null }: { module?: string | null }) {
               {stageEndgames.length > 1 ? 's' : ''} contre le bot.{' '}
               <a href="#/endgames">Ouvrir le cours de finales</a>
             </p>
+
+            <ExamCard
+              stage={stage.phase}
+              id={stage.id}
+              exam={exams.find((e) => e.stage === stage.phase)}
+            />
           </section>
         );
       })}
