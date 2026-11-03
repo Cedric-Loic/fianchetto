@@ -3,6 +3,7 @@ import {
   ENDGAMES,
   OPENING_LINES,
   PASS_RATIO,
+  endgameById,
   computeSkills,
   lessonById,
   newCardSchedule,
@@ -51,6 +52,16 @@ function hrefOf(step: StepRef): string {
   return step.type === 'endgame' ? '#/endgames' : '#/openings';
 }
 
+/** Compétence travaillée par une finale (`pawn-endgames` par défaut). */
+export function skillOfEndgame(endgameId: string): SkillId {
+  return endgameById(endgameId)?.skill ?? 'pawn-endgames';
+}
+
+/** Des tours restent-elles sur l'échiquier de cette FEN ? */
+function hasRooks(fen: string): boolean {
+  return /[rR]/.test(fen.split(' ')[0] ?? '');
+}
+
 /** Compétence d'une leçon : celle du module du parcours qui la contient ('method' sinon). */
 export function skillOfLesson(lessonId: string): SkillId {
   return (
@@ -92,15 +103,18 @@ export class LearningService {
   /** Planification d'une carte après un jugement ; une réussite n'avance que si elle est due. */
   #schedule(
     userId: string,
-    source: 'exercise' | 'mistake',
+    source: 'exercise' | 'mistake' | 'endgame',
     ref: string,
     skill: SkillId,
     ok: boolean,
     hinted = false,
+    /** Une première réussite crée la carte (exercices) ; pour une finale, seul un échec la crée. */
+    createOnSuccess = true,
   ) {
     const now = this.#now();
     const card = this.#store.getCard(userId, source, ref);
     if (!card) {
+      if (ok && !createOnSuccess) return;
       this.#store.saveCard(userId, { source, ref, skill, ...newCardSchedule(now) }, now, false);
     } else if (!ok) {
       this.#store.saveCard(userId, { source, ref, skill, ...newCardSchedule(now) }, now, true);
@@ -145,6 +159,48 @@ export class LearningService {
     );
   }
 
+  /**
+   * Partie de finale terminée : preuve de compétence (réussie ou non) et carte de révision. Un
+   * échec crée la carte (ou la remet à l'étape 0, demain) ; une réussite la fait avancer, sauf
+   * avec indice consulté (comme un exercice). La réussite n'est jamais « pour toujours ».
+   */
+  recordEndgame(
+    userId: string,
+    endgameId: string,
+    success: boolean,
+    hints: number,
+    moves: number,
+  ): void {
+    this.#store.recordEndgameAttempt({
+      userId,
+      endgameId,
+      success,
+      hints,
+      moves,
+      at: this.#now(),
+    });
+    this.#schedule(
+      userId,
+      'endgame',
+      endgameId,
+      skillOfEndgame(endgameId),
+      success,
+      hints > 0,
+      false,
+    );
+  }
+
+  /** Finales dont une carte de révision est due maintenant. */
+  dueEndgames(userId: string): Set<string> {
+    const now = this.#now();
+    return new Set(
+      this.#store
+        .cards(userId)
+        .filter((c) => c.source === 'endgame' && c.dueAt <= now)
+        .map((c) => c.ref),
+    );
+  }
+
   /** Question de partie coachée : preuve de compétence seulement, aucune carte de révision. */
   recordCoachPrompt(
     userId: string,
@@ -182,6 +238,9 @@ export class LearningService {
     for (const a of this.#store.exerciseAttempts(userId)) {
       evidence.push({ skill: skillOfLesson(a.lessonId), success: a.success, at: a.at });
     }
+    for (const a of this.#store.endgameAttempts(userId)) {
+      evidence.push({ skill: skillOfEndgame(a.endgameId), success: a.success, at: a.at });
+    }
     for (const p of this.#store.coachPrompts(userId)) {
       const skill: SkillId = p.kind === 'threat' ? 'threats' : 'piece-safety';
       evidence.push({ skill, success: p.correct, at: p.at });
@@ -209,7 +268,15 @@ export class LearningService {
       const review = this.#store.getReview(g.id);
       for (const m of review?.moves ?? []) {
         if (m.color === g.color && m.explanation) {
-          out.push({ skill: skillForKind(m.explanation.kind), success: false, at: g.at });
+          // Une finale mal convertie compte pour les finales de tours si des tours restent.
+          const rooks =
+            m.explanation.kind === 'endgame-conversion' &&
+            hasRooks(review?.positions[m.ply - 1] ?? '');
+          out.push({
+            skill: rooks ? 'rook-endgames' : skillForKind(m.explanation.kind),
+            success: false,
+            at: g.at,
+          });
         }
       }
     }
@@ -309,6 +376,14 @@ export class LearningService {
     if (source === 'mistake') {
       const own = this.#store.puzzles.getOwn(ref);
       return own && own.userId === userId ? { fen: own.fen, prompt: own.label } : null;
+    }
+    if (source === 'endgame') {
+      // L'action « rejouer » ouvre #/endgames (la carte ne porte pas d'adresse : l'interface
+      // route par `source`).
+      const endgame = endgameById(ref);
+      return endgame
+        ? { fen: endgame.fen, prompt: `${endgame.title} : ${endgame.objective}` }
+        : null;
     }
     return null;
   }

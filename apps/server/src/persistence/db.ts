@@ -219,6 +219,18 @@ export class GameStore {
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (user_id, endgame_id)
       );
+      -- Lot 1 (finales) : chaque partie de finale terminée est une tentative datée (preuve de
+      -- compétence), avec les indices consultés et les coups du joueur.
+      CREATE TABLE IF NOT EXISTS endgame_attempts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        endgame_id TEXT NOT NULL,
+        success    INTEGER NOT NULL,
+        hints      INTEGER NOT NULL DEFAULT 0,
+        moves      INTEGER NOT NULL DEFAULT 0,
+        at         INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS endgame_attempts_user ON endgame_attempts (user_id, at);
       -- Lot 4d : répertoire d'ouvertures en répétition espacée (étape et échéance par ligne).
       CREATE TABLE IF NOT EXISTS opening_progress (
         user_id    TEXT NOT NULL REFERENCES users(id),
@@ -643,6 +655,41 @@ export class GameStore {
            successes = successes + excluded.successes, updated_at = excluded.updated_at`,
       )
       .run(userId, endgameId, success ? 1 : 0, Date.now());
+  }
+
+  /** Tentative de finale (preuve de compétence) : réussie ou non, indices consultés, coups du joueur. */
+  recordEndgameAttempt(a: {
+    userId: string;
+    endgameId: string;
+    success: boolean;
+    hints: number;
+    moves: number;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT INTO endgame_attempts (user_id, endgame_id, success, hints, moves, at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.endgameId, a.success ? 1 : 0, a.hints, a.moves, a.at);
+  }
+
+  endgameAttempts(
+    userId: string,
+  ): { endgameId: string; success: boolean; hints: number; moves: number; at: number }[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT endgame_id AS endgameId, success, hints, moves, at
+         FROM endgame_attempts WHERE user_id = ? ORDER BY at`,
+      )
+      .all(userId) as {
+      endgameId: string;
+      success: number;
+      hints: number;
+      moves: number;
+      at: number;
+    }[];
+    return rows.map((r) => ({ ...r, success: r.success === 1 }));
   }
 
   // --- Répertoire d'ouvertures (lot 4d) ------------------------------------------------------

@@ -106,12 +106,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       endgames.onGameEnd(session, result);
     },
   });
-  const endgames = new EndgameService(store, games);
   const training = new TrainingService((fen) => reviews.evaluate(fen));
   const coach = new CoachService(store, config.botLevels);
   const learning = new LearningService(store, {
     phaseOf: (userId) => coach.dashboard(userId).phase.current,
   });
+  const endgames = new EndgameService(store, games, learning);
   const lessons = new LessonService(
     store,
     (fen) => reviews.evaluate(fen, 400),

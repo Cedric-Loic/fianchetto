@@ -52,7 +52,14 @@ describe('finales contre le bot', () => {
       goal: 'draw',
       attempts: 0,
       passed: false,
+      due: false,
     });
+    // Valeurs par défaut côté serveur quand le contenu ne renseigne rien.
+    for (const e of endgames) {
+      expect(e.stage).toBeGreaterThanOrEqual(1);
+      expect(e.hints).toBeGreaterThanOrEqual(0);
+      expect(['pawn-endgames', 'rook-endgames']).toContain(e.skill);
+    }
     expect((await http('POST', '/api/endgames/inconnue/start')).status).toBe(404);
     await app.close();
   });

@@ -20,6 +20,16 @@ export const EndgameSummarySchema = z.object({
   /** Parties terminées depuis cette position. */
   attempts: z.number().int(),
   passed: z.boolean(),
+  /** Palier du cours (1 : 1000-1200, 2 : 1200-1400, 3 : 1400-1600). */
+  stage: z.number().int().min(1).max(3),
+  /** Coups maximum du joueur pour réussir, `null` : pas de limite. */
+  maxMoves: z.number().int().nullable(),
+  /** Nombre d'indices propres à la finale (0 à 3), servis à la demande. */
+  hints: z.number().int().min(0).max(3),
+  /** Compétence travaillée. */
+  skill: z.enum(['pawn-endgames', 'rook-endgames']),
+  /** À rejouer : une carte de révision de cette finale est due (échec passé). */
+  due: z.boolean(),
 });
 export type EndgameSummary = z.infer<typeof EndgameSummarySchema>;
 
@@ -28,3 +38,8 @@ export type EndgamesResponse = z.infer<typeof EndgamesResponseSchema>;
 
 export const EndgameStartResponseSchema = z.object({ gameId: z.string() });
 export type EndgameStartResponse = z.infer<typeof EndgameStartResponseSchema>;
+
+/** Indice progressif d'une finale (1 = discret, 3 = presque la réponse), servi à la demande. */
+export const EndgameHintRequestSchema = z.object({ level: z.number().int().min(1).max(3) });
+export const EndgameHintResponseSchema = z.object({ hint: z.string() });
+export type EndgameHintResponse = z.infer<typeof EndgameHintResponseSchema>;

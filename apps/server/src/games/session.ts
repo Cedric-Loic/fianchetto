@@ -225,6 +225,11 @@ export class GameSession {
     return this.mode === 'bot' && !this.training;
   }
 
+  /** Demi-coups joués (reprises annulées déduites). */
+  get plyCount(): number {
+    return this.#game?.plyCount ?? 0;
+  }
+
   get phase(): GamePhase {
     return this.#phase;
   }
