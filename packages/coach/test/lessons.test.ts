@@ -32,11 +32,11 @@ const exercises: [string, Exercise][] = LESSONS.flatMap((l) =>
 );
 
 describe('leçons', () => {
-  it('identifiants uniques, phases 1 à 3 complètes (10 leçons de base et 7 chapitres de finales en phase 1, plus les parties classiques), au moins 2 exercices', () => {
+  it('identifiants uniques, phases 1 à 3 complètes (leçons de base, chapitres de finales des trois paliers, parties classiques), au moins 2 exercices', () => {
     expect(new Set(LESSONS.map((l) => l.id)).size).toBe(LESSONS.length);
     expect(LESSONS.filter((l) => l.phase === 1)).toHaveLength(17);
-    expect(LESSONS.filter((l) => l.phase === 2)).toHaveLength(13);
-    expect(LESSONS.filter((l) => l.phase === 3)).toHaveLength(13);
+    expect(LESSONS.filter((l) => l.phase === 2)).toHaveLength(22);
+    expect(LESSONS.filter((l) => l.phase === 3)).toHaveLength(20);
     for (const l of LESSONS) expect(l.exercises.length, l.id).toBeGreaterThanOrEqual(2);
     for (const l of LESSONS.filter((x) => x.phase === 3))
       expect(l.exercises.length, l.id).toBeGreaterThanOrEqual(5);

@@ -31,7 +31,8 @@ export interface Endgame {
 /*
  * Chapitres du cours de finales. Palier 1 (1000-1200) : mats élémentaires, pions et dame contre
  * pion. Palier 2 : opposition à distance, pion passé éloigné, percée, roi actif, positions théoriques
- * de tours (Lucena, Philidor, tour derrière le pion passé) et bon fou. `maxMoves` = coups du joueur : le mat le plus rapide du moteur
+ * de tours (Lucena, Philidor, tour derrière le pion passé) et bon fou. Palier 3 : Vancura et fous de
+ * couleurs opposées (à tenir). `maxMoves` = coups du joueur : le mat le plus rapide du moteur
  * (mesuré avec Stockfish) plus une marge pour une exécution humaine. Pas de limite pour les
  * nulles « à tenir » : leur durée dépend du bot.
  */
@@ -347,6 +348,40 @@ export const ENDGAMES: readonly Endgame[] = [
       'Ton fou contrôle h8, la case de promotion : le roi noir ne peut pas s’y réfugier.',
       'Ne prive pas le roi noir de toutes ses cases : sinon c’est pat.',
       'Fe3 (un coup de fou tranquille), puis h6 et h7+.',
+    ],
+  },
+  // --- Palier 3 -----------------------------------------------------------------------------
+  {
+    id: 'vancura',
+    title: 'Position de Vancura',
+    objective:
+      'Avec les Noirs, tiens la nulle contre le pion de tour a6 soutenu par sa tour : ta tour attaque le pion par le côté ' +
+      'sur la 6e rangée et ton roi reste loin. Quand le roi blanc s’approche, donne des échecs latéraux depuis la colonne f.',
+    fen: 'R7/6k1/Pr6/8/8/3K4/8/8 b - - 0 1',
+    goal: 'draw',
+    lesson: 'fin-vancura',
+    stage: 3,
+    skill: 'rook-endgames',
+    hints: [
+      'La tour blanche est liée à la défense du pion a6 : ta tour l’attaque par le côté, sur la 6e rangée.',
+      'Garde la tour sur la 6e rangée, loin du roi blanc, et ton roi loin du pion (g7).',
+      'Premier coup : Tf6 (Tc6 ou Th6 conviennent aussi), puis des échecs depuis la colonne f.',
+    ],
+  },
+  {
+    id: 'fous-opposes',
+    title: 'Fous de couleurs opposées',
+    objective:
+      'Avec les Noirs, tiens la nulle avec deux pions de moins : place ton fou sur la grande diagonale, qui contrôle ' +
+      'e5, et garde ton roi devant les pions. Ne mets jamais ton fou en prise.',
+    fen: '8/6k1/8/8/4P1P1/3B4/6K1/6b1 b - - 0 1',
+    goal: 'draw',
+    lesson: 'fin-fous-opposes',
+    stage: 3,
+    hints: [
+      'Les deux fous sont de couleurs opposées : les pions blancs ne peuvent pas être chassés par ton fou, mais ils peuvent être bloqués.',
+      'Ton fou doit contrôler la case d’avance du pion e4, e5, et ton roi doit rester devant les pions.',
+      'Premier coup : Fd4, sur la grande diagonale.',
     ],
   },
 ];

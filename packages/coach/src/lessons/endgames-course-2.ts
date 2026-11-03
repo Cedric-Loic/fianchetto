@@ -129,7 +129,7 @@ const OPPOSITION_DISTANCE: Lesson = {
       prompt: 'Les Blancs jouent et gagnent. Où va le roi ?',
       mode: 'engine',
       solution: ['b2c3'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['b2b3', 'b2c2', 'e2e4'],
       hints: [
         'Ton roi est loin du pion et du roi noir. Quelle ligne peut-il prendre sur le roi noir, avec le bon nombre de cases ?',
@@ -145,7 +145,7 @@ const OPPOSITION_DISTANCE: Lesson = {
       prompt: 'Avec les Noirs, tiens la nulle contre le pion c4. Ton roi est loin : où vas-tu ?',
       mode: 'engine',
       solution: ['e8d8'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['e8e7', 'e8f7'],
       hints: [
         'Le roi blanc est en d4 : sur quelle colonne peux-tu te placer face à lui ?',
@@ -161,7 +161,7 @@ const OPPOSITION_DISTANCE: Lesson = {
       prompt: 'Les Blancs jouent et gagnent. Quel coup de roi prend l’opposition à distance ?',
       mode: 'engine',
       solution: ['g3f4'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['g3g4', 'g3f3'],
       hints: [
         'Le roi noir est en f8 : regarde la colonne f.',
@@ -770,7 +770,7 @@ const LUCENA: Lesson = {
       prompt: 'Les Noirs viennent de jouer Re7. Construis le pont.',
       mode: 'engine',
       solution: ['d1d4'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['d1d2'],
       hints: [
         'Ta tour ne doit pas rester sur la 1re rangée, où les échecs la gênent.',
@@ -786,7 +786,7 @@ const LUCENA: Lesson = {
       prompt: 'La tour noire donne échec depuis b1. Comment sors-tu du jeu d’échecs ?',
       mode: 'engine',
       solution: ['b6c6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['b6a5', 'b6c5'],
       hints: [
         'Le roi doit quitter la colonne b, mais pas pour n’importe quelle case : il doit défendre le pion b7.',
@@ -802,7 +802,7 @@ const LUCENA: Lesson = {
       prompt: 'Le roi est en b5, la tour noire donne échec. Termine la construction.',
       mode: 'engine',
       solution: ['d4b4'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['b5c5', 'b5a5'],
       hints: [
         'Ton roi ne peut plus se cacher en avançant : il lui faut un abri.',
@@ -934,7 +934,7 @@ const PHILIDOR: Lesson = {
       prompt: 'Position de départ du chapitre. Garde la 6e rangée sans mettre ta tour en danger.',
       mode: 'engine',
       solution: ['b6h6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['b6b5', 'b6e6'],
       hints: [
         'Ta tour doit rester sur la 6e rangée, mais pas à portée du roi ni du pion.',
@@ -950,7 +950,7 @@ const PHILIDOR: Lesson = {
       prompt: 'La tour blanche est en g1. Quel coup choisis-tu ?',
       mode: 'engine',
       solution: ['a6b6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['a6a1', 'a6a8'],
       hints: [
         'Le pion est encore en e5 : peut-on déjà quitter la 6e rangée ?',
@@ -966,7 +966,7 @@ const PHILIDOR: Lesson = {
       prompt: 'Même idée : le pion est toujours en e5. Où va ta tour ?',
       mode: 'engine',
       solution: ['a6h6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['a6a1', 'a6a5'],
       hints: [
         'Ta tour garde la 6e rangée, mais le roi f5 contrôle e6, f6 et g6.',
@@ -982,7 +982,7 @@ const PHILIDOR: Lesson = {
       prompt: 'Le pion vient d’avancer en e6. Que fait ta tour ?',
       mode: 'engine',
       solution: ['a6a1'],
-      tolerance: 5,
+      tolerance: 10,
       hints: [
         'Le pion a franchi la 6e rangée : ta tour a un autre rôle.',
         'Elle doit aller donner des échecs de loin.',
@@ -1086,7 +1086,7 @@ const TOUR_DERRIERE: Lesson = {
       prompt: 'Les Blancs jouent et gagnent. Trouve le premier coup.',
       mode: 'engine',
       solution: ['a5a6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['a1c1', 'a1a4'],
       hints: [
         'Ta tour est derrière le pion : elle est bien placée. Que dois-tu faire du pion ?',
@@ -1102,7 +1102,7 @@ const TOUR_DERRIERE: Lesson = {
       prompt: 'Échec de la tour noire. Où va ton roi ?',
       mode: 'engine',
       solution: ['b5c4'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['b5a4'],
       hints: [
         'Quel est ton plan pour échapper aux échecs sans perdre le pion a7 ?',

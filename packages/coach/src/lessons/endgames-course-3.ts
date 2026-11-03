@@ -93,7 +93,7 @@ const VANCURA: Lesson = {
       prompt: 'Les Noirs jouent et tiennent la nulle. Que fais-tu ?',
       mode: 'engine',
       solution: ['b6f6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['b6b1', 'b6b5', 'g7g6', 'g7f7'],
       hints: [
         'Ta tour doit rester sur la 6e rangée, mais pas près du roi blanc.',
@@ -109,7 +109,7 @@ const VANCURA: Lesson = {
       prompt: 'Le roi blanc est en b5, juste devant le pion. Comment l’empêches-tu d’avancer ?',
       mode: 'engine',
       solution: ['f4f5'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['f4f6', 'f4f1', 'f4h4'],
       hints: [
         'Une tour peut donner un échec sans s’approcher du roi.',
@@ -125,7 +125,7 @@ const VANCURA: Lesson = {
       prompt: 'Le roi blanc est en c5. Quel coup de tour tient la nulle ?',
       mode: 'engine',
       solution: ['f1f5'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['f1c1', 'f1a1', 'g7f7'],
       hints: [
         'Reste à distance du roi blanc, sans te mettre sur une colonne qui le gêne.',
@@ -141,7 +141,7 @@ const VANCURA: Lesson = {
       prompt: 'Le roi blanc est en d4. Quelle tour garde la 6e rangée, sans erreur ?',
       mode: 'engine',
       solution: ['f6c6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['f6f1', 'f6f5', 'g7g6'],
       hints: [
         'Le roi blanc s’approche. Où ta tour est-elle en sécurité sur la 6e rangée ?',
@@ -552,7 +552,7 @@ const COUPER_ROI: Lesson = {
       prompt: 'Les Blancs jouent et gagnent. Comment fais-tu avancer le pion ?',
       mode: 'engine',
       solution: ['d1e1'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['a4a5', 'b5b4', 'd1d7', 'd1f1'],
       hints: [
         'Avant de pousser le pion, empêche le roi noir de s’en approcher.',
@@ -569,7 +569,7 @@ const COUPER_ROI: Lesson = {
         'La tour noire est en h1, derrière ton pion à la 1re rangée. Où coupes-tu le roi noir ?',
       mode: 'engine',
       solution: ['d2e2'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['d2b2', 'a4a5', 'd2d7'],
       hints: [
         'La colonne qui sépare le roi noir du pion est la même.',
@@ -585,7 +585,7 @@ const COUPER_ROI: Lesson = {
         'Cette fois, tu défends : c’est aux Noirs de jouer. Que fais-tu avant que la tour ne coupe ?',
       mode: 'engine',
       solution: ['f7e6'],
-      tolerance: 5,
+      tolerance: 10,
       traps: ['f7g6', 'f7g7', 'f7f6'],
       hints: [
         'La tour blanche veut aller en e1. Peux-tu l’en empêcher ?',
