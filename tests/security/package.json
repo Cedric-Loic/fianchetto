@@ -1,0 +1,18 @@
+{
+  "name": "@sq/security-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Banc de tests d'attaque (agent qa-security) : fuites du secret, règles mal gérées.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@sq/engine": "workspace:*",
+    "@sq/server": "workspace:*",
+    "@sq/shared": "workspace:*",
+    "@types/ws": "^8.18.2",
+    "fast-check": "^4.10.2",
+    "ws": "^8.22.0"
+  }
+}

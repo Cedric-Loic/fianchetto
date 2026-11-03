@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+  - apps/*
+  - tests/security
+
+# pnpm 10 bloque les scripts d'installation par défaut : on autorise explicitement
+# ceux qui téléchargent un binaire natif (SQLite) ou le valident (esbuild).
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild

@@ -1,0 +1,1026 @@
+import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import Database from 'better-sqlite3';
+import {
+  VARIANTS,
+  type Color,
+  type GameReview,
+  type GameSummary,
+  type Rating,
+  type SelfReviewMoment,
+  type Square,
+  type UserPublic,
+  type Variant,
+} from '@sq/shared';
+import { Secret } from '@sq/shared/secret';
+import type { PersistedAny, SessionRecord, SessionSecrets } from '../games/session.js';
+import { PuzzleStore } from './puzzles.js';
+
+/**
+ * Stockage SQLite des parties (reprise après redémarrage du serveur).
+ *
+ * Le secret (choix des pions, coups rejoués par le moteur) est écrit dans la colonne dédiée
+ * `secret_state`, uniquement ici (seul dossier serveur autorisé à appeler `expose()`), et n'est
+ * jamais loggé. Limite assumée : l'administrateur local peut lire la base (docs/SECURITY.md).
+ */
+export interface UserRow {
+  id: string;
+  username: string;
+  passwordHash: string;
+}
+
+const USER_SELECT = `SELECT id, username, password_hash AS passwordHash FROM users`;
+
+/** Partie importée (PGN ou chess.com) : le PGN complet et ses en-têtes utiles. */
+export interface ImportedGameRow {
+  id: string;
+  userId: string;
+  source: 'pgn' | 'chesscom';
+  /** Clé anti-doublon : lien chess.com, ou empreinte du PGN. */
+  externalId: string;
+  pgn: string;
+  white: string;
+  black: string;
+  whiteElo: number | null;
+  blackElo: number | null;
+  result: string;
+  date: string | null;
+  timeControl: string | null;
+  userColor: Color | null;
+  plies: number;
+  url: string | null;
+}
+
+const IMPORTED_SELECT = `SELECT id, user_id AS userId, source, external_id AS externalId, pgn,
+  white, black, white_elo AS whiteElo, black_elo AS blackElo, result, date,
+  time_control AS timeControl, user_color AS userColor, plies, url FROM imported_games`;
+
+/** Résumé d'une revue, par camp : précision et nombre d'imprécisions, d'erreurs et de gaffes. */
+export interface ReviewSummary {
+  accuracy: GameReview['accuracy'];
+  counts: Record<Color, { inaccuracy: number; mistake: number; blunder: number }>;
+}
+
+/** Ligne de la liste des parties importées : sans le PGN, avec le résumé de la revue. */
+export type ImportedGameListRow = Omit<ImportedGameRow, 'pgn' | 'userId' | 'externalId'> & {
+  /** Une revue est enregistrée pour cette partie. */
+  reviewed: boolean;
+  /** Résumé de la revue (`null` : pas de revue, ou revue illisible). */
+  summary: ReviewSummary | null;
+};
+
+function reviewSummary(review: GameReview): ReviewSummary {
+  const counts = (c: GameReview['counts']['w']) => ({
+    inaccuracy: c.inaccuracy,
+    mistake: c.mistake,
+    blunder: c.blunder,
+  });
+  return {
+    accuracy: { w: review.accuracy.w, b: review.accuracy.b },
+    counts: { w: counts(review.counts.w), b: counts(review.counts.b) },
+  };
+}
+
+/** Révision d'une ligne du répertoire d'ouvertures. */
+export interface OpeningProgressRow {
+  lineId: string;
+  step: number;
+  dueAt: number;
+  successes: number;
+  failures: number;
+}
+
+/** Séances comptées dans les minutes d'entraînement du coach. */
+export type ActivityKind = 'lesson' | 'analysis';
+
+/** Carte de révision (étape 14) : planification d'un exercice de leçon ou d'une erreur perso. */
+export interface CardRow {
+  id: string;
+  source: string;
+  ref: string;
+  skill: string;
+  step: number;
+  dueAt: number;
+  mastered: boolean;
+  reviewedAt: number | null;
+}
+
+const CARD_SELECT = `SELECT id, source, ref, skill, step, due_at AS dueAt, mastered,
+  reviewed_at AS reviewedAt FROM review_cards`;
+
+export interface SavedGame {
+  record: SessionRecord;
+  secrets: { selection: Partial<Record<Color, Square>>; game: Secret<PersistedAny> | null };
+}
+
+export class GameStore {
+  readonly #db: Database.Database;
+  readonly #initialRating: number;
+  /** Puzzles : base Lichess attachée et données de l'utilisateur. */
+  readonly puzzles: PuzzleStore;
+
+  /**
+   * `initialRating` : Elo d'un joueur qui n'a encore joué aucune partie classée de la variante.
+   * `puzzlesPath` : base de puzzles (défaut : `puzzles.db` à côté de la base principale, en
+   * mémoire si celle-ci l'est).
+   */
+  constructor(path: string, options: { initialRating: number; puzzlesPath?: string }) {
+    this.#initialRating = options.initialRating;
+    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+    this.#db = new Database(path);
+    this.#db.pragma('journal_mode = WAL');
+    this.#db.exec(`
+      CREATE TABLE IF NOT EXISTS games (
+        id           TEXT PRIMARY KEY,
+        record       TEXT NOT NULL,
+        secret_state TEXT NOT NULL,
+        phase        TEXT NOT NULL,
+        updated_at   INTEGER NOT NULL
+      );
+      -- users.rating et users.games_played : Elo unique d'avant la variante classique, lu
+      -- seulement par la migration vers la table ratings ci-dessous.
+      CREATE TABLE IF NOT EXISTS users (
+        id            TEXT PRIMARY KEY,
+        username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash TEXT NOT NULL,
+        rating        INTEGER NOT NULL,
+        games_played  INTEGER NOT NULL DEFAULT 0,
+        created_at    INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS sessions (
+        token      TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        expires_at INTEGER NOT NULL
+      );
+      -- Ancienne analyse (étapes 4 à 6), remplacée par la revue : table laissée en place.
+      CREATE TABLE IF NOT EXISTS analyses (
+        game_id  TEXT PRIMARY KEY,
+        analysis TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS reviews (
+        game_id    TEXT PRIMARY KEY,
+        review     TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS imported_games (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id),
+        source      TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        pgn         TEXT NOT NULL,
+        white       TEXT NOT NULL,
+        black       TEXT NOT NULL,
+        white_elo   INTEGER,
+        black_elo   INTEGER,
+        result      TEXT NOT NULL,
+        date        TEXT,
+        time_control TEXT,
+        user_color  TEXT,
+        plies       INTEGER NOT NULL,
+        url         TEXT,
+        created_at  INTEGER NOT NULL,
+        UNIQUE (user_id, external_id)
+      );
+      CREATE TABLE IF NOT EXISTS results (
+        game_id       TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL REFERENCES users(id),
+        summary       TEXT NOT NULL,
+        ended_at      INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS lesson_progress (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        lesson_id  TEXT NOT NULL,
+        best       INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, lesson_id)
+      );
+      CREATE TABLE IF NOT EXISTS ratings (
+        user_id      TEXT NOT NULL REFERENCES users(id),
+        variant      TEXT NOT NULL,
+        rating       INTEGER NOT NULL,
+        games_played INTEGER NOT NULL,
+        PRIMARY KEY (user_id, variant)
+      );
+      -- Étape 13 : séances d'entraînement (leçon, revue ouverte), une par sujet et par jour.
+      CREATE TABLE IF NOT EXISTS activity_sessions (
+        user_id TEXT NOT NULL REFERENCES users(id),
+        kind    TEXT NOT NULL,
+        ref     TEXT NOT NULL,
+        day     TEXT NOT NULL,
+        at      INTEGER NOT NULL,
+        PRIMARY KEY (user_id, kind, ref, day)
+      );
+      -- Lot 4b : finales contre le bot (parties terminées et réussites par position).
+      CREATE TABLE IF NOT EXISTS endgame_progress (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        endgame_id TEXT NOT NULL,
+        attempts   INTEGER NOT NULL,
+        successes  INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, endgame_id)
+      );
+      -- Lot 1 (finales) : chaque partie de finale terminée est une tentative datée (preuve de
+      -- compétence), avec les indices consultés et les coups du joueur.
+      CREATE TABLE IF NOT EXISTS endgame_attempts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        endgame_id TEXT NOT NULL,
+        success    INTEGER NOT NULL,
+        hints      INTEGER NOT NULL DEFAULT 0,
+        moves      INTEGER NOT NULL DEFAULT 0,
+        at         INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS endgame_attempts_user ON endgame_attempts (user_id, at);
+      -- Lot 4d : répertoire d'ouvertures en répétition espacée (étape et échéance par ligne).
+      CREATE TABLE IF NOT EXISTS opening_progress (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        line_id    TEXT NOT NULL,
+        step       INTEGER NOT NULL,
+        due_at     INTEGER NOT NULL,
+        successes  INTEGER NOT NULL,
+        failures   INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, line_id)
+      );
+      -- Étape 14 : coach pédagogique (tentatives d'exercices, cartes de révision, séance du jour).
+      CREATE TABLE IF NOT EXISTS exercise_attempts (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id        TEXT NOT NULL REFERENCES users(id),
+        lesson_id      TEXT NOT NULL,
+        exercise_index INTEGER NOT NULL,
+        success        INTEGER NOT NULL,
+        hints          INTEGER NOT NULL DEFAULT 0,
+        at             INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS exercise_attempts_user ON exercise_attempts (user_id, at);
+      -- Parties coachées : réponses aux questions socratiques (une par partie et demi-coup).
+      CREATE TABLE IF NOT EXISTS coach_prompts (
+        user_id TEXT NOT NULL REFERENCES users(id),
+        game_id TEXT NOT NULL,
+        ply     INTEGER NOT NULL,
+        kind    TEXT NOT NULL,
+        correct INTEGER NOT NULL,
+        at      INTEGER NOT NULL,
+        PRIMARY KEY (user_id, game_id, ply)
+      );
+      CREATE TABLE IF NOT EXISTS review_cards (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id),
+        source      TEXT NOT NULL,
+        ref         TEXT NOT NULL,
+        skill       TEXT NOT NULL,
+        step        INTEGER NOT NULL,
+        due_at      INTEGER NOT NULL,
+        mastered    INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL,
+        reviewed_at INTEGER,
+        UNIQUE (user_id, source, ref)
+      );
+      -- Étape 15 : revue réflexive (moments d'hésitation du joueur et défaut de réflexion nommé),
+      -- une ligne par moment ; un nouvel envoi remplace tous les moments de la partie.
+      CREATE TABLE IF NOT EXISTS self_reviews (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        game_id    TEXT NOT NULL,
+        ply        INTEGER NOT NULL,
+        flaw       TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, game_id, ply, flaw)
+      );
+      -- Étape 15 : entraîneur de calcul (une réponse par problème servi, preuve de compétence).
+      CREATE TABLE IF NOT EXISTS calc_attempts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        puzzle_id  TEXT NOT NULL,
+        depth      INTEGER NOT NULL,
+        line_ok    INTEGER NOT NULL,
+        answer_ok  INTEGER NOT NULL,
+        hints      INTEGER NOT NULL DEFAULT 0,
+        at         INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS calc_attempts_user ON calc_attempts (user_id, at);
+      -- Étape 15 (lot 5) : examens de palier, meilleur score par palier et par type (stage, mini).
+      CREATE TABLE IF NOT EXISTS exam_results (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        stage      INTEGER NOT NULL,
+        kind       TEXT NOT NULL,
+        best       INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, stage, kind)
+      );
+      CREATE TABLE IF NOT EXISTS daily_sessions (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        day        TEXT NOT NULL,
+        steps_done TEXT NOT NULL,
+        PRIMARY KEY (user_id, day)
+      );
+      -- Migration : l'Elo unique d'avant la variante classique était celui de Secret Queen.
+      INSERT OR IGNORE INTO ratings (user_id, variant, rating, games_played)
+        SELECT id, 'secret-queen', rating, games_played FROM users WHERE games_played > 0;`);
+    this.#migrateReviewSummaries();
+    this.puzzles = new PuzzleStore(
+      this.#db,
+      options.puzzlesPath ?? (path === ':memory:' ? ':memory:' : join(dirname(path), 'puzzles.db')),
+    );
+  }
+
+  /**
+   * Migration : colonne `reviews.summary` (statistiques résumées, lues par la liste des parties
+   * importées sans relire la revue complète), calculée pour les revues qui ne l'ont pas encore.
+   */
+  #migrateReviewSummaries(): void {
+    const columns = this.#db.prepare(`PRAGMA table_info(reviews)`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'summary')) {
+      this.#db.exec(`ALTER TABLE reviews ADD COLUMN summary TEXT`);
+    }
+    const rows = this.#db
+      .prepare(`SELECT game_id AS gameId, review FROM reviews WHERE summary IS NULL`)
+      .all() as { gameId: string; review: string }[];
+    if (rows.length === 0) return;
+    const update = this.#db.prepare(`UPDATE reviews SET summary = ? WHERE game_id = ?`);
+    this.#db.transaction(() => {
+      for (const row of rows) {
+        try {
+          const summary = reviewSummary(JSON.parse(row.review) as GameReview);
+          update.run(JSON.stringify(summary), row.gameId);
+        } catch {
+          // Revue illisible : pas de résumé (la liste affiche la partie sans statistiques).
+        }
+      }
+    })();
+  }
+
+  // --- Comptes ---------------------------------------------------------------------------
+
+  createUser(user: { id: string; username: string; passwordHash: string }): boolean {
+    try {
+      this.#db
+        .prepare(
+          `INSERT INTO users (id, username, password_hash, rating, created_at)
+           VALUES (@id, @username, @passwordHash, @rating, @now)`,
+        )
+        .run({ ...user, rating: this.#initialRating, now: Date.now() });
+      return true;
+    } catch {
+      return false; // pseudo déjà pris
+    }
+  }
+
+  findUserByName(username: string): UserRow | undefined {
+    return this.#db.prepare(`${USER_SELECT} WHERE username = ?`).get(username) as
+      UserRow | undefined;
+  }
+
+  findUser(id: string): UserRow | undefined {
+    return this.#db.prepare(`${USER_SELECT} WHERE id = ?`).get(id) as UserRow | undefined;
+  }
+
+  /** Elo d'un joueur dans une variante (Elo initial s'il n'y a encore joué aucune partie). */
+  ratingOf(userId: string, variant: Variant): Rating {
+    const row = this.#db
+      .prepare(
+        `SELECT rating, games_played AS gamesPlayed FROM ratings WHERE user_id = ? AND variant = ?`,
+      )
+      .get(userId, variant) as Rating | undefined;
+    return row ?? { rating: this.#initialRating, gamesPlayed: 0 };
+  }
+
+  /** Enregistre le nouvel Elo après une partie classée de la variante. */
+  setRating(userId: string, variant: Variant, rating: number): void {
+    this.#db
+      .prepare(
+        `INSERT INTO ratings (user_id, variant, rating, games_played) VALUES (?, ?, ?, 1)
+         ON CONFLICT(user_id, variant) DO UPDATE SET rating = excluded.rating,
+           games_played = games_played + 1`,
+      )
+      .run(userId, variant, rating);
+  }
+
+  publicUser(user: UserRow): UserPublic {
+    const ratings = Object.fromEntries(
+      VARIANTS.map((variant) => [variant, this.ratingOf(user.id, variant)]),
+    ) as UserPublic['ratings'];
+    return { id: user.id, username: user.username, ratings };
+  }
+
+  /** Classement d'une variante : tous les comptes, Elo initial pour ceux qui n'y ont pas joué. */
+  leaderboard(variant: Variant): (Rating & { username: string })[] {
+    return this.#db
+      .prepare(
+        `SELECT u.username, COALESCE(r.rating, @initial) AS rating,
+           COALESCE(r.games_played, 0) AS gamesPlayed
+         FROM users u LEFT JOIN ratings r ON r.user_id = u.id AND r.variant = @variant
+         ORDER BY rating DESC, u.username LIMIT 100`,
+      )
+      .all({ variant, initial: this.#initialRating }) as (Rating & { username: string })[];
+  }
+
+  createSession(token: string, userId: string, expiresAt: number): void {
+    this.#db
+      .prepare(`INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)`)
+      .run(token, userId, expiresAt);
+  }
+
+  sessionUser(token: string): UserRow | undefined {
+    return this.#db
+      .prepare(
+        `SELECT u.id, u.username, u.password_hash AS passwordHash
+         FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.token = ? AND s.expires_at > ?`,
+      )
+      .get(token, Date.now()) as UserRow | undefined;
+  }
+
+  deleteSession(token: string): void {
+    this.#db.prepare(`DELETE FROM sessions WHERE token = ?`).run(token);
+  }
+
+  // --- Historique ------------------------------------------------------------------------
+
+  saveResult(gameId: string, userId: string, summary: GameSummary): void {
+    this.#db
+      .prepare(
+        `INSERT OR REPLACE INTO results (game_id, user_id, summary, ended_at) VALUES (?, ?, ?, ?)`,
+      )
+      .run(gameId, userId, JSON.stringify(summary), Date.now());
+  }
+
+  history(userId: string): GameSummary[] {
+    const rows = this.#db
+      .prepare(`SELECT summary FROM results WHERE user_id = ? ORDER BY ended_at DESC LIMIT 100`)
+      .all(userId) as { summary: string }[];
+    // Résumés antérieurs à la variante classique : Secret Queen.
+    return rows.map(
+      (r) => ({ variant: 'secret-queen', ...(JSON.parse(r.summary) as object) }) as GameSummary,
+    );
+  }
+
+  /** Partie non terminée la plus récente d'un utilisateur (reprise après rafraîchissement). */
+  activeGameOf(userId: string): string | null {
+    const rows = this.#db
+      .prepare(`SELECT id, record FROM games WHERE phase != 'ended' ORDER BY updated_at DESC`)
+      .all() as { id: string; record: string }[];
+    for (const row of rows) {
+      const record = JSON.parse(row.record) as { ownerId?: string | null; mode?: string };
+      if (record.ownerId === userId && record.mode === 'bot') return row.id;
+    }
+    return null;
+  }
+
+  save(record: SessionRecord, secrets: Secret<SessionSecrets>): void {
+    const { selection, game } = secrets.expose();
+    const secretJson = JSON.stringify({ selection, game: game ? game.expose() : null });
+    this.#db
+      .prepare(
+        `INSERT INTO games (id, record, secret_state, phase, updated_at)
+         VALUES (@id, @record, @secret, @phase, @now)
+         ON CONFLICT(id) DO UPDATE SET record = @record, secret_state = @secret,
+           phase = @phase, updated_at = @now`,
+      )
+      .run({
+        id: record.id,
+        record: JSON.stringify(record),
+        secret: secretJson,
+        phase: record.phase,
+        now: Date.now(),
+      });
+  }
+
+  /** Une partie précise (par exemple terminée, pour le rejeu), quelle que soit sa phase. */
+  load(id: string): SavedGame | undefined {
+    const row = this.#db.prepare(`SELECT record, secret_state FROM games WHERE id = ?`).get(id) as
+      { record: string; secret_state: string } | undefined;
+    return row ? this.#parse(row) : undefined;
+  }
+
+  // --- Leçons ------------------------------------------------------------------------------
+
+  /** Meilleur score d'une leçon (exercices réussis du premier coup), `null` si jamais finie. */
+  lessonBest(userId: string, lessonId: string): number | null {
+    const row = this.#db
+      .prepare(`SELECT best FROM lesson_progress WHERE user_id = ? AND lesson_id = ?`)
+      .get(userId, lessonId) as { best: number } | undefined;
+    return row?.best ?? null;
+  }
+
+  /** Progression de toutes les leçons commencées. */
+  lessonProgress(userId: string): { lessonId: string; best: number; updatedAt: number }[] {
+    return this.#db
+      .prepare(
+        `SELECT lesson_id AS lessonId, best, updated_at AS updatedAt FROM lesson_progress
+         WHERE user_id = ?`,
+      )
+      .all(userId) as { lessonId: string; best: number; updatedAt: number }[];
+  }
+
+  saveLessonResult(userId: string, lessonId: string, correct: number): void {
+    this.#db
+      .prepare(
+        `INSERT INTO lesson_progress (user_id, lesson_id, best, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, lesson_id) DO UPDATE SET best = MAX(best, excluded.best),
+           updated_at = excluded.updated_at`,
+      )
+      .run(userId, lessonId, correct, Date.now());
+    this.recordActivity(userId, 'lesson', lessonId);
+  }
+
+  // --- Examens de palier (étape 15) ----------------------------------------------------------
+
+  /** Meilleur score d'un examen (`stage` ou `mini`), `null` s'il n'a jamais été passé. */
+  examBest(userId: string, stage: number, kind: string): number | null {
+    const row = this.#db
+      .prepare(`SELECT best FROM exam_results WHERE user_id = ? AND stage = ? AND kind = ?`)
+      .get(userId, stage, kind) as { best: number } | undefined;
+    return row?.best ?? null;
+  }
+
+  /** Enregistre un score en gardant le meilleur. */
+  saveExamResult(userId: string, stage: number, kind: string, correct: number): void {
+    this.#db
+      .prepare(
+        `INSERT INTO exam_results (user_id, stage, kind, best, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, stage, kind) DO UPDATE SET best = MAX(best, excluded.best),
+           updated_at = excluded.updated_at`,
+      )
+      .run(userId, stage, kind, correct, Date.now());
+  }
+
+  // --- Coach pédagogique (étape 14) ----------------------------------------------------------
+
+  recordExerciseAttempt(a: {
+    userId: string;
+    lessonId: string;
+    index: number;
+    success: boolean;
+    hints: number;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT INTO exercise_attempts (user_id, lesson_id, exercise_index, success, hints, at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.lessonId, a.index, a.success ? 1 : 0, a.hints, a.at);
+  }
+
+  /** Réponse à une question de partie coachée ; la première réponse par position fait foi. */
+  recordCoachPrompt(a: {
+    userId: string;
+    gameId: string;
+    ply: number;
+    kind: string;
+    correct: boolean;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO coach_prompts (user_id, game_id, ply, kind, correct, at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.gameId, a.ply, a.kind, a.correct ? 1 : 0, a.at);
+  }
+
+  coachPrompts(userId: string): { kind: string; correct: boolean; at: number }[] {
+    const rows = this.#db
+      .prepare('SELECT kind, correct, at FROM coach_prompts WHERE user_id = ? ORDER BY at')
+      .all(userId) as { kind: string; correct: number; at: number }[];
+    return rows.map((r) => ({ kind: r.kind, correct: r.correct === 1, at: r.at }));
+  }
+
+  exerciseAttempts(
+    userId: string,
+  ): { lessonId: string; index: number; success: boolean; hints: number; at: number }[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT lesson_id AS lessonId, exercise_index AS idx, success, hints, at
+         FROM exercise_attempts WHERE user_id = ? ORDER BY at`,
+      )
+      .all(userId) as {
+      lessonId: string;
+      idx: number;
+      success: number;
+      hints: number;
+      at: number;
+    }[];
+    return rows.map((r) => ({
+      lessonId: r.lessonId,
+      index: r.idx,
+      success: r.success === 1,
+      hints: r.hints,
+      at: r.at,
+    }));
+  }
+
+  #card(row: (Omit<CardRow, 'mastered'> & { mastered: number }) | undefined): CardRow | undefined {
+    return row && { ...row, mastered: row.mastered === 1 };
+  }
+
+  getCard(userId: string, source: string, ref: string): CardRow | undefined {
+    return this.#card(
+      this.#db
+        .prepare(`${CARD_SELECT} WHERE user_id = ? AND source = ? AND ref = ?`)
+        .get(userId, source, ref) as never,
+    );
+  }
+
+  cards(userId: string): CardRow[] {
+    return (
+      this.#db.prepare(`${CARD_SELECT} WHERE user_id = ? ORDER BY due_at`).all(userId) as never[]
+    ).map((r) => this.#card(r)!);
+  }
+
+  /** Crée ou met à jour une carte ; `reviewedAt` est renseigné pour une révision d'une carte existante. */
+  saveCard(
+    userId: string,
+    card: {
+      source: string;
+      ref: string;
+      skill: string;
+      step: number;
+      dueAt: number;
+      mastered: boolean;
+    },
+    now: number,
+    reviewed: boolean,
+  ): void {
+    this.#db
+      .prepare(
+        `INSERT INTO review_cards (id, user_id, source, ref, skill, step, due_at, mastered,
+           created_at, reviewed_at)
+         VALUES (@id, @userId, @source, @ref, @skill, @step, @dueAt, @mastered, @now, @reviewedAt)
+         ON CONFLICT(user_id, source, ref) DO UPDATE SET skill = @skill, step = @step,
+           due_at = @dueAt, mastered = @mastered,
+           reviewed_at = COALESCE(@reviewedAt, reviewed_at)`,
+      )
+      .run({
+        id: randomUUID(),
+        userId,
+        ...card,
+        mastered: card.mastered ? 1 : 0,
+        now,
+        reviewedAt: reviewed ? now : null,
+      });
+  }
+
+  /** Étapes de la séance du jour cochées par l'utilisateur. */
+  sessionStepsDone(userId: string, day: string): string[] {
+    const row = this.#db
+      .prepare(`SELECT steps_done AS done FROM daily_sessions WHERE user_id = ? AND day = ?`)
+      .get(userId, day) as { done: string } | undefined;
+    try {
+      const parsed: unknown = row ? JSON.parse(row.done) : [];
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  markSessionStep(userId: string, day: string, kind: string): void {
+    const done = new Set(this.sessionStepsDone(userId, day));
+    done.add(kind);
+    this.#db
+      .prepare(
+        `INSERT INTO daily_sessions (user_id, day, steps_done) VALUES (?, ?, ?)
+         ON CONFLICT(user_id, day) DO UPDATE SET steps_done = excluded.steps_done`,
+      )
+      .run(userId, day, JSON.stringify([...done]));
+  }
+
+  // --- Revue réflexive (étape 15) ------------------------------------------------------------
+
+  /** Remplace les moments de la revue réflexive d'une partie (un nouvel envoi efface l'ancien). */
+  saveSelfReview(userId: string, gameId: string, moments: SelfReviewMoment[], at: number): void {
+    const insert = this.#db.prepare(
+      `INSERT OR IGNORE INTO self_reviews (user_id, game_id, ply, flaw, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    );
+    this.#db.transaction(() => {
+      this.#db
+        .prepare(`DELETE FROM self_reviews WHERE user_id = ? AND game_id = ?`)
+        .run(userId, gameId);
+      for (const m of moments) insert.run(userId, gameId, m.ply, m.flaw, at);
+    })();
+  }
+
+  /** Revue réflexive d'une partie, `undefined` si le joueur ne l'a pas faite. */
+  getSelfReview(
+    userId: string,
+    gameId: string,
+  ): { moments: SelfReviewMoment[]; createdAt: number } | undefined {
+    const rows = this.#db
+      .prepare(
+        `SELECT ply, flaw, created_at AS createdAt FROM self_reviews
+         WHERE user_id = ? AND game_id = ? ORDER BY ply, rowid`,
+      )
+      .all(userId, gameId) as (SelfReviewMoment & { createdAt: number })[];
+    const first = rows[0];
+    if (!first) return undefined;
+    return { moments: rows.map((r) => ({ ply: r.ply, flaw: r.flaw })), createdAt: first.createdAt };
+  }
+
+  /** Défauts de réflexion cumulés : nombre de parties revues et décompte par défaut. */
+  thinkingCounts(userId: string): { reviews: number; counts: Record<string, number> } {
+    const rows = this.#db
+      .prepare(`SELECT flaw, COUNT(*) AS n FROM self_reviews WHERE user_id = ? GROUP BY flaw`)
+      .all(userId) as { flaw: string; n: number }[];
+    const reviews = (
+      this.#db
+        .prepare(`SELECT COUNT(DISTINCT game_id) AS n FROM self_reviews WHERE user_id = ?`)
+        .get(userId) as { n: number }
+    ).n;
+    return { reviews, counts: Object.fromEntries(rows.map((r) => [r.flaw, r.n])) };
+  }
+
+  // --- Entraîneur de calcul (étape 15) ---------------------------------------------------------
+
+  recordCalcAttempt(a: {
+    userId: string;
+    puzzleId: string;
+    depth: number;
+    lineOk: boolean;
+    answerOk: boolean;
+    hints: number;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT INTO calc_attempts (user_id, puzzle_id, depth, line_ok, answer_ok, hints, at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.puzzleId, a.depth, a.lineOk ? 1 : 0, a.answerOk ? 1 : 0, a.hints, a.at);
+  }
+
+  calcAttempts(
+    userId: string,
+  ): { puzzleId: string; depth: number; lineOk: boolean; answerOk: boolean; at: number }[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT puzzle_id AS puzzleId, depth, line_ok AS lineOk, answer_ok AS answerOk, at
+         FROM calc_attempts WHERE user_id = ? ORDER BY at`,
+      )
+      .all(userId) as {
+      puzzleId: string;
+      depth: number;
+      lineOk: number;
+      answerOk: number;
+      at: number;
+    }[];
+    return rows.map((r) => ({ ...r, lineOk: r.lineOk === 1, answerOk: r.answerOk === 1 }));
+  }
+
+  // --- Finales (lot 4b) ----------------------------------------------------------------------
+
+  /** Progression des finales déjà tentées. */
+  endgameProgress(userId: string): { endgameId: string; attempts: number; successes: number }[] {
+    return this.#db
+      .prepare(
+        `SELECT endgame_id AS endgameId, attempts, successes FROM endgame_progress
+         WHERE user_id = ?`,
+      )
+      .all(userId) as { endgameId: string; attempts: number; successes: number }[];
+  }
+
+  /** Une partie terminée depuis une finale, réussie ou non. */
+  saveEndgameResult(userId: string, endgameId: string, success: boolean): void {
+    this.#db
+      .prepare(
+        `INSERT INTO endgame_progress (user_id, endgame_id, attempts, successes, updated_at)
+         VALUES (?, ?, 1, ?, ?)
+         ON CONFLICT(user_id, endgame_id) DO UPDATE SET attempts = attempts + 1,
+           successes = successes + excluded.successes, updated_at = excluded.updated_at`,
+      )
+      .run(userId, endgameId, success ? 1 : 0, Date.now());
+  }
+
+  /** Tentative de finale (preuve de compétence) : réussie ou non, indices consultés, coups du joueur. */
+  recordEndgameAttempt(a: {
+    userId: string;
+    endgameId: string;
+    success: boolean;
+    hints: number;
+    moves: number;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT INTO endgame_attempts (user_id, endgame_id, success, hints, moves, at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.endgameId, a.success ? 1 : 0, a.hints, a.moves, a.at);
+  }
+
+  endgameAttempts(
+    userId: string,
+  ): { endgameId: string; success: boolean; hints: number; moves: number; at: number }[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT endgame_id AS endgameId, success, hints, moves, at
+         FROM endgame_attempts WHERE user_id = ? ORDER BY at`,
+      )
+      .all(userId) as {
+      endgameId: string;
+      success: number;
+      hints: number;
+      moves: number;
+      at: number;
+    }[];
+    return rows.map((r) => ({ ...r, success: r.success === 1 }));
+  }
+
+  // --- Répertoire d'ouvertures (lot 4d) ------------------------------------------------------
+
+  /** État de révision des lignes déjà travaillées. */
+  openingProgress(userId: string): OpeningProgressRow[] {
+    return this.#db
+      .prepare(
+        `SELECT line_id AS lineId, step, due_at AS dueAt, successes, failures
+         FROM opening_progress WHERE user_id = ?`,
+      )
+      .all(userId) as OpeningProgressRow[];
+  }
+
+  /** Enregistre une révision : nouvelle étape et échéance, réussite ou échec. */
+  saveOpeningReview(
+    userId: string,
+    lineId: string,
+    schedule: { step: number; dueAt: number },
+    success: boolean,
+  ): void {
+    this.#db
+      .prepare(
+        `INSERT INTO opening_progress (user_id, line_id, step, due_at, successes, failures,
+           updated_at)
+         VALUES (@userId, @lineId, @step, @dueAt, @ok, @ko, @now)
+         ON CONFLICT(user_id, line_id) DO UPDATE SET step = excluded.step,
+           due_at = excluded.due_at, successes = successes + excluded.successes,
+           failures = failures + excluded.failures, updated_at = excluded.updated_at`,
+      )
+      .run({
+        userId,
+        lineId,
+        step: schedule.step,
+        dueAt: schedule.dueAt,
+        ok: success ? 1 : 0,
+        ko: success ? 0 : 1,
+        now: Date.now(),
+      });
+  }
+
+  // --- Séances d'entraînement (minutes du coach, étape 13) ----------------------------------
+
+  /**
+   * Séance d'entraînement : une seule par sujet (leçon, partie revue) et par jour local, pour
+   * qu'un rechargement de page ne compte pas deux fois.
+   */
+  recordActivity(userId: string, kind: ActivityKind, ref: string, at = Date.now()): void {
+    const d = new Date(at);
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO activity_sessions (user_id, kind, ref, day, at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(userId, kind, ref, day, at);
+  }
+
+  /** Séances enregistrées d'un type, par ordre chronologique. */
+  activity(userId: string, kind: ActivityKind): { ref: string; at: number }[] {
+    return this.#db
+      .prepare(`SELECT ref, at FROM activity_sessions WHERE user_id = ? AND kind = ? ORDER BY at`)
+      .all(userId, kind) as { ref: string; at: number }[];
+  }
+
+  /**
+   * Rang (0 = la première) d'une partie d'entraînement parmi celles de son propriétaire, par
+   * date de début : sert au garde-fou dégressif (une partie sur deux en phase 2).
+   */
+  trainingGameIndex(userId: string, startedAt: string): number {
+    const row = this.#db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM games
+         WHERE json_extract(record, '$.ownerId') = ?
+           AND json_extract(record, '$.training') = 1
+           AND json_extract(record, '$.startedAt') < ?`,
+      )
+      .get(userId, startedAt) as { n: number };
+    return row.n;
+  }
+
+  // --- Revues et parties importées (coach) ------------------------------------------------
+
+  getReview(gameId: string): GameReview | undefined {
+    const row = this.#db.prepare(`SELECT review FROM reviews WHERE game_id = ?`).get(gameId) as
+      { review: string } | undefined;
+    return row ? (JSON.parse(row.review) as GameReview) : undefined;
+  }
+
+  /** Présence d'une revue, sans la lire. */
+  hasReview(gameId: string): boolean {
+    return this.#db.prepare(`SELECT 1 FROM reviews WHERE game_id = ?`).get(gameId) !== undefined;
+  }
+
+  /** Instant (ms) de la revue d'une partie, `null` si elle n'est pas analysée. */
+  reviewDate(gameId: string): number | null {
+    const row = this.#db.prepare(`SELECT created_at FROM reviews WHERE game_id = ?`).get(gameId) as
+      { created_at: number } | undefined;
+    return row?.created_at ?? null;
+  }
+
+  saveReview(gameId: string, review: GameReview): void {
+    this.#db
+      .prepare(
+        `INSERT OR REPLACE INTO reviews (game_id, review, summary, created_at) VALUES (?, ?, ?, ?)`,
+      )
+      .run(gameId, JSON.stringify(review), JSON.stringify(reviewSummary(review)), Date.now());
+  }
+
+  /** Enregistre une partie importée ; `false` si elle l'était déjà (même `externalId`). */
+  addImported(game: ImportedGameRow): boolean {
+    const result = this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO imported_games (id, user_id, source, external_id, pgn, white, black,
+           white_elo, black_elo, result, date, time_control, user_color, plies, url, created_at)
+         VALUES (@id, @userId, @source, @externalId, @pgn, @white, @black, @whiteElo, @blackElo,
+           @result, @date, @timeControl, @userColor, @plies, @url, @now)`,
+      )
+      .run({ ...game, now: Date.now() });
+    return result.changes > 0;
+  }
+
+  /** Parties importées d'un utilisateur, les plus récentes d'abord. */
+  listImported(userId: string): ImportedGameRow[] {
+    return this.#db
+      .prepare(
+        `${IMPORTED_SELECT} WHERE user_id = ? ORDER BY COALESCE(date, '') DESC, created_at DESC`,
+      )
+      .all(userId) as ImportedGameRow[];
+  }
+
+  /**
+   * Liste des parties importées (rafraîchie souvent pendant une analyse) : seulement les colonnes
+   * affichées et le résumé de la revue, jamais le PGN ni la revue complète.
+   */
+  listImportedSummaries(userId: string): ImportedGameListRow[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT g.id, g.source, g.white, g.black, g.white_elo AS whiteElo,
+           g.black_elo AS blackElo, g.result, g.date, g.time_control AS timeControl,
+           g.user_color AS userColor, g.plies, g.url,
+           r.game_id IS NOT NULL AS reviewed, r.summary
+         FROM imported_games g LEFT JOIN reviews r ON r.game_id = g.id
+         WHERE g.user_id = ? ORDER BY COALESCE(g.date, '') DESC, g.created_at DESC`,
+      )
+      .all(userId) as (Omit<ImportedGameListRow, 'reviewed' | 'summary'> & {
+      reviewed: number;
+      summary: string | null;
+    })[];
+    return rows.map((row) => {
+      let summary: ReviewSummary | null;
+      try {
+        summary = row.summary ? (JSON.parse(row.summary) as ReviewSummary) : null;
+      } catch {
+        summary = null;
+      }
+      return { ...row, reviewed: row.reviewed === 1, summary };
+    });
+  }
+
+  getImported(id: string): ImportedGameRow | undefined {
+    return this.#db.prepare(`${IMPORTED_SELECT} WHERE id = ?`).get(id) as
+      ImportedGameRow | undefined;
+  }
+
+  deleteImported(id: string, userId: string): boolean {
+    const result = this.#db
+      .prepare(`DELETE FROM imported_games WHERE id = ? AND user_id = ?`)
+      .run(id, userId);
+    if (result.changes > 0) this.#db.prepare(`DELETE FROM reviews WHERE game_id = ?`).run(id);
+    return result.changes > 0;
+  }
+
+  /** Parties à reprendre au démarrage : toutes celles qui ne sont pas terminées. */
+  loadUnfinished(): SavedGame[] {
+    const rows = this.#db
+      .prepare(`SELECT record, secret_state FROM games WHERE phase != 'ended'`)
+      .all() as { record: string; secret_state: string }[];
+    return rows.map((row) => this.#parse(row));
+  }
+
+  #parse(row: { record: string; secret_state: string }): SavedGame {
+    const secret = JSON.parse(row.secret_state) as {
+      selection: Partial<Record<Color, Square>>;
+      game: PersistedAny | null;
+    };
+    return {
+      record: JSON.parse(row.record) as SessionRecord,
+      secrets: {
+        selection: secret.selection,
+        game: secret.game ? new Secret(secret.game) : null,
+      },
+    };
+  }
+
+  close(): void {
+    this.#db.close();
+  }
+}

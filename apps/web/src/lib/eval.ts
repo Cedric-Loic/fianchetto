@@ -1,0 +1,27 @@
+/** Évaluation d'une position (centipions ou mat), du point de vue des Blancs. */
+interface EvalLike {
+  evalCp: number | null;
+  mate: number | null;
+}
+
+/** Évaluation affichable (centipions, point de vue des Blancs), bornée pour les graphiques. */
+export function evalValue(p: EvalLike | undefined): number {
+  if (!p) return 0;
+  if (p.mate !== null) return p.mate >= 0 ? 1000 : -1000;
+  return Math.max(-1000, Math.min(1000, p.evalCp ?? 0));
+}
+
+export function evalLabel(p: EvalLike | undefined): string {
+  if (!p) return '';
+  if (p.mate !== null) return `#${p.mate}`;
+  const v = (p.evalCp ?? 0) / 100;
+  if (Math.abs(v) >= 100) return v > 0 ? '1-0' : '0-1';
+  return `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
+}
+
+/** Évaluation d'une ligne du moteur à la française : « +1,2 », « -0,4 », « #3 », « #-2 ». */
+export function engineEvalLabel(p: EvalLike): string {
+  if (p.mate !== null) return `#${p.mate}`;
+  const v = (p.evalCp ?? 0) / 100;
+  return `${v > 0 ? '+' : ''}${v.toFixed(1).replace('.', ',')}`;
+}
