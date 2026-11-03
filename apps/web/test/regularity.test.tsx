@@ -25,6 +25,7 @@ vi.mock('../src/lib/api', () => ({
     coachCurriculum: vi.fn().mockResolvedValue(null),
     reviewCards: vi.fn().mockResolvedValue(null),
     coachProgress: vi.fn().mockResolvedValue(null),
+    thinkingProfile: vi.fn().mockResolvedValue(null),
   },
   summarizePgn: vi.fn(),
 }));

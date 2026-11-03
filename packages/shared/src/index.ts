@@ -27,3 +27,5 @@ export * from './analysis.js';
 export * from './endgame.js';
 export * from './opening.js';
 export * from './skills.js';
+export * from './self-review.js';
+export * from './calc.js';

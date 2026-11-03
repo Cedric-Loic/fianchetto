@@ -152,6 +152,28 @@ export class PuzzleStore {
       .get({ ...range, theme, userId }) as BankPuzzle | undefined;
   }
 
+  /**
+   * Puzzle pour l'entraîneur de calcul : solution d'exactement `depth` coups du joueur (le coup
+   * d'amorce de l'adversaire plus `2 * depth - 1` demi-coups), dans une fourchette de classement,
+   * jamais servi à l'utilisateur en calcul si possible (`fresh`), au hasard.
+   */
+  pickCalc(
+    userId: string,
+    range: { min: number; max: number },
+    depth: number,
+    fresh: boolean,
+  ): BankPuzzle | undefined {
+    return this.#db
+      .prepare(
+        `${BANK_SELECT} WHERE rating BETWEEN @min AND @max
+           AND length(moves) - length(replace(moves, ' ', '')) = @spaces
+           AND (@fresh = 0 OR id NOT IN (SELECT puzzle_id FROM calc_attempts WHERE user_id = @userId))
+         ORDER BY RANDOM() LIMIT 1`,
+      )
+      .get({ ...range, spaces: 2 * depth - 1, fresh: fresh ? 1 : 0, userId }) as
+      BankPuzzle | undefined;
+  }
+
   // --- Classement et tentatives --------------------------------------------------------------
 
   glicko(userId: string): Glicko | undefined {

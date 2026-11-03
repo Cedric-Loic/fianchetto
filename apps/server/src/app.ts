@@ -33,6 +33,9 @@ import { registerPuzzleRoutes } from './puzzles/routes.js';
 import { PuzzleService } from './puzzles/service.js';
 import { registerReviewRoutes } from './review/routes.js';
 import { ReviewService, type ReviewEngine } from './review/service.js';
+import { registerCalcRoutes } from './calc/routes.js';
+import { CalcService } from './calc/service.js';
+import { registerSelfReviewRoutes } from './review/self.js';
 import { registerCoachedRoutes } from './training/coached.js';
 import { registerTrainingRoutes } from './training/routes.js';
 import { TrainingService } from './training/service.js';
@@ -118,6 +121,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     (userId, id, index, solved, hints) => learning.recordExercise(userId, id, index, solved, hints),
   );
   const openings = new OpeningService(store);
+  const calc = new CalcService(store, learning);
   const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen), {
     themeOfDay: (userId) => coach.themeOfDay(userId),
     onOwnJudged: (userId, puzzleId, ok) => learning.recordOwnPuzzle(userId, puzzleId, ok),
@@ -195,6 +199,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   registerLessonRoutes(app, store, lessons);
   registerEndgameRoutes(app, store, endgames);
   registerOpeningRoutes(app, store, openings);
+  registerCalcRoutes(app, store, calc);
+  registerSelfReviewRoutes(app, { store, findGame: (id) => games.get(id) });
   registerCoachRoutes(app, store, coach, learning);
   registerAnalysisRoutes(app, store, analysis);
   registerTrainingRoutes(

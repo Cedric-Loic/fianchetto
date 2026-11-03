@@ -203,3 +203,40 @@ export function formatMoveClock(ms: number): string {
   const s = String(total % 60).padStart(2, '0');
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
+
+export interface SelfComparison {
+  /** Moments signalés par le joueur. */
+  flagged: number;
+  /** Coups du joueur classés imprécision, erreur ou gaffe par le moteur. */
+  engine: number;
+  /** Demi-coups à la fois signalés et classés ainsi. */
+  common: number[];
+}
+
+/**
+ * Compare les moments signalés (étape 1) aux coups du joueur classés ?!, ? ou ?? (étape 2).
+ * `flaggedPlies` : demi-coups signalés.
+ */
+export function compareSelfReview(
+  review: GameReview,
+  userColor: Color | null,
+  flaggedPlies: readonly number[],
+): SelfComparison {
+  const engine = new Set(
+    review.moves
+      .filter(
+        (m) =>
+          (userColor === null || m.color === userColor) &&
+          (m.classification === 'inaccuracy' ||
+            m.classification === 'mistake' ||
+            m.classification === 'blunder'),
+      )
+      .map((m) => m.ply),
+  );
+  const flagged = new Set(flaggedPlies);
+  return {
+    flagged: flagged.size,
+    engine: engine.size,
+    common: [...flagged].filter((p) => engine.has(p)).sort((a, b) => a - b),
+  };
+}

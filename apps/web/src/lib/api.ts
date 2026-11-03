@@ -1,5 +1,8 @@
 import type {
   BotLevelInfo,
+  CalcAnswerResponse,
+  CalcNextResponse,
+  CalcStepResponse,
   CardsResponse,
   CoachAnswerResponse,
   CoachPromptResponse,
@@ -26,8 +29,11 @@ import type {
   PuzzleNextResponse,
   PuzzleStats,
   ReviewResponse,
+  SelfReviewRequest,
+  SelfReviewResponse,
   SessionStep,
   SkillsResponse,
+  ThinkingProfile,
   RetryMoveResponse,
   UserPublic,
   Variant,
@@ -198,6 +204,18 @@ export const api = {
     call<DailySessionResponse>('POST', '/api/coach/session/progress', { kind }),
   reviewCards: () => call<CardsResponse>('GET', '/api/reviews/cards'),
   dashboard: () => call<CoachDashboard>('GET', '/api/coach/dashboard'),
+  // Revue réflexive (partie terminée) et profil de pensée.
+  selfReview: (id: string, signal?: AbortSignal) =>
+    request<SelfReviewResponse>('GET', `/api/reviews/${id}/self`, undefined, { signal }),
+  saveSelfReview: (id: string, body: SelfReviewRequest) =>
+    request<SelfReviewResponse>('POST', `/api/reviews/${id}/self`, body),
+  thinkingProfile: () => call<ThinkingProfile>('GET', '/api/coach/thinking'),
+  // Entraîneur de calcul : la solution n'arrive qu'avec la réponse.
+  calcNext: (depth: number) => request<CalcNextResponse>('GET', `/api/calc/next?depth=${depth}`),
+  calcStep: (id: string, line: string[], uci: string) =>
+    request<CalcStepResponse>('POST', `/api/calc/${id}/step`, { line, uci }),
+  calcAnswer: (id: string, line: string[], answer: number) =>
+    request<CalcAnswerResponse>('POST', `/api/calc/${id}/answer`, { line, answer }),
   // Leçons.
   lessons: () => call<LessonsResponse>('GET', '/api/lessons'),
   lesson: (id: string) => call<LessonView>('GET', `/api/lessons/${id}`),

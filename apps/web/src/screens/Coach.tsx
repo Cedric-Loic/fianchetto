@@ -10,6 +10,8 @@ import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { useCoachPlan } from '../lib/coachPlan';
 import { SkillsCard } from './CoachPlan';
+import { useThinking } from '../lib/thinking';
+import { ThinkingProfileCard } from './ThinkingProfile';
 
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
 
@@ -29,6 +31,7 @@ export function Coach({ footer }: { footer?: ReactNode }) {
   const user = useSession((s) => s.user);
   const plan = useCoachPlan(user !== null, { skills: true, curriculum: true });
   const [data, setData] = useState<CoachDashboard | null>(null);
+  const thinking = useThinking(user !== null);
   useEffect(() => {
     if (user) void api.dashboard().then(setData);
   }, [user]);
@@ -322,6 +325,8 @@ export function Coach({ footer }: { footer?: ReactNode }) {
           </>
         )}
       </div>
+
+      <ThinkingProfileCard profile={thinking} />
 
       <div className="panel page-panel">
         <h2>Ta progression</h2>

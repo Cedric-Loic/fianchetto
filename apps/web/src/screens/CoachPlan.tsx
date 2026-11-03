@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type {
   CurriculumResponse,
   DailySession,
@@ -17,6 +17,8 @@ export function SessionCard(props: {
   /** Cartes dues : affiche le bouton « Révisions » de la séance (absent si la page l'affiche). */
   due?: number | null;
   onChange: (s: DailySession) => void;
+  /** Contenu ajouté en bas de la séance (conseil de réflexion). */
+  footer?: ReactNode;
 }) {
   const { session } = props;
   const [bilan, setBilan] = useState(false);
@@ -88,6 +90,7 @@ export function SessionCard(props: {
           </Button>
         )}
       </div>
+      {props.footer}
     </section>
   );
 }

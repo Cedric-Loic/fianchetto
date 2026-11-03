@@ -8,6 +8,7 @@ import type {
   ReviewInfo,
   ReviewMove,
   ReviewResponse,
+  SelfReview,
   Square,
 } from '@sq/shared';
 import { AnalysisBoard } from '../analysis/AnalysisBoard';
@@ -22,6 +23,7 @@ import { useSan } from '../lib/notation';
 import { useSettings } from '../lib/settings';
 import { ExplainText, GuidedPanel } from '../review/GuidedReview';
 import { LearnMistakes } from '../review/LearnMistakes';
+import { SelfCompare, SelfReviewStep, type DraftMoment } from '../review/SelfReview';
 import {
   formatMoveClock,
   isQuizMoment,
@@ -129,6 +131,20 @@ export function Review({ id, guided = false }: { id: string; guided?: boolean })
 
   const review = data?.state.status === 'done' ? data.state.review : null;
 
+  // Revue réflexive : `undefined` = indisponible (pas de compte, pas ma partie…), `null` = pas
+  // encore faite (étape 1 proposée), sinon revue enregistrée (comparaison à l'étape 2).
+  const [self, setSelf] = useState<SelfReview | null | undefined | 'loading'>('loading');
+  const done = review !== null;
+  useEffect(() => {
+    if (!done) return;
+    const controller = new AbortController();
+    void api.selfReview(id, controller.signal).then((res) => {
+      if (controller.signal.aborted) return;
+      setSelf(res.ok ? res.data.selfReview : undefined);
+    });
+    return () => controller.abort();
+  }, [id, done]);
+
   if (failure) {
     return (
       <div className="page">
@@ -196,7 +212,10 @@ export function Review({ id, guided = false }: { id: string; guided?: boolean })
     );
   }
 
-  return <ReviewBoard reviewId={id} info={info} review={review} guided={guided} />;
+  if (self === 'loading') return <Loading label="Chargement de la revue…" />;
+  return (
+    <ReviewBoard reviewId={id} info={info} review={review} guided={guided} selfReview={self} />
+  );
 }
 
 /** Délai entre deux coups de « Voir la ligne ». */
@@ -223,12 +242,15 @@ function ReviewBoard({
   info,
   review,
   guided,
+  selfReview,
 }: {
   reviewId: string;
   info: ReviewInfo;
   review: GameReview;
   /** Revue ouverte directement en mode guidé (lien de la fin de partie). */
   guided: boolean;
+  /** Revue réflexive : `null` = étape 1 à faire, `undefined` = indisponible. */
+  selfReview: SelfReview | null | undefined;
 }) {
   const san = useSan();
   const ctl = useAnalysisTree(
@@ -255,6 +277,11 @@ function ReviewBoard({
   /** Case citée dans une explication et survolée : surlignée sur le plateau. */
   const [hoverSquare, setHoverSquare] = useState<Square | null>(null);
   const moments = useMemo(() => keyMoments(review, info.userColor), [review, info.userColor]);
+  // Revue réflexive : tant que l'étape 1 n'est pas terminée, rien de l'analyse n'est affiché.
+  const [self, setSelf] = useState(selfReview);
+  const [skipped, setSkipped] = useState(false);
+  const [draft, setDraft] = useState<DraftMoment[]>([]);
+  const stepOne = self === null && !skipped && info.userColor !== null;
   const learnMoves = useMemo(
     () => (info.userColor ? mistakesOf(review, info.userColor) : []),
     [review, info.userColor],
@@ -378,12 +405,17 @@ function ReviewBoard({
   // Ouverture en mode guidé : le plateau se place sur le premier moment clé.
   const firstMomentPly = moments[0]?.ply ?? total;
   useEffect(() => {
-    if (!guided) return;
+    // Pas de saut au premier moment clé pendant l'étape 1 : ce serait révéler l'analyse.
+    if (!guided || stepOne) return;
     const id = [tree.rootId, ...tree.initialLine][firstMomentPly];
     if (id) ctl.select(id);
     // Une seule fois, à l'ouverture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /** Fin de l'étape 1 (revue enregistrée ou étape passée) : la revue se dévoile. */
+  const leaveStepOne = () => {
+    if (mode.kind === 'guided') showMoment(mode.index);
+  };
   const exitMode = useCallback(() => {
     setHoverSquare(null);
     setMode((m) => (m.kind === 'learn' ? m.back : { kind: 'free' }));
@@ -393,6 +425,40 @@ function ReviewBoard({
     setHoverSquare(null);
     setMode((m) => ({ kind: 'learn', moves, back: m.kind === 'learn' ? m.back : m }));
   };
+
+  const markedIds = (plies: readonly number[]) => new Set(plies.flatMap((p) => lineIds[p] ?? []));
+
+  if (stepOne && info.userColor) {
+    return (
+      <AnalysisBoard
+        controller={ctl}
+        blind
+        lockMainline
+        orientation={info.userColor}
+        names={{ w: info.white, b: info.black }}
+        marked={markedIds(draft.map((m) => m.ply))}
+        panelTop={
+          <SelfReviewStep
+            reviewId={reviewId}
+            review={review}
+            userColor={info.userColor}
+            ply={ply}
+            moments={draft}
+            onMoments={setDraft}
+            onSelect={setCursor}
+            onSaved={(saved) => {
+              setSelf(saved);
+              leaveStepOne();
+            }}
+            onSkip={() => {
+              setSkipped(true);
+              leaveStepOne();
+            }}
+          />
+        }
+      />
+    );
+  }
 
   const quizCurrent = mode.kind === 'guided' ? moments[mode.index] : undefined;
   if (
@@ -601,8 +667,17 @@ function ReviewBoard({
       marks={marks}
       lockMainline
       names={{ w: info.white, b: info.black }}
+      {...(self ? { marked: markedIds(self.moments.map((m) => m.ply)) } : {})}
       panelTop={
         <>
+          {self && info.userColor && (
+            <SelfCompare
+              review={review}
+              userColor={info.userColor}
+              selfReview={self}
+              onSelect={setCursor}
+            />
+          )}
           <div className="turn-banner">
             {info.white} – {info.black} · {info.result}
             <Badge>{VARIANT_LABEL[info.variant]}</Badge>

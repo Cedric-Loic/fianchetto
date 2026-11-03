@@ -31,6 +31,7 @@ import {
   type SkillId,
   type SkillLevel,
 } from '@sq/shared';
+import { parseCalc } from '../calc/problem.js';
 import type { GameStore } from '../persistence/db.js';
 import { REVIEW_INTERVALS_DAYS } from '../persistence/puzzles.js';
 
@@ -103,7 +104,7 @@ export class LearningService {
   /** Planification d'une carte après un jugement ; une réussite n'avance que si elle est due. */
   #schedule(
     userId: string,
-    source: 'exercise' | 'mistake' | 'endgame',
+    source: 'exercise' | 'mistake' | 'endgame' | 'calc',
     ref: string,
     skill: SkillId,
     ok: boolean,
@@ -190,6 +191,31 @@ export class LearningService {
     );
   }
 
+  /**
+   * Problème de calcul jugé : preuve de compétence `calculation` (réussite = ligne exacte) et
+   * carte de révision. Une ligne fausse crée la carte (ou la remet à demain) ; une réussite fait
+   * seulement avancer une carte due, sans en créer.
+   */
+  recordCalc(
+    userId: string,
+    puzzleId: string,
+    depth: number,
+    lineOk: boolean,
+    answerOk: boolean,
+    hints: number,
+  ): void {
+    this.#store.recordCalcAttempt({
+      userId,
+      puzzleId,
+      depth,
+      lineOk,
+      answerOk,
+      hints,
+      at: this.#now(),
+    });
+    this.#schedule(userId, 'calc', puzzleId, 'calculation', lineOk, hints > 0, false);
+  }
+
   /** Finales dont une carte de révision est due maintenant. */
   dueEndgames(userId: string): Set<string> {
     const now = this.#now();
@@ -240,6 +266,9 @@ export class LearningService {
     }
     for (const a of this.#store.endgameAttempts(userId)) {
       evidence.push({ skill: skillOfEndgame(a.endgameId), success: a.success, at: a.at });
+    }
+    for (const a of this.#store.calcAttempts(userId)) {
+      evidence.push({ skill: 'calculation', success: a.lineOk, at: a.at });
     }
     for (const p of this.#store.coachPrompts(userId)) {
       const skill: SkillId = p.kind === 'threat' ? 'threats' : 'piece-safety';
@@ -383,6 +412,17 @@ export class LearningService {
       const endgame = endgameById(ref);
       return endgame
         ? { fen: endgame.fen, prompt: `${endgame.title} : ${endgame.objective}` }
+        : null;
+    }
+    if (source === 'calc') {
+      // Position à calculer (après le coup d'amorce) : la carte rouvre l'entraîneur de calcul.
+      const puzzle = this.#store.puzzles.getLichess(ref);
+      const parsed = puzzle ? parseCalc(puzzle) : null;
+      return parsed
+        ? {
+            fen: parsed.fen,
+            prompt: `Calcul : trouve la ligne de ${2 * parsed.depth - 1} demi-coup(s).`,
+          }
         : null;
     }
     return null;

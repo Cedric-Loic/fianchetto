@@ -24,6 +24,8 @@ export interface MoveTreeProps {
   locked?: ReadonlySet<string>;
   /** Temps restant à la pendule après certains coups (revue d'une partie importée), en ms. */
   clocks?: ReadonlyMap<string, number>;
+  /** Coups repérés par le joueur (« J'ai hésité ici ») : drapeau après le coup. */
+  marked?: ReadonlySet<string>;
 }
 
 /**
@@ -54,6 +56,12 @@ export function MoveTree(props: MoveTreeProps) {
         {san(node.san ?? '')}
         {cls && SHOWN.includes(cls) && (
           <span className={`class-symbol ${classCss(cls)}`}> {CLASS_SYMBOL[cls]}</span>
+        )}
+        {props.marked?.has(id) && (
+          <span className="moment-flag" title="Moment signalé" data-testid="moment-flag">
+            {' '}
+            ⚑
+          </span>
         )}
         {clock !== undefined && (
           <span className="move-clock" title="Temps restant à la pendule">

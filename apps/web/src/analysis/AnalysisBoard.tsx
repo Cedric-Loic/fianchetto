@@ -50,6 +50,13 @@ export interface AnalysisBoardProps {
    * clavier ; la page pilote la position.
    */
   guided?: boolean;
+  /**
+   * Étape 1 de la revue réflexive : aucun résultat du moteur (ni barre, ni flèche, ni panneau,
+   * ni classe des coups) ; plateau parcourable en lecture seule, liste des coups conservée.
+   */
+  blind?: boolean;
+  /** Nœuds repérés dans la liste des coups (moments signalés par le joueur). */
+  marked?: ReadonlySet<string>;
 }
 
 const uciArrow = (uci: string, kind: BoardArrow['kind']): BoardArrow => ({
@@ -87,10 +94,12 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
   const [hover, setHover] = useState<{ fen: string; uci: string } | null>(null);
   const [threatOn, setThreatOn] = useState(false);
   const guided = props.guided === true;
+  const blind = props.blind === true;
+  const readOnly = guided || blind;
   const checkSquare = tree.checkSquare(current);
   // Menace : seulement si le camp au trait n'est pas en échec (trait inversé impossible sinon).
   const threatActive = threatOn && checkSquare === null;
-  const engineOn = settings.engine && !guided;
+  const engineOn = settings.engine && !readOnly;
   const engine = useEngine(node.fen, engineOn, 3, threatActive);
 
   // Rang de chaque nœud de la ligne fournie (0 = position de départ).
@@ -140,7 +149,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
         Home: () => go(tree.rootId),
         End: () => go(tree.end(current)),
         f: () => setFlipped((f) => !f),
-        x: () => setThreatOn((t) => !t),
+        ...(blind ? {} : { x: () => setThreatOn((t) => !t) }),
       };
       const action = actions[e.key];
       if (!action) return;
@@ -198,14 +207,16 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
       className="review analysis-board"
       testId="analysis-board"
       slimBars
-      evalBar={<EvalBar value={evalValue(evalShown)} label={evalLabel(evalShown)} />}
+      {...(blind
+        ? {}
+        : { evalBar: <EvalBar value={evalValue(evalShown)} label={evalLabel(evalShown)} /> })}
       top={name(orientation === 'w' ? 'b' : 'w')}
       bottom={name(orientation)}
       board={
         <Board
           pieces={pieces}
           orientation={orientation}
-          movable={guided ? null : turn}
+          movable={readOnly ? null : turn}
           onMove={onMove}
           lastMove={
             node.uci
@@ -213,7 +224,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
               : null
           }
           checkSquare={checkSquare}
-          legalMoves={settings.showLegalMoves && !guided ? tree.legalMoves(current) : null}
+          legalMoves={settings.showLegalMoves && !readOnly ? tree.legalMoves(current) : null}
           arrows={arrows}
           {...(props.marks ? { squareMarks: props.marks } : {})}
         />
@@ -223,15 +234,21 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
           {props.panelTop}
           {!guided && (
             <>
-              <EnginePanel
-                fen={node.fen}
-                engine={engine}
-                enabled={settings.engine}
-                onToggle={(on) => settings.update({ engine: on })}
-                onPlay={(ucis) => ctl.playLine(ucis)}
-                onHover={(uci) => setHover(uci ? { fen: node.fen, uci } : null)}
-                threat={{ enabled: threatOn, inCheck: checkSquare !== null, onToggle: setThreatOn }}
-              />
+              {!blind && (
+                <EnginePanel
+                  fen={node.fen}
+                  engine={engine}
+                  enabled={settings.engine}
+                  onToggle={(on) => settings.update({ engine: on })}
+                  onPlay={(ucis) => ctl.playLine(ucis)}
+                  onHover={(uci) => setHover(uci ? { fen: node.fen, uci } : null)}
+                  threat={{
+                    enabled: threatOn,
+                    inCheck: checkSquare !== null,
+                    onToggle: setThreatOn,
+                  }}
+                />
+              )}
               <MoveTree
                 tree={tree}
                 version={ctl.version}
@@ -242,6 +259,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
                 annotations={annotations}
                 locked={locked}
                 clocks={clocks}
+                {...(props.marked ? { marked: props.marked } : {})}
               />
               <div className="nav">
                 <button title="Début" aria-label="Début" onClick={() => go(tree.rootId)}>

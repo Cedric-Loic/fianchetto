@@ -17,6 +17,7 @@ const SOURCE_LABEL: Record<ReviewCard['source'], string> = {
   exercise: 'Exercice de leçon',
   endgame: 'Finale à rejouer',
   opening: "Exercice d'ouverture",
+  calc: 'Calcul à refaire',
 };
 
 /** Repli (serveur ancien, `ref` absent) : retrouve l'exercice par sa position et sa consigne. */
@@ -53,6 +54,10 @@ export function Reviews() {
     if (card.source === 'endgame') {
       // `ref` = id de finale : le cours de finales permet de la rejouer.
       location.hash = '#/endgames';
+      return;
+    }
+    if (card.source === 'calc') {
+      location.hash = '#/calc';
       return;
     }
     setBusy(true);

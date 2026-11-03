@@ -96,7 +96,7 @@ export type SkillLevel = z.infer<typeof SkillLevelSchema>;
 
 // --- Cartes de révision ------------------------------------------------------------------------
 
-export const CARD_SOURCES = ['mistake', 'exercise', 'endgame', 'opening'] as const;
+export const CARD_SOURCES = ['mistake', 'exercise', 'endgame', 'opening', 'calc'] as const;
 export const CardSourceSchema = z.enum(CARD_SOURCES);
 export type CardSource = z.infer<typeof CardSourceSchema>;
 

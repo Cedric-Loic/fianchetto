@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { THINKING_FLAW_ADVICE } from '@sq/shared';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
 import { Button } from '../ui/Button';
@@ -8,6 +9,7 @@ import { Loading } from '../ui/Spinner';
 import { useCoachPlan } from '../lib/coachPlan';
 import { SessionCard } from './CoachPlan';
 import { ResumeCard } from './Home';
+import { useThinking } from '../lib/thinking';
 
 /**
  * Accueil connecté : ce qu'il y a à faire aujourd'hui. Séance du jour, partie en cours à
@@ -16,6 +18,7 @@ import { ResumeCard } from './Home';
 export function Today() {
   const user = useSession((s) => s.user);
   const plan = useCoachPlan(user !== null, { session: true, curriculum: true, due: true });
+  const thinking = useThinking(user !== null);
   const [active, setActive] = useState<string | null>(null);
   useEffect(() => {
     if (user) void api.activeGame().then((a) => setActive(a?.gameId ?? null));
@@ -60,7 +63,17 @@ export function Today() {
         />
       )}
 
-      <SessionCard session={plan.session} onChange={plan.setSession} />
+      <SessionCard
+        session={plan.session}
+        onChange={plan.setSession}
+        footer={
+          thinking?.top ? (
+            <p className="muted" data-testid="today-thinking-tip">
+              Conseil de réflexion : {THINKING_FLAW_ADVICE[thinking.top]}
+            </p>
+          ) : null
+        }
+      />
 
       <div className="coach-grid">
         <section className="panel page-panel" data-testid="today-reviews">

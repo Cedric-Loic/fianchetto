@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
+import { Calc } from './screens/Calc';
 import { Endgames } from './screens/Endgames';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
@@ -36,6 +37,7 @@ type Route =
   | { page: 'coach' }
   | { page: 'learn'; module: string | null }
   | { page: 'train' }
+  | { page: 'calc' }
   | { page: 'progress' }
   | { page: 'lessons' }
   | { page: 'endgames' }
@@ -71,6 +73,7 @@ function parseHash(h: string): Route {
   if (h === '#/coach') return { page: 'coach' };
   if (h === '#/today') return { page: 'today' };
   if (h === '#/train') return { page: 'train' };
+  if (h === '#/calc') return { page: 'calc' };
   if (h === '#/progress') return { page: 'progress' };
   // Parcours, éventuellement sur un module : #/learn?module=<id>.
   m = /^#\/learn(?:\?module=([\w-]+))?$/.exec(h);
@@ -110,6 +113,7 @@ function sectionOf(route: Route): NavSection {
     case 'openings':
       return 'learn';
     case 'train':
+    case 'calc':
     case 'puzzles':
     case 'reviews':
       return 'train';
@@ -178,6 +182,7 @@ export function App() {
   else if (route.page === 'progress') content = <Progress />;
   else if (route.page === 'learn') content = <Learn module={route.module} />;
   else if (route.page === 'train') content = <Train />;
+  else if (route.page === 'calc') content = <Calc />;
   else if (route.page === 'reviews') content = <Reviews />;
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'endgames') content = <Endgames />;

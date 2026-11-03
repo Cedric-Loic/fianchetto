@@ -73,6 +73,33 @@ const SCREENS: Screen[] = [
     },
   },
   {
+    // Calcul : position simulée (le test ne dépend pas de la base de puzzles).
+    name: 'calcul',
+    bars: 0,
+    evalWidth: 0,
+    open: async (page) => {
+      await page.route('**/api/calc/next*', (route) =>
+        route.fulfill({
+          json: {
+            problem: {
+              id: 'bs1',
+              fen: '6k1/p4ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1',
+              color: 'w',
+              depth: 1,
+              plies: 1,
+              technique: 'forced',
+              prompt: 'Les Blancs jouent.',
+              question: { text: 'Question ?', options: ['Oui', 'Non'] },
+            },
+          },
+        }),
+      );
+      await page.goto('/#/calc');
+      await page.getByTestId('calc-depth-1').click();
+      await expect(page.getByTestId('calc')).toBeVisible();
+    },
+  },
+  {
     name: 'analyse',
     // Onglets au-dessus (≈ 60 px), pas de barres de noms sur l'échiquier libre.
     bars: 60,

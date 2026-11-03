@@ -3,6 +3,7 @@ import type { ExplanationKind, GameReview, MoveClass, ReviewMove } from '@sq/sha
 import { threatFen } from '../src/analysis/useEngine';
 import {
   TIPS,
+  compareSelfReview,
   formatMoveClock,
   guidedSummary,
   isQuizMoment,
@@ -170,5 +171,23 @@ describe('mode quiz', () => {
       total: 2,
       answered: 2,
     });
+  });
+});
+
+describe('revue réflexive : comparaison avec le moteur', () => {
+  const review = reviewOf([
+    mv(1, 'best', 50, 50),
+    mv(2, 'blunder', 50, 10, 'generic'),
+    mv(3, 'inaccuracy', 50, 45),
+    mv(4, 'mistake', 45, 20),
+    mv(5, 'good', 45, 44),
+    mv(7, 'blunder', 45, 10),
+  ]);
+
+  it('compte les coups du joueur classés ?!, ? ou ??, et ceux signalés en commun', () => {
+    // Blancs : plies impairs 3 (?!) et 7 (??) ; le coup 5 est bon.
+    expect(compareSelfReview(review, 'w', [3, 5])).toEqual({ flagged: 2, engine: 2, common: [3] });
+    expect(compareSelfReview(review, 'w', [])).toEqual({ flagged: 0, engine: 2, common: [] });
+    expect(compareSelfReview(review, 'b', [2, 4, 6]).common).toEqual([2, 4]);
   });
 });

@@ -8,6 +8,7 @@ import {
   type GameReview,
   type GameSummary,
   type Rating,
+  type SelfReviewMoment,
   type Square,
   type UserPublic,
   type Variant,
@@ -276,6 +277,28 @@ export class GameStore {
         reviewed_at INTEGER,
         UNIQUE (user_id, source, ref)
       );
+      -- Étape 15 : revue réflexive (moments d'hésitation du joueur et défaut de réflexion nommé),
+      -- une ligne par moment ; un nouvel envoi remplace tous les moments de la partie.
+      CREATE TABLE IF NOT EXISTS self_reviews (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        game_id    TEXT NOT NULL,
+        ply        INTEGER NOT NULL,
+        flaw       TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, game_id, ply, flaw)
+      );
+      -- Étape 15 : entraîneur de calcul (une réponse par problème servi, preuve de compétence).
+      CREATE TABLE IF NOT EXISTS calc_attempts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        puzzle_id  TEXT NOT NULL,
+        depth      INTEGER NOT NULL,
+        line_ok    INTEGER NOT NULL,
+        answer_ok  INTEGER NOT NULL,
+        hints      INTEGER NOT NULL DEFAULT 0,
+        at         INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS calc_attempts_user ON calc_attempts (user_id, at);
       CREATE TABLE IF NOT EXISTS daily_sessions (
         user_id    TEXT NOT NULL REFERENCES users(id),
         day        TEXT NOT NULL,
@@ -631,6 +654,88 @@ export class GameStore {
          ON CONFLICT(user_id, day) DO UPDATE SET steps_done = excluded.steps_done`,
       )
       .run(userId, day, JSON.stringify([...done]));
+  }
+
+  // --- Revue réflexive (étape 15) ------------------------------------------------------------
+
+  /** Remplace les moments de la revue réflexive d'une partie (un nouvel envoi efface l'ancien). */
+  saveSelfReview(userId: string, gameId: string, moments: SelfReviewMoment[], at: number): void {
+    const insert = this.#db.prepare(
+      `INSERT OR IGNORE INTO self_reviews (user_id, game_id, ply, flaw, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    );
+    this.#db.transaction(() => {
+      this.#db
+        .prepare(`DELETE FROM self_reviews WHERE user_id = ? AND game_id = ?`)
+        .run(userId, gameId);
+      for (const m of moments) insert.run(userId, gameId, m.ply, m.flaw, at);
+    })();
+  }
+
+  /** Revue réflexive d'une partie, `undefined` si le joueur ne l'a pas faite. */
+  getSelfReview(
+    userId: string,
+    gameId: string,
+  ): { moments: SelfReviewMoment[]; createdAt: number } | undefined {
+    const rows = this.#db
+      .prepare(
+        `SELECT ply, flaw, created_at AS createdAt FROM self_reviews
+         WHERE user_id = ? AND game_id = ? ORDER BY ply, rowid`,
+      )
+      .all(userId, gameId) as (SelfReviewMoment & { createdAt: number })[];
+    const first = rows[0];
+    if (!first) return undefined;
+    return { moments: rows.map((r) => ({ ply: r.ply, flaw: r.flaw })), createdAt: first.createdAt };
+  }
+
+  /** Défauts de réflexion cumulés : nombre de parties revues et décompte par défaut. */
+  thinkingCounts(userId: string): { reviews: number; counts: Record<string, number> } {
+    const rows = this.#db
+      .prepare(`SELECT flaw, COUNT(*) AS n FROM self_reviews WHERE user_id = ? GROUP BY flaw`)
+      .all(userId) as { flaw: string; n: number }[];
+    const reviews = (
+      this.#db
+        .prepare(`SELECT COUNT(DISTINCT game_id) AS n FROM self_reviews WHERE user_id = ?`)
+        .get(userId) as { n: number }
+    ).n;
+    return { reviews, counts: Object.fromEntries(rows.map((r) => [r.flaw, r.n])) };
+  }
+
+  // --- Entraîneur de calcul (étape 15) ---------------------------------------------------------
+
+  recordCalcAttempt(a: {
+    userId: string;
+    puzzleId: string;
+    depth: number;
+    lineOk: boolean;
+    answerOk: boolean;
+    hints: number;
+    at: number;
+  }): void {
+    this.#db
+      .prepare(
+        `INSERT INTO calc_attempts (user_id, puzzle_id, depth, line_ok, answer_ok, hints, at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(a.userId, a.puzzleId, a.depth, a.lineOk ? 1 : 0, a.answerOk ? 1 : 0, a.hints, a.at);
+  }
+
+  calcAttempts(
+    userId: string,
+  ): { puzzleId: string; depth: number; lineOk: boolean; answerOk: boolean; at: number }[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT puzzle_id AS puzzleId, depth, line_ok AS lineOk, answer_ok AS answerOk, at
+         FROM calc_attempts WHERE user_id = ? ORDER BY at`,
+      )
+      .all(userId) as {
+      puzzleId: string;
+      depth: number;
+      lineOk: number;
+      answerOk: number;
+      at: number;
+    }[];
+    return rows.map((r) => ({ ...r, lineOk: r.lineOk === 1, answerOk: r.answerOk === 1 }));
   }
 
   // --- Finales (lot 4b) ----------------------------------------------------------------------

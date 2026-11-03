@@ -71,6 +71,7 @@ test('anciennes adresses : redirigées ou toujours valides, rubrique parente sur
     ['/#/endgames', 'endgame-lucena', 'Apprendre'],
     ['/#/openings', 'openings-due', 'Apprendre'],
     ['/#/puzzles', 'puzzle-rating', "S'entraîner"],
+    ['/#/calc', 'calc-depth', "S'entraîner"],
     ['/#/reviews', 'reviews', "S'entraîner"],
     ['/#/analyse', 'chesscom-username', 'Mes parties'],
     ['/#/analyse/board', 'analysis-board', 'Mes parties'],

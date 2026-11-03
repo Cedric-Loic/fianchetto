@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from '../ui/Button';
-import { IconBook, IconFlag, IconPuzzle, IconRetry } from '../ui/icons';
+import { IconBook, IconFlag, IconPuzzle, IconRetry, IconTarget } from '../ui/icons';
 
 const CARDS: {
   id: string;
@@ -17,6 +17,14 @@ const CARDS: {
     href: '#/puzzles',
     action: 'Résoudre',
     icon: <IconPuzzle />,
+  },
+  {
+    id: 'calc',
+    title: 'Calcul',
+    text: 'Calcule 1 à 3 coups sans bouger les pièces, puis réponds à une question.',
+    href: '#/calc',
+    action: 'Calculer',
+    icon: <IconTarget />,
   },
   {
     id: 'reviews',

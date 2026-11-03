@@ -30,8 +30,8 @@ export interface Endgame {
 
 /*
  * Chapitres du cours de finales. Palier 1 (1000-1200) : mats élémentaires, pions et dame contre
- * pion. Palier 2 : les positions théoriques de tours, le roi actif et le bon fou (leur cours de
- * palier 2 viendra ensuite). `maxMoves` = coups du joueur : le mat le plus rapide du moteur
+ * pion. Palier 2 : opposition à distance, pion passé éloigné, percée, roi actif, positions théoriques
+ * de tours (Lucena, Philidor, tour derrière le pion passé) et bon fou. `maxMoves` = coups du joueur : le mat le plus rapide du moteur
  * (mesuré avec Stockfish) plus une marge pour une exécution humaine. Pas de limite pour les
  * nulles « à tenir » : leur durée dépend du bot.
  */
@@ -210,7 +210,58 @@ export const ENDGAMES: readonly Endgame[] = [
       'Premier coup : Dh1+, puis De4+.',
     ],
   },
-  // --- Palier 2 (cours à venir) -----------------------------------------------------------------
+  // --- Palier 2 -----------------------------------------------------------------------------
+  {
+    id: 'opposition-distance',
+    title: 'Opposition à distance',
+    objective:
+      'Fais passer ton pion c3, puis mate. Ton roi est trop loin pour l’opposition directe : prends l’opposition à ' +
+      'distance sur la colonne du roi noir, avec trois cases libres entre les rois, puis entre sur une case clé du pion.',
+    fen: '4k3/8/8/8/8/2P2K2/8/8 w - - 0 1',
+    goal: 'win',
+    lesson: 'fin-opposition-distance',
+    stage: 2,
+    maxMoves: 32,
+    hints: [
+      'Les rois ne sont pas assez proches pour l’opposition directe. Regarde la colonne e et compte les cases libres.',
+      'Il faut trois cases libres entre les rois, avec les Noirs au trait.',
+      'Premier coup : Re4 (seul coup gagnant), puis Rd5.',
+    ],
+  },
+  {
+    id: 'passe-eloigne',
+    title: 'Pion passé éloigné',
+    objective:
+      'Gagne avec ton pion passé éloigné a4 : le roi noir ne peut pas surveiller à la fois ce pion et ses pions de ' +
+      'l’aile roi. Lance ton roi vers l’autre aile, puis fais passer un de tes pions et mate.',
+    fen: '8/6pp/3k4/8/P7/4K3/6PP/8 w - - 0 1',
+    goal: 'win',
+    lesson: 'fin-pion-passe-eloigne',
+    stage: 2,
+    maxMoves: 30,
+    hints: [
+      'Le pion a4 est éloigné des autres pions : il sert d’appât, ne le pousse pas tout de suite.',
+      'Lance ton roi vers l’aile roi, par le centre : le roi noir devra choisir entre le pion a4 et ses pions.',
+      'Premier coup : Rf4 (Re4 ou Rd4 gagnent aussi).',
+    ],
+  },
+  {
+    id: 'percee',
+    title: 'Percée de pions',
+    objective:
+      'Trois pions contre trois : aucun ne peut avancer sans être pris, mais le sacrifice du pion central ouvre la voie. ' +
+      'Crée un pion passé que le roi noir ne rattrape pas, puis promeus et mate.',
+    fen: '6k1/ppp5/8/PPP5/8/8/8/6K1 w - - 0 1',
+    goal: 'win',
+    lesson: 'fin-percee',
+    stage: 2,
+    maxMoves: 30,
+    hints: [
+      'Trois pions contre trois : avance un pion pour être capturé et ouvrir une colonne.',
+      'Le pion du milieu, b5, avance en b6 : les Noirs prennent et un de tes pions devient passé.',
+      'Premier coup : b6 ! Après axb6, c6 ! ; après cxb6, a6 !',
+    ],
+  },
   {
     id: 'roi-actif',
     title: 'Le roi actif',
@@ -219,6 +270,7 @@ export const ENDGAMES: readonly Endgame[] = [
       'attaquer le pion sans laisser le roi noir revenir.',
     fen: '8/5k2/8/2p1K3/2P5/8/8/8 w - - 0 1',
     goal: 'win',
+    lesson: 'fin-roi-actif',
     stage: 2,
     maxMoves: 24,
     hints: [
@@ -235,7 +287,7 @@ export const ENDGAMES: readonly Endgame[] = [
       'protéger ton roi des échecs. Gagne ensuite la partie avec ta nouvelle dame.',
     fen: '1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1',
     goal: 'win',
-    lesson: 'finales-tours-pratiques',
+    lesson: 'fin-lucena',
     stage: 2,
     maxMoves: 35,
     skill: 'rook-endgames',
@@ -253,12 +305,31 @@ export const ENDGAMES: readonly Endgame[] = [
       'derrière. Reste sur la 6e rangée tant que le pion n’a pas dépassé cette limite.',
     fen: '4k3/R7/1r6/4PK2/8/8/8/8 b - - 0 1',
     goal: 'draw',
+    lesson: 'fin-philidor',
     stage: 2,
     skill: 'rook-endgames',
     hints: [
       'Ta tour doit empêcher le roi blanc de monter : elle garde la 6e rangée.',
       'Ton roi reste en e8 et ta tour sur la 6e rangée ; tu attends que le pion avance.',
       'Un coup d’attente de la tour sur la 6e rangée ; quand le pion arrive en e6, passe derrière avec Tb1 et donne des échecs.',
+    ],
+  },
+  {
+    id: 'tour-derriere',
+    title: 'Tour derrière le pion passé',
+    objective:
+      'Gagne avec ta tour derrière le pion passé a5. Pousse le pion en comptant sur la tour pour protéger la case de ' +
+      'promotion, et éloigne ton roi des échecs de la tour noire en marchant vers elle.',
+    fen: '8/3k4/7r/PK6/8/8/8/R7 w - - 0 1',
+    goal: 'win',
+    lesson: 'fin-tour-derriere',
+    stage: 2,
+    maxMoves: 34,
+    skill: 'rook-endgames',
+    hints: [
+      'Ta tour est derrière le pion : c’est sa bonne place. Il faut maintenant faire avancer le pion.',
+      'Le roi noir est loin : pousse le pion, soutenu par la tour, et sors des échecs en allant vers la tour noire.',
+      'Premier coup : a6, puis a7.',
     ],
   },
   {
@@ -269,7 +340,7 @@ export const ENDGAMES: readonly Endgame[] = [
       'ensemble, et le roi noir reste dans le coin.',
     fen: '7k/8/6K1/7P/8/8/8/2B5 w - - 0 1',
     goal: 'win',
-    lesson: 'bon-fou-mauvais-fou',
+    lesson: 'fin-bon-fou',
     stage: 2,
     maxMoves: 8,
     hints: [
