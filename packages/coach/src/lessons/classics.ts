@@ -461,6 +461,156 @@ export const CLASSICS_1: Lesson[] = [
       },
     ],
   },
+  {
+    id: 'classique-legal',
+    phase: 1,
+    title: 'Le mat de Légal (1750)',
+    summary:
+      'Un sacrifice de dame qui réussit parce que le cavalier n’était cloué que contre la dame.',
+    minutes: 12,
+    sections: [
+      {
+        kind: 'text',
+        body: 'Le mat de Légal, ancien de près de trois siècles, se rejoue encore. Il montre qu’un clouage contre la dame n’est pas un clouage absolu : le cavalier peut bouger, à condition qu’on ait vu la suite.',
+      },
+      {
+        kind: 'text',
+        title: 'Ce qu’il faut observer',
+        body: '**À observer** : (1) le clouage du cavalier f3 contre la dame ; (2) pourquoi les Noirs prennent la dame sans regarder les échecs ; (3) le mat final avec trois pièces seulement.',
+      },
+      {
+        kind: 'walkthrough',
+        title: 'La partie, coup par coup',
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        moves: [
+          {
+            uci: 'e2e4',
+            comment: 'Ouverture classique : le pion occupe le centre.',
+          },
+          {
+            uci: 'e7e5',
+            comment: 'Réponse symétrique des Noirs.',
+          },
+          {
+            uci: 'g1f3',
+            comment: 'Le cavalier attaque e5 en se développant.',
+          },
+          {
+            uci: 'd7d6',
+            comment: 'Les Noirs défendent e5 d’un pion : solide, mais cela bloque le fou f8.',
+          },
+          {
+            uci: 'f1c4',
+            comment: 'Le fou vise f7, case faible tant que le roi noir n’a pas roqué.',
+          },
+          {
+            uci: 'c8g4',
+            comment:
+              'Le fou noir cloue le cavalier f3 contre la dame. Tentant, mais il quitte la défense de f7 et sort sans raison tactique.',
+          },
+          {
+            uci: 'b1c3',
+            comment: 'Le cavalier c3 développe une pièce et prépare le piège : il contrôle d5.',
+          },
+          {
+            uci: 'g7g6',
+            comment:
+              'Les Noirs préparent un fianchetto mais n’ont pas posé la question des menaces : que veulent les Blancs ?',
+          },
+          {
+            uci: 'f3e5',
+            comment:
+              'Sacrifice de dame ! Le cavalier f3 n’est cloué que contre la dame, pas contre le roi : il peut partir.',
+          },
+          {
+            uci: 'g4d1',
+            comment:
+              'Les Noirs prennent la dame : gagner une dame est tentant, mais ils n’ont pas regardé les échecs.',
+          },
+          {
+            uci: 'c4f7',
+            comment:
+              'Échec : le fou prend f7, et le roi ne peut pas reprendre car le cavalier e5 protège f7.',
+          },
+          {
+            uci: 'e8e7',
+            comment: 'Le roi est forcé d’aller en e7.',
+          },
+          {
+            uci: 'c3d5',
+            comment:
+              'Mat : le cavalier d5 donne l’échec, et le roi est enfermé par sa propre dame, son fou f8 et son pion d6.',
+          },
+        ],
+      },
+      {
+        kind: 'text',
+        title: 'Bilan',
+        body: '**Ce que je retiens** : avant de prendre une pièce, je regarde les échecs que l’adversaire peut donner ensuite. Un clouage contre la dame n’empêche pas de bouger la pièce clouée : c’est un sacrifice.',
+      },
+    ],
+    exercises: [
+      {
+        fen: 'rnbqkbnr/ppp2ppp/3p4/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3',
+        prompt:
+          'Les Noirs viennent de défendre e5. Quel développement naturel vise f7, le point faible des Noirs ?',
+        mode: 'engine',
+        solution: ['f1c4'],
+        tolerance: 7,
+        traps: ['f3e5'],
+        hints: [
+          'Quelle pièce mineure n’est pas encore sortie ?',
+          'Le fou roi a une belle diagonale.',
+          'Fc4 vise f7.',
+        ],
+        explanation: 'Fc4 développe le fou vers f7. Cxe5? dxe5 donne un cavalier pour un pion.',
+      },
+      {
+        fen: 'rn1qkbnr/ppp2ppp/3p4/4p3/2B1P1b1/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 3 4',
+        prompt:
+          'Que jouerais-tu avec les Noirs ? Pense à ce que menacent les Blancs avant de fianchetter.',
+        mode: 'engine',
+        solution: ['g8f6'],
+        tolerance: 8,
+        traps: ['g7g6'],
+        hints: [
+          'Quelle menace les Blancs ont-ils ? Regarde e5.',
+          'Le cavalier f3 est cloué, mais seulement contre la dame : il peut partir.',
+          'Mieux vaut développer un cavalier : Cf6 ou Cc6.',
+        ],
+        explanation:
+          'g6 ? permet Cxe5! Fxd1 Fxf7+ Re7 Cd5#. Un développement normal comme Cf6 ou Cc6 évite le piège.',
+      },
+      {
+        fen: 'rn1qkbnr/ppp2p1p/3p2p1/4p3/2B1P1b1/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 0 5',
+        prompt:
+          'Les Noirs ont joué g6. Les Blancs ont une pièce clouée. Quel coup sacrifie la dame pour mater ?',
+        mode: 'engine',
+        solution: ['f3e5'],
+        tolerance: 8,
+        traps: ['c4f7'],
+        hints: [
+          'Le cavalier f3 est-il vraiment cloué ?',
+          'Que se passe-t-il si le cavalier prend un pion en e5 ?',
+          'Cxe5 offre la dame : si Fxd1, Fxf7+ puis Cd5#.',
+        ],
+        explanation: 'Cxe5 ! Si Fxd1, Fxf7+ Re7 Cd5#. Fxf7+? Rxf7 perd une pièce sans raison.',
+      },
+      {
+        fen: 'rn1qkbnr/ppp2p1p/3p2p1/4N3/2B1P3/2N5/PPPP1PPP/R1BbK2R w KQkq - 0 6',
+        prompt: 'Les Noirs ont pris la dame. Trouve le mat en 2 (ta suite complète).',
+        mode: 'exact',
+        solution: ['c4f7', 'e8e7', 'c3d5'],
+        hints: [
+          'Quel échec peux-tu donner avec le fou ?',
+          'Le roi n’a qu’une case de fuite.',
+          'Fxf7+ Re7, Cd5#.',
+        ],
+        explanation:
+          'Fxf7+ Re7 Cd5# : le roi est enfermé par sa propre dame, son fou f8 et son pion d6.',
+      },
+    ],
+  },
 ];
 
 export const CLASSICS_2: Lesson[] = [
@@ -727,156 +877,6 @@ export const CLASSICS_2: Lesson[] = [
         ],
         explanation:
           'Fxd7+ Cxd7 Db8+! Cxb8 Td8# : le cavalier est dévié de la colonne d, et le fou g5 protège la tour.',
-      },
-    ],
-  },
-  {
-    id: 'classique-legal',
-    phase: 2,
-    title: 'Le mat de Légal (1750)',
-    summary:
-      'Un sacrifice de dame qui réussit parce que le cavalier n’était cloué que contre la dame.',
-    minutes: 12,
-    sections: [
-      {
-        kind: 'text',
-        body: 'Le mat de Légal, ancien de près de trois siècles, se rejoue encore. Il montre qu’un clouage contre la dame n’est pas un clouage absolu : le cavalier peut bouger, à condition qu’on ait vu la suite.',
-      },
-      {
-        kind: 'text',
-        title: 'Ce qu’il faut observer',
-        body: '**À observer** : (1) le clouage du cavalier f3 contre la dame ; (2) pourquoi les Noirs prennent la dame sans regarder les échecs ; (3) le mat final avec trois pièces seulement.',
-      },
-      {
-        kind: 'walkthrough',
-        title: 'La partie, coup par coup',
-        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-        moves: [
-          {
-            uci: 'e2e4',
-            comment: 'Ouverture classique : le pion occupe le centre.',
-          },
-          {
-            uci: 'e7e5',
-            comment: 'Réponse symétrique des Noirs.',
-          },
-          {
-            uci: 'g1f3',
-            comment: 'Le cavalier attaque e5 en se développant.',
-          },
-          {
-            uci: 'd7d6',
-            comment: 'Les Noirs défendent e5 d’un pion : solide, mais cela bloque le fou f8.',
-          },
-          {
-            uci: 'f1c4',
-            comment: 'Le fou vise f7, case faible tant que le roi noir n’a pas roqué.',
-          },
-          {
-            uci: 'c8g4',
-            comment:
-              'Le fou noir cloue le cavalier f3 contre la dame. Tentant, mais il quitte la défense de f7 et sort sans raison tactique.',
-          },
-          {
-            uci: 'b1c3',
-            comment: 'Le cavalier c3 développe une pièce et prépare le piège : il contrôle d5.',
-          },
-          {
-            uci: 'g7g6',
-            comment:
-              'Les Noirs préparent un fianchetto mais n’ont pas posé la question des menaces : que veulent les Blancs ?',
-          },
-          {
-            uci: 'f3e5',
-            comment:
-              'Sacrifice de dame ! Le cavalier f3 n’est cloué que contre la dame, pas contre le roi : il peut partir.',
-          },
-          {
-            uci: 'g4d1',
-            comment:
-              'Les Noirs prennent la dame : gagner une dame est tentant, mais ils n’ont pas regardé les échecs.',
-          },
-          {
-            uci: 'c4f7',
-            comment:
-              'Échec : le fou prend f7, et le roi ne peut pas reprendre car le cavalier e5 protège f7.',
-          },
-          {
-            uci: 'e8e7',
-            comment: 'Le roi est forcé d’aller en e7.',
-          },
-          {
-            uci: 'c3d5',
-            comment:
-              'Mat : le cavalier d5 donne l’échec, et le roi est enfermé par sa propre dame, son fou f8 et son pion d6.',
-          },
-        ],
-      },
-      {
-        kind: 'text',
-        title: 'Bilan',
-        body: '**Ce que je retiens** : avant de prendre une pièce, je regarde les échecs que l’adversaire peut donner ensuite. Un clouage contre la dame n’empêche pas de bouger la pièce clouée : c’est un sacrifice.',
-      },
-    ],
-    exercises: [
-      {
-        fen: 'rnbqkbnr/ppp2ppp/3p4/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3',
-        prompt:
-          'Les Noirs viennent de défendre e5. Quel développement naturel vise f7, le point faible des Noirs ?',
-        mode: 'engine',
-        solution: ['f1c4'],
-        tolerance: 7,
-        traps: ['f3e5'],
-        hints: [
-          'Quelle pièce mineure n’est pas encore sortie ?',
-          'Le fou roi a une belle diagonale.',
-          'Fc4 vise f7.',
-        ],
-        explanation: 'Fc4 développe le fou vers f7. Cxe5? dxe5 donne un cavalier pour un pion.',
-      },
-      {
-        fen: 'rn1qkbnr/ppp2ppp/3p4/4p3/2B1P1b1/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 3 4',
-        prompt:
-          'Que jouerais-tu avec les Noirs ? Pense à ce que menacent les Blancs avant de fianchetter.',
-        mode: 'engine',
-        solution: ['g8f6'],
-        tolerance: 8,
-        traps: ['g7g6'],
-        hints: [
-          'Quelle menace les Blancs ont-ils ? Regarde e5.',
-          'Le cavalier f3 est cloué, mais seulement contre la dame : il peut partir.',
-          'Mieux vaut développer un cavalier : Cf6 ou Cc6.',
-        ],
-        explanation:
-          'g6 ? permet Cxe5! Fxd1 Fxf7+ Re7 Cd5#. Un développement normal comme Cf6 ou Cc6 évite le piège.',
-      },
-      {
-        fen: 'rn1qkbnr/ppp2p1p/3p2p1/4p3/2B1P1b1/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 0 5',
-        prompt:
-          'Les Noirs ont joué g6. Les Blancs ont une pièce clouée. Quel coup sacrifie la dame pour mater ?',
-        mode: 'engine',
-        solution: ['f3e5'],
-        tolerance: 8,
-        traps: ['c4f7'],
-        hints: [
-          'Le cavalier f3 est-il vraiment cloué ?',
-          'Que se passe-t-il si le cavalier prend un pion en e5 ?',
-          'Cxe5 offre la dame : si Fxd1, Fxf7+ puis Cd5#.',
-        ],
-        explanation: 'Cxe5 ! Si Fxd1, Fxf7+ Re7 Cd5#. Fxf7+? Rxf7 perd une pièce sans raison.',
-      },
-      {
-        fen: 'rn1qkbnr/ppp2p1p/3p2p1/4N3/2B1P3/2N5/PPPP1PPP/R1BbK2R w KQkq - 0 6',
-        prompt: 'Les Noirs ont pris la dame. Trouve le mat en 2 (ta suite complète).',
-        mode: 'exact',
-        solution: ['c4f7', 'e8e7', 'c3d5'],
-        hints: [
-          'Quel échec peux-tu donner avec le fou ?',
-          'Le roi n’a qu’une case de fuite.',
-          'Fxf7+ Re7, Cd5#.',
-        ],
-        explanation:
-          'Fxf7+ Re7 Cd5# : le roi est enfermé par sa propre dame, son fou f8 et son pion d6.',
       },
     ],
   },
