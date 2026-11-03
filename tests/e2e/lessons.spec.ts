@@ -95,8 +95,10 @@ test('partie commentée : suivant, précédent, liste des coups', async ({ page 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await register(page);
   await page.goto('/#/lessons/routine');
+  // Le plateau montre d'abord le premier exemple : on ouvre la partie commentée depuis le panneau.
+  await page.locator('[data-testid^="walkthrough-open-"]').first().click();
   const walk = page.getByTestId('walkthrough');
-  await walk.scrollIntoViewIfNeeded();
+  await expect(walk).toBeVisible();
   await expect(walk).toContainText('Coup 0 /');
   await page.getByTestId('walkthrough-next').click();
   await expect(walk).toContainText('Coup 1 /');

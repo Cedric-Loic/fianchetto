@@ -101,12 +101,22 @@ const SCREENS: Screen[] = [
   },
   {
     name: 'analyse',
-    // Onglets au-dessus (≈ 60 px), pas de barres de noms sur l'échiquier libre.
-    bars: 60,
+    // Onglets dans le panneau, pas de barres de noms sur l'échiquier libre.
+    bars: 0,
     evalWidth: 38,
     open: async (page) => {
       await page.goto('/#/analyse/board');
       await expect(page.getByTestId('analysis-board')).toBeVisible();
+    },
+  },
+  {
+    // Lecture d'une leçon : plateau fixe à gauche, tout le texte dans le panneau (élargi à 560 px).
+    name: 'lecon-lecture',
+    bars: 0,
+    evalWidth: 0,
+    open: async (page) => {
+      await page.goto('/#/lessons/routine');
+      await expect(page.getByTestId('lesson-reader')).toBeVisible();
     },
   },
   {

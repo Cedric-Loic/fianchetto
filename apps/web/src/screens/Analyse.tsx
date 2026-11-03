@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { ImportedGameSummary, ImportResult } from '@sq/shared';
 import { AnalysisBoard } from '../analysis/AnalysisBoard';
 import { checkFen, parsePgn, START_FEN } from '../analysis/tree';
@@ -95,7 +95,7 @@ const boardLink = (fen: string) =>
  * Échiquier d'analyse libre : position de départ (ou FEN du lien), chargement d'une FEN ou d'un
  * PGN, variantes, moteur en direct.
  */
-function BoardTab({ fen }: { fen: string | null }) {
+function BoardTab({ fen, tabs }: { fen: string | null; tabs: ReactNode }) {
   const invalid = fen !== null && checkFen(fen) !== null;
   const ctl = useAnalysisTree(fen && !invalid ? fen.trim() : START_FEN);
   const [text, setText] = useState('');
@@ -124,6 +124,7 @@ function BoardTab({ fen }: { fen: string | null }) {
   return (
     <AnalysisBoard
       controller={ctl}
+      panelHeader={tabs}
       panelBottom={
         <div className="load-position">
           <label htmlFor="load-position">Charger une FEN ou un PGN</label>
@@ -162,19 +163,27 @@ function BoardTab({ fen }: { fen: string | null }) {
  * « Échiquier d'analyse » (plateau libre).
  */
 export function Analyse({ tab = 'import', fen = null }: { tab?: AnalyseTab; fen?: string | null }) {
-  return (
-    <div className={`analyse-shell${tab === 'board' ? ' board-shell' : ''}`}>
-      <Tabs
-        label="Analyse"
-        className="analyse-tabs"
-        value={tab}
-        onChange={(t) => (location.hash = t === 'board' ? '#/analyse/board' : '#/analyse')}
-        items={[
-          { id: 'import', label: 'Mes parties', testId: 'tab-import' },
-          { id: 'board', label: "Échiquier d'analyse", testId: 'tab-board' },
-        ]}
-      />
-      {tab === 'board' ? <BoardTab key={fen ?? ''} fen={fen} /> : <Imports />}
+  // Onglet plateau : les onglets vont dans le panneau, pour que le plateau garde toute la hauteur.
+  const tabs = (
+    <Tabs
+      label="Analyse"
+      className="analyse-tabs"
+      value={tab}
+      onChange={(t) => (location.hash = t === 'board' ? '#/analyse/board' : '#/analyse')}
+      items={[
+        { id: 'import', label: 'Mes parties', testId: 'tab-import' },
+        { id: 'board', label: "Échiquier d'analyse", testId: 'tab-board' },
+      ]}
+    />
+  );
+  return tab === 'board' ? (
+    <div className="analyse-shell">
+      <BoardTab key={fen ?? ''} fen={fen} tabs={tabs} />
+    </div>
+  ) : (
+    <div className="analyse-shell">
+      {tabs}
+      <Imports />
     </div>
   );
 }
