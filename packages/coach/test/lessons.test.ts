@@ -69,11 +69,12 @@ describe('leçons', () => {
     expect(legalPosition(e.fen)).toBe(true);
     expect(e.hints?.length ?? 0).toBeLessThanOrEqual(3);
     if (e.mode === 'squares') {
-      // Cases attendues : non vides, occupées par une pièce, pas de coup à jouer.
+      // Cases attendues : non vides, valides (occupées ou non : « cases clés », « cases libres »),
+      // pas de coup à jouer.
       expect(e.solution).toHaveLength(0);
       expect(e.squares?.length).toBeGreaterThan(0);
-      const chess = new Chess(e.fen);
-      for (const sq of e.squares ?? []) expect(chess.get(sq as never), sq).toBeTruthy();
+      for (const sq of e.squares ?? []) expect(sq, sq).toMatch(/^[a-h][1-8]$/);
+      expect(new Set(e.squares).size).toBe(e.squares?.length);
       return;
     }
     expect(e.solution.length).toBeGreaterThan(0);

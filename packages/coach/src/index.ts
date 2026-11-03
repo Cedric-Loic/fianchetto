@@ -97,3 +97,4 @@ export {
 } from './curriculum.js';
 export { planToday, stepHref, type PlanInput } from './plan.js';
 export { coachAnswerCorrect, coachPrompt, type CoachPromptData } from './coached.js';
+export { kpkResult, type KpkResult } from './kpk.js';

@@ -2,6 +2,7 @@ import { PHASE_1 } from './phase1.js';
 import { PHASE_2 } from './phase2.js';
 import { CLASSICS_2, CLASSICS_3 } from './classics.js';
 import { PHASE_3 } from './phase3.js';
+import { ENDGAMES_COURSE } from './endgames-course.js';
 import type { Lesson } from './types.js';
 
 export { PASS_RATIO, type Exercise, type Lesson, type Section } from './types.js';
@@ -9,6 +10,7 @@ export { PASS_RATIO, type Exercise, type Lesson, type Section } from './types.js
 /** Toutes les leçons, dans l'ordre du programme. */
 export const LESSONS: readonly Lesson[] = [
   ...PHASE_1,
+  ...ENDGAMES_COURSE,
   ...PHASE_2,
   ...PHASE_3,
   ...CLASSICS_2,
