@@ -21,7 +21,7 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étapes 0 à 11 terminées** (plateforme et coach complets ; leçons des phases 2 à 4 à venir) (Secret Queen, puis plateforme et variante classique).
+> **État : étapes 0 à 15 terminées** (plateforme et coach complets ; leçons des phases 2 à 4 à venir) (Secret Queen, puis plateforme et variante classique).
 > Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Suite prévue (coach personnel) :
 > [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md).
 
@@ -101,7 +101,12 @@ docs/
    explore des variantes (← → ↑ ↓, f pour retourner), active le **Moteur** (3 lignes
    cliquables) et la **Menace** (touche x). **▶ Revue guidée** parcourt les moments clés avec
    le coach ; **Apprends de tes erreurs** te fait retrouver le bon coup à chaque erreur.
-8. **Coach** (menu) : ta page d'accueil d'entraînement. En tête, la **séance du jour** (~28 min :
+8. **Navigation** : six rubriques. **Aujourd'hui** (séance du jour, révisions dues), **Jouer**,
+   **Apprendre** (parcours par palier : P1 1000-1200, P2 1200-1400, P3 1400-1600, avec leçons,
+   finales, ouvertures, parties commentées et un examen par palier), **S'entraîner** (puzzles,
+   calcul, révisions, finales, ouvertures), **Mes parties** (revue, import, analyse) et
+   **Progrès** (compétences, profil de pensée, courbes, classement).
+   8 bis. **Coach** : ta page d'accueil d'entraînement. En tête, la **séance du jour** (~28 min :
    révisions dues, étape du parcours, puzzles sur ta compétence la plus faible, bilan), puis
    tes **14 compétences** (niveau, tendance) et le **parcours** en modules (ordre conseillé, rien
    n'est verrouillé). Le reste de la page : où tu en es (phase du plan et
@@ -129,7 +134,14 @@ docs/
 - **Mes erreurs** : les positions où tu t'es trompé dans tes parties analysées.
   💡 Indice : montre la pièce à jouer (une réussite avec indice ne compte pas au classement).
 
-12. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
+12. **Finales** (Apprendre) : chaque chapitre se fait en trois temps : le cours (pas à pas et quiz),
+    puis la partie contre le moteur, avec indices et limite de coups. Un échec revient en
+    révision (1, 3, 7, 21 puis 60 jours). **Calcul** (`#/calc`) : plateau figé, tu saisis ta ligne
+    de 1 à 3 coups sans bouger les pièces, puis tu réponds à une question. **Revue réflexive** :
+    avant le moteur, tu marques tes moments d'hésitation et leur cause ; ton profil de pensée
+    s'affiche dans Progrès. **Parties lentes** (15 | 10 ou 30 min, contre le bot, non classées) :
+    routine de réflexion en un clic (touche r) et bilan du temps passé sur tes erreurs.
+13. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
     fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
     est le seul accès à Internet de l'application, uniquement quand tu cliques. L'onglet
     **Échiquier d'analyse** charge une FEN ou un PGN, avec le moteur en direct.
@@ -143,21 +155,24 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 
 ## Feuille de route
 
-| Étape | Contenu                                                        | État |
-| ----- | -------------------------------------------------------------- | ---- |
-| 0     | Monorepo, contrats, CI locale, journal des décisions           | ✅   |
-| 1     | Moteur (règles, projection, notation) + banc de tests de fuite | ✅   |
-| 2     | Serveur + interface : partie hot-seat complète                 | ✅   |
-| 3     | Bot, comptes, Elo, pendules                                    | ✅   |
-| 4     | Thèmes, sons, flèches, premoves, rejeu et analyse              | ✅   |
-| 5     | Audit de sécurité du secret, recette                           | ✅   |
-| 6     | Plateforme : variante classique, Elo par variante              | ✅   |
-| 7     | Coach : revue de partie, import PGN et chess.com               | ✅   |
-| 8     | Coach : puzzles (Lichess, thèmes, révisions, mes erreurs)      | ✅   |
-| 9     | Coach : entraînement (indices, garde-fou, reprise), bilan      | ✅   |
-| 10    | Coach : leçons (moteur et 10 leçons de la phase 1)             | ✅   |
-| 11    | Coach : tableau de bord                                        | ✅   |
-| 12    | Interface et logo, premove partout, analyse interactive        | ✅   |
+| Étape | Contenu                                                              | État |
+| ----- | -------------------------------------------------------------------- | ---- |
+| 0     | Monorepo, contrats, CI locale, journal des décisions                 | ✅   |
+| 1     | Moteur (règles, projection, notation) + banc de tests de fuite       | ✅   |
+| 2     | Serveur + interface : partie hot-seat complète                       | ✅   |
+| 3     | Bot, comptes, Elo, pendules                                          | ✅   |
+| 4     | Thèmes, sons, flèches, premoves, rejeu et analyse                    | ✅   |
+| 5     | Audit de sécurité du secret, recette                                 | ✅   |
+| 6     | Plateforme : variante classique, Elo par variante                    | ✅   |
+| 7     | Coach : revue de partie, import PGN et chess.com                     | ✅   |
+| 8     | Coach : puzzles (Lichess, thèmes, révisions, mes erreurs)            | ✅   |
+| 9     | Coach : entraînement (indices, garde-fou, reprise), bilan            | ✅   |
+| 10    | Coach : leçons (moteur et 10 leçons de la phase 1)                   | ✅   |
+| 11    | Coach : tableau de bord                                              | ✅   |
+| 12    | Interface et logo, premove partout, analyse interactive              | ✅   |
+| 13    | Régularité (série, thème du jour, garde-fou dégressif)               | ✅   |
+| 14    | Plateau maximal, compétences, parcours, séance, partie coachée       | ✅   |
+| 15    | Finales par palier, calcul, revue réflexive, examens, parties lentes | ✅   |
 
 ## Licences et crédits
 

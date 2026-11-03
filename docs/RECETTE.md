@@ -159,6 +159,21 @@ Légende : ✅ couvert par un test automatisé · 👁 à vérifier à l'œil ·
 | Leçons de phase 3 et parties classiques, solutions vérifiées par Stockfish | ✅   | `pnpm test:stress` (`apps/server/test/lessons.stress.ts`)                                    |
 | Partie coachée : seulement en entraînement classique, jamais Secret Queen  | ✅   | `apps/server/test/coached.test.ts`, `tests/security/coach-routes.test.ts`, `coached.spec.ts` |
 
+## Étape 15 : feuille de route pédagogique (finales, calcul, revue réflexive, examens, parties lentes)
+
+| Exigence                                                                       | État | Preuve                                                                                              |
+| ------------------------------------------------------------------------------ | ---- | --------------------------------------------------------------------------------------------------- |
+| Navigation par intention (6 rubriques), anciennes adresses conservées          | ✅   | `tests/e2e/navigation.spec.ts`                                                                      |
+| Finales en chapitres par palier : cours, indices, limite de coups, cartes      | ✅   | `apps/server/test/endgames-course.test.ts`, `packages/coach/test/endgames.test.ts`                  |
+| Finales de pions vérifiées par une base roi et pion exacte                     | ✅   | `packages/coach/test/kpk.test.ts`                                                                   |
+| Finales et leçons de finales vérifiées par Stockfish                           | ✅   | `pnpm test:stress` (`endgames.stress.ts`, `lessons.stress.ts`)                                      |
+| Revue réflexive en deux temps (étape 1 sans moteur), profil de pensée          | ✅   | `apps/server/test/self-review.test.ts`, `tests/e2e/self-review.spec.ts`                             |
+| Entraîneur de calcul : plateau figé, ligne saisie, question, solution après    | ✅   | `apps/server/test/calc.test.ts`, `tests/e2e/calc.spec.ts`                                           |
+| Examens de palier (20 questions, 80 %), mini-test de finales, critère de phase | ✅   | `apps/server/test/exams.test.ts`, `tests/e2e/exam.spec.ts`, `packages/coach/test/dashboard.test.ts` |
+| Parties classiques commentées (10, coups légaux, mat final vérifié)            | ✅   | `packages/coach/test/lessons.test.ts`, `lessons.stress.ts` (filtre `classique-`)                    |
+| Parties lentes : bot seulement, jamais classées, routine de réflexion          | ✅   | `apps/server/test/slow-games.test.ts`, `tests/e2e/slow-game.spec.ts`                                |
+| Aucune fuite : nouvelles routes sans secret ni partie en cours                 | ✅   | `tests/security/`, `tests/security/bundle.test.ts` (chess.js absent du chargement initial)          |
+
 ## Limites connues (acceptées)
 
 - Base SQLite lisible par l'administrateur local (§4).
