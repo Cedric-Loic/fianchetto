@@ -1,6 +1,6 @@
 import { PHASE_1 } from './phase1.js';
 import { PHASE_2 } from './phase2.js';
-import { CLASSICS_2, CLASSICS_3 } from './classics.js';
+import { CLASSICS_1, CLASSICS_2, CLASSICS_3 } from './classics.js';
 import { PHASE_3 } from './phase3.js';
 import { ENDGAMES_COURSE } from './endgames-course.js';
 import { ENDGAMES_COURSE_2 } from './endgames-course-2.js';
@@ -17,6 +17,7 @@ export const LESSONS: readonly Lesson[] = [
   ...ENDGAMES_COURSE_2,
   ...PHASE_3,
   ...ENDGAMES_COURSE_3,
+  ...CLASSICS_1,
   ...CLASSICS_2,
   ...CLASSICS_3,
 ];

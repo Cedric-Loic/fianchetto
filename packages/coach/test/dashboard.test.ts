@@ -267,3 +267,23 @@ describe('tableau de bord', () => {
     expect(label(buildDashboard(input({ skills: skills(70) })))?.met).toBe(true);
   });
 });
+
+describe('critère d’examen de palier', () => {
+  const label = (d: ReturnType<typeof buildDashboard>, stage: number) =>
+    d.phase.criteria.find((c) => c.label === `Examen du palier ${stage}`);
+
+  it('absent sans information du serveur', () => {
+    expect(label(buildDashboard(input()), 1)).toBeUndefined();
+  });
+
+  it('palier 1 : à passer, puis validé', () => {
+    expect(label(buildDashboard(input({ examsPassed: [] })), 1)).toMatchObject({
+      value: 'à passer',
+      met: false,
+    });
+    expect(label(buildDashboard(input({ examsPassed: [1] })), 1)).toMatchObject({
+      value: 'validé',
+      met: true,
+    });
+  });
+});

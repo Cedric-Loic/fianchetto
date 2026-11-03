@@ -67,6 +67,8 @@ const KEY_SKILLS: Record<number, SkillId[]> = {
 export interface DashboardInput {
   /** Niveaux par compétence (étape 14) ; sans eux, le critère de compétences est absent. */
   skills?: SkillLevel[];
+  /** Paliers dont l'examen est validé (étape 15) ; sans eux, le critère d'examen est absent. */
+  examsPassed?: number[];
   now: Date;
   /** Lignes du répertoire d'ouvertures à réviser aujourd'hui. */
   dueOpenings?: number;
@@ -395,6 +397,18 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
       },
     ];
   };
+  /** Critère « examen du palier » (conseillé) : absent tant que le serveur ne le fournit pas. */
+  const examCriterion = (stage: number) =>
+    input.examsPassed
+      ? [
+          {
+            label: `Examen du palier ${stage}`,
+            value: input.examsPassed.includes(stage) ? 'validé' : 'à passer',
+            target: '16 / 20',
+            met: input.examsPassed.includes(stage),
+          },
+        ]
+      : [];
   const criteriaByPhase = [
     [
       {
@@ -410,6 +424,7 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         met: passed1 >= 8,
       },
       ...skillCriterion(1),
+      ...examCriterion(1),
       {
         label: 'Puzzles réussis',
         value: String(solvedPuzzles),
@@ -443,6 +458,7 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         met: passed2 >= 8,
       },
       ...skillCriterion(2),
+      ...examCriterion(2),
     ],
     [
       {

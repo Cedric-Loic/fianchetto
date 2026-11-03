@@ -57,6 +57,7 @@ function promoteToPhase2(store: GameStore): void {
   for (const l of LESSONS.filter((x) => x.phase === 1)) {
     store.saveLessonResult('u1', l.id, l.exercises.length);
   }
+  store.saveExamResult('u1', 1, 'stage', 20);
   for (let i = 0; i < 150; i++) {
     store.puzzles.recordAttempt({
       userId: 'u1',

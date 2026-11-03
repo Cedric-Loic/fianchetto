@@ -34,9 +34,9 @@ const exercises: [string, Exercise][] = LESSONS.flatMap((l) =>
 describe('leçons', () => {
   it('identifiants uniques, phases 1 à 3 complètes (leçons de base, chapitres de finales des trois paliers, parties classiques), au moins 2 exercices', () => {
     expect(new Set(LESSONS.map((l) => l.id)).size).toBe(LESSONS.length);
-    expect(LESSONS.filter((l) => l.phase === 1)).toHaveLength(17);
-    expect(LESSONS.filter((l) => l.phase === 2)).toHaveLength(22);
-    expect(LESSONS.filter((l) => l.phase === 3)).toHaveLength(20);
+    expect(LESSONS.filter((l) => l.phase === 1)).toHaveLength(20);
+    expect(LESSONS.filter((l) => l.phase === 2)).toHaveLength(23);
+    expect(LESSONS.filter((l) => l.phase === 3)).toHaveLength(21);
     for (const l of LESSONS) expect(l.exercises.length, l.id).toBeGreaterThanOrEqual(2);
     for (const l of LESSONS.filter((x) => x.phase === 3))
       expect(l.exercises.length, l.id).toBeGreaterThanOrEqual(5);
@@ -63,6 +63,55 @@ describe('leçons', () => {
           ).toBe(true);
           for (const m of s.moves) expect(m.comment.length, l.id).toBeGreaterThan(5);
         }
+  });
+
+  it('parties classiques : 3 à 6 questions à 3 indices, bilan « ce que je retiens »', () => {
+    const classics = LESSONS.filter((l) => l.id.startsWith('classique-'));
+    expect(classics.length).toBeGreaterThanOrEqual(10);
+    for (const l of classics) {
+      expect(l.exercises.length, l.id).toBeGreaterThanOrEqual(3);
+      expect(l.exercises.length, l.id).toBeLessThanOrEqual(6);
+      for (const e of l.exercises) expect(e.hints?.length, l.id).toBe(3);
+      const bilan = l.sections.find((s) => s.kind === 'text' && s.title === 'Bilan');
+      expect(bilan?.kind === 'text' ? bilan.body : '', l.id).toContain('Ce que je retiens');
+      // Les parties ajoutées au lot 4 ont un bilan en trois points numérotés.
+      const lot4 = [
+        'classique-lazard',
+        'classique-shilling',
+        'classique-berger',
+        'classique-lasker-thomas',
+        'classique-rotlewi-rubinstein',
+      ];
+      if (lot4.includes(l.id))
+        for (const n of ['(1)', '(2)', '(3)'])
+          expect(bilan?.kind === 'text' ? bilan.body : '', l.id).toContain(n);
+      expect(
+        l.sections.some((s) => s.kind === 'walkthrough'),
+        l.id,
+      ).toBe(true);
+    }
+  });
+
+  it('parties classiques : celles qui finissent par un mat finissent bien par un mat', () => {
+    const matees = [
+      'classique-opera',
+      'classique-legal',
+      'classique-reti',
+      'classique-lazard',
+      'classique-shilling',
+      'classique-berger',
+      'classique-lasker-thomas',
+    ];
+    for (const id of matees) {
+      const lesson = LESSONS.find((l) => l.id === id);
+      const walk = lesson?.sections.find((s) => s.kind === 'walkthrough');
+      expect(walk, id).toBeTruthy();
+      if (walk?.kind !== 'walkthrough') continue;
+      const chess = new Chess(walk.fen);
+      for (const m of walk.moves)
+        chess.move({ from: m.uci.slice(0, 2), to: m.uci.slice(2, 4), promotion: m.uci[4] });
+      expect(chess.isCheckmate(), id).toBe(true);
+    }
   });
 
   it.each(exercises)('%s : position légale, solution jouable', (_tag, e) => {

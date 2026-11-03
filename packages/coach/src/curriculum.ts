@@ -71,6 +71,13 @@ export const CURRICULUM: CurriculumModule[] = [
     steps: [lesson('principes-ouverture')],
   },
   {
+    id: 'm-classics-1',
+    phase: 1,
+    title: 'Parties classiques : pièges et mats courts',
+    skill: 'opening-principles',
+    steps: [lesson('classique-berger'), lesson('classique-shilling'), lesson('classique-lazard')],
+  },
+  {
     id: 'm-calc',
     phase: 2,
     title: 'Calculer sans se tromper',
@@ -187,7 +194,12 @@ export const CURRICULUM: CurriculumModule[] = [
     phase: 2,
     title: 'Parties classiques : tactique et développement',
     skill: 'calculation',
-    steps: [lesson('classique-opera'), lesson('classique-legal'), lesson('classique-reti')],
+    steps: [
+      lesson('classique-opera'),
+      lesson('classique-legal'),
+      lesson('classique-reti'),
+      lesson('classique-lasker-thomas'),
+    ],
   },
   {
     id: 'm-plans',
@@ -210,6 +222,7 @@ export const CURRICULUM: CurriculumModule[] = [
       lesson('classique-lasker-bauer'),
       lesson('classique-immortelle'),
       lesson('classique-evergreen'),
+      lesson('classique-rotlewi-rubinstein'),
     ],
   },
   {

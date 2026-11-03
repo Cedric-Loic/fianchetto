@@ -13,6 +13,8 @@ import {
   type DashboardGame,
 } from '@sq/coach';
 import {
+  EXAM_PASS_RATIO,
+  EXAM_SIZE,
   SessionProgressRequestSchema,
   type CoachDashboard,
   type GameConfig,
@@ -154,6 +156,10 @@ export function dashboardFor(
   return buildDashboard({
     now,
     ...(skills ? { skills } : {}),
+    examsPassed: [1, 2, 3].filter(
+      (stage) =>
+        (store.examBest(userId, stage, 'stage') ?? 0) >= Math.ceil(EXAM_PASS_RATIO * EXAM_SIZE),
+    ),
     dueOpenings: new OpeningService(store).dueCount(userId),
     games,
     puzzleAttempts: store.puzzles.attempts(userId).map((a) => ({
