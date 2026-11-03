@@ -1,6 +1,7 @@
 import { Chess } from 'chess.js';
 import { LESSONS, PASS_RATIO, lessonById, winChance, type Lesson } from '@sq/coach';
 import type {
+  LessonExercise,
   LessonMoveResponse,
   LessonSquaresResponse,
   LessonSummary,
@@ -94,21 +95,30 @@ export class LessonService {
                 marks: (s.marks ?? []).map(square),
               },
       ),
-      exercises: lesson.exercises.map((e) => {
-        const chess = new Chess(e.fen);
-        const squares = e.mode === 'squares';
-        return {
-          fen: e.fen,
-          prompt: e.prompt,
-          color: chess.turn(),
-          legalMoves: squares ? [] : legalMoves(chess),
-          kind: squares ? ('squares' as const) : ('move' as const),
-          hints: Math.min(3, e.hints?.length ?? 0),
-        };
-      }),
+      exercises: lesson.exercises.map((e) => this.#exerciseView(e)),
       passRatio: PASS_RATIO,
       ...this.#progress(userId, lesson),
     };
+  }
+
+  /** Exercice tel que le client le voit : jamais de solution ni d'explication. */
+  #exerciseView(e: Lesson['exercises'][number]): LessonExercise {
+    const chess = new Chess(e.fen);
+    const squares = e.mode === 'squares';
+    return {
+      fen: e.fen,
+      prompt: e.prompt,
+      color: chess.turn(),
+      legalMoves: squares ? [] : legalMoves(chess),
+      kind: squares ? 'squares' : 'move',
+      hints: Math.min(3, e.hints?.length ?? 0),
+    };
+  }
+
+  /** Vue d'un exercice isolé (examens) ; `null` si leçon ou indice inconnu. */
+  exerciseView(id: string, index: number): LessonExercise | null {
+    const exercise = this.#lesson(id)?.exercises[index];
+    return exercise ? this.#exerciseView(exercise) : null;
   }
 
   #walkthrough(s: Extract<Lesson['sections'][number], { kind: 'walkthrough' }>) {

@@ -25,6 +25,8 @@ import { LearningService } from './coach/learning.js';
 import { CoachService, registerCoachRoutes } from './coach/routes.js';
 import { registerEndgameRoutes } from './endgames/routes.js';
 import { EndgameService } from './endgames/service.js';
+import { registerExamRoutes } from './exams/routes.js';
+import { ExamService } from './exams/service.js';
 import { registerLessonRoutes } from './lessons/routes.js';
 import { LessonService } from './lessons/service.js';
 import { registerOpeningRoutes } from './openings/routes.js';
@@ -120,6 +122,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     (fen) => reviews.evaluate(fen, 400),
     (userId, id, index, solved, hints) => learning.recordExercise(userId, id, index, solved, hints),
   );
+  const exams = new ExamService(store, lessons);
   const openings = new OpeningService(store);
   const calc = new CalcService(store, learning);
   const puzzles = new PuzzleService(store, (fen) => reviews.evaluate(fen), {
@@ -197,6 +200,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   registerPuzzleRoutes(app, store, puzzles);
   registerLessonRoutes(app, store, lessons);
+  registerExamRoutes(app, store, exams);
   registerEndgameRoutes(app, store, endgames);
   registerOpeningRoutes(app, store, openings);
   registerCalcRoutes(app, store, calc);

@@ -299,6 +299,15 @@ export class GameStore {
         at         INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS calc_attempts_user ON calc_attempts (user_id, at);
+      -- Étape 15 (lot 5) : examens de palier, meilleur score par palier et par type (stage, mini).
+      CREATE TABLE IF NOT EXISTS exam_results (
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        stage      INTEGER NOT NULL,
+        kind       TEXT NOT NULL,
+        best       INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, stage, kind)
+      );
       CREATE TABLE IF NOT EXISTS daily_sessions (
         user_id    TEXT NOT NULL REFERENCES users(id),
         day        TEXT NOT NULL,
@@ -513,6 +522,27 @@ export class GameStore {
       )
       .run(userId, lessonId, correct, Date.now());
     this.recordActivity(userId, 'lesson', lessonId);
+  }
+
+  // --- Examens de palier (étape 15) ----------------------------------------------------------
+
+  /** Meilleur score d'un examen (`stage` ou `mini`), `null` s'il n'a jamais été passé. */
+  examBest(userId: string, stage: number, kind: string): number | null {
+    const row = this.#db
+      .prepare(`SELECT best FROM exam_results WHERE user_id = ? AND stage = ? AND kind = ?`)
+      .get(userId, stage, kind) as { best: number } | undefined;
+    return row?.best ?? null;
+  }
+
+  /** Enregistre un score en gardant le meilleur. */
+  saveExamResult(userId: string, stage: number, kind: string, correct: number): void {
+    this.#db
+      .prepare(
+        `INSERT INTO exam_results (user_id, stage, kind, best, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, stage, kind) DO UPDATE SET best = MAX(best, excluded.best),
+           updated_at = excluded.updated_at`,
+      )
+      .run(userId, stage, kind, correct, Date.now());
   }
 
   // --- Coach pédagogique (étape 14) ----------------------------------------------------------
