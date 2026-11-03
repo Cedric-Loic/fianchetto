@@ -76,7 +76,7 @@ test('cours de finales : paliers, lien vers le cours, coups restants et indices'
   const course = page.getByTestId('endgame-course-lucena').getByRole('link', {
     name: 'Commence par le cours',
   });
-  await expect(course).toHaveAttribute('href', '#/lessons/finales-tours-pratiques');
+  await expect(course).toHaveAttribute('href', '#/lessons/fin-lucena');
   await page.getByTestId('endgame-play-lucena').click();
 
   // Barre « coups restants » : se décrémente au coup joué, se réajuste à la reprise.
@@ -108,6 +108,6 @@ test('cours de finales : paliers, lien vers le cours, coups restants et indices'
   await expect(modal.getByTestId('endgame-verdict')).toContainText('Objectif non atteint');
   await expect(modal.getByTestId('endgame-course-link')).toHaveAttribute(
     'href',
-    '#/lessons/finales-tours-pratiques',
+    '#/lessons/fin-lucena',
   );
 });

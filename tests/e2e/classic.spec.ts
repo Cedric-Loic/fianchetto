@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 /** Clique au centre d'une case (plateau orienté Blancs en bas). */
 async function clickSquare(page: Page, square: string) {
@@ -53,7 +54,7 @@ test('classique à deux : coups possibles (réglage), mat, fin sans révélation
   await expect(modal).not.toContainText('dames secrètes');
   // Revue : 2. g4 ?? permet le mat, explication locale.
   await modal.getByRole('link', { name: /Revue de la partie/ }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
   await page.getByTestId('move-list').locator('button.move', { hasText: 'g4' }).click();
   await expect(page.getByTestId('move-card')).toContainText('g4');
   await expect(page.getByTestId('move-card')).toContainText('Gaffe');

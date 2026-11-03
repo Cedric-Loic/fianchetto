@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 /**
  * Captures d'écran de contrôle visuel (bureau 1366 × 768 et téléphone 390 × 844) : accueil,
@@ -52,7 +53,7 @@ test('captures d’écran (bureau et téléphone)', async ({ page }) => {
   await page.getByTestId('pgn-input').fill(PGN);
   await page.getByRole('button', { name: 'Importer le PGN' }).click();
   await page.getByTestId('imported-games').getByRole('link', { name: 'Analyser' }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
   await page.getByTestId('move-list').locator('button.move', { hasText: 'Nxe5' }).first().click();
   const reviewUrl = page.url();
 
@@ -78,7 +79,7 @@ test('captures d’écran (bureau et téléphone)', async ({ page }) => {
       gameUrl,
       () => expect(page.getByTestId('move-list').locator('button.move')).toHaveCount(2),
     ],
-    ['revue', reviewUrl, () => expect(page.getByTestId('move-card')).toBeVisible()],
+    ['revue', reviewUrl, () => openedReview(page)],
     [
       'echiquier',
       '/#/analyse/board',

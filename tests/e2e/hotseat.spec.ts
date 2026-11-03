@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 /** Clique au centre d'une case (plateau orienté Blancs en bas). */
 async function clickSquare(page: Page, square: string, orientation: 'w' | 'b' = 'w') {
@@ -80,7 +81,7 @@ test('partie hot-seat complète : choix secrets, passage, mat par la dame secrè
 
   // Revue : positions réelles, notation réelle, courbe, classe et meilleur coup.
   await modal.getByRole('link', { name: /Revue de la partie/ }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
   await expect(page.getByTestId('move-list')).toContainText('Qh5#');
   await expect(page.getByTestId('eval-chart')).toBeVisible();
   await page.getByTestId('move-list').locator('button.move', { hasText: 'a3' }).first().click();

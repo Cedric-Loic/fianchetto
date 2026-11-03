@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 /*
  * Échiquier d'analyse (étape 12) : variantes dans la revue, échiquier libre (FEN / PGN),
@@ -93,7 +94,7 @@ test('revue : variante jouée sur l’échiquier, retour à la partie, moteur', 
   await page.getByRole('button', { name: 'Importer le PGN' }).click();
   await expect(page.getByTestId('import-message')).toContainText('1 partie importée');
   await page.getByTestId('imported-games').getByRole('link', { name: 'Analyser' }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
 
   // La gaffe 3. Nxe5 : explication, et schéma (flèches) sur le plateau.
   const moves = page.getByTestId('move-list');

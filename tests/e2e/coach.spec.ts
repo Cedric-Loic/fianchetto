@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 const PGN = `[Event "Live Chess"]
 [Date "2026.10.01"]
@@ -34,7 +35,7 @@ test('import PGN, analyse, revue avec explication, point de départ', async ({ p
 
   // Analyse puis revue : 3. Nxe5 ?? laisse le cavalier en prise.
   await table.getByRole('link', { name: 'Analyser' }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
   await expect(page.getByTestId('accuracy-w')).toContainText('moi_cc');
   await page.getByTestId('move-list').locator('button.move', { hasText: 'Nxe5' }).first().click();
   await expect(page.getByTestId('move-card')).toContainText('Gaffe');

@@ -1,5 +1,4 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { START_FEN } from '../analysis/tree';
 import type { LessonSummary, LessonView } from '@sq/shared';
 import {
   ExercisePlayer,
@@ -17,6 +16,9 @@ import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { IconBook, IconNext } from '../ui/icons';
 import { StreakBadge } from '../ui/StreakBadge';
+
+/** Position de départ (copie locale : `analysis/tree` embarque chess.js, chargé à la demande). */
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 const PHASES: Record<number, string> = {
   1: 'Phase 1 · Ne plus rien donner',

@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 /*
  * Revue guidée, « Apprends de tes erreurs » (vraie route de réessai) et moteur en direct réel
@@ -72,7 +73,7 @@ test('revue guidée jusqu’au bilan, puis « Apprends de tes erreurs »', async
   await page.getByRole('button', { name: 'Importer le PGN' }).click();
   await expect(page.getByTestId('import-message')).toContainText('1 partie importée');
   await page.getByTestId('imported-games').getByRole('link', { name: 'Analyser' }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
   const reviewId = /#\/review\/([\w-]+)/.exec(page.url())?.[1] ?? '';
 
   // Revue guidée : bandeau, bulle du coach, moments clés un par un.
@@ -149,7 +150,7 @@ test('revue guidée en mode quiz : réponse, puis bulle du coach', async ({ page
   await page.getByRole('button', { name: 'Importer le PGN' }).click();
   await expect(page.getByTestId('import-message')).toContainText('1 partie importée');
   await page.getByTestId('imported-games').getByRole('link', { name: 'Analyser' }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
 
   await page.getByTestId('quiz-toggle').check();
   await page.getByTestId('start-guided').click();

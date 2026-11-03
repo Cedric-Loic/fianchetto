@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 const d = new Date();
 const date = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
@@ -37,7 +38,7 @@ test('tableau de bord : phase, semaine, profil, courbes, lien vers les puzzles',
   await page.getByTestId('pgn-input').fill(PGN);
   await page.getByRole('button', { name: 'Importer le PGN' }).click();
   await page.getByTestId('imported-games').getByRole('link', { name: 'Analyser' }).click();
-  await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
+  await openedReview(page);
 
   await page.locator('nav').getByRole('link', { name: 'Progrès', exact: true }).click();
   await expect(page.getByTestId('task-reviews')).toContainText('1 / 2');

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openedReview } from './review-helpers';
 
 async function clickSquare(page: Page, square: string) {
   const box = await page.getByTestId('board').boundingBox();
@@ -93,6 +94,7 @@ test('garde-fou avant une gaffe, mat, bilan du coach', async ({ page }) => {
   await expect(page.getByTestId('square-mark')).toHaveCount(0);
   await expect(page.getByTestId('elo-change')).toHaveCount(0);
   await modal.getByRole('link', { name: /Revue de la partie/ }).click();
+  await openedReview(page);
   await expect(page.getByTestId('coach-summary')).toContainText('Aucune erreur notable', {
     timeout: 60_000,
   });
