@@ -18,6 +18,14 @@ export interface Endgame {
   goal: EndgameGoal;
   /** Leçon qui explique la technique, si elle existe. */
   lesson?: string;
+  /** Palier du cours (1 : 1000-1200, 2 : 1200-1400, 3 : 1400-1600) ; 1 par défaut. */
+  stage?: 1 | 2 | 3;
+  /** Coups maximum du joueur pour réussir (`undefined` : pas de limite). */
+  maxMoves?: number;
+  /** Indices progressifs propres à la finale (1 = l'idée, 2 = la case ou la pièce, 3 = le coup). */
+  hints?: readonly string[];
+  /** Compétence travaillée ; `pawn-endgames` par défaut. */
+  skill?: 'pawn-endgames' | 'rook-endgames';
 }
 
 export const ENDGAMES: readonly Endgame[] = [
