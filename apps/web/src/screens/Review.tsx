@@ -23,6 +23,7 @@ import { useSan } from '../lib/notation';
 import { useSettings } from '../lib/settings';
 import { ExplainText, GuidedPanel } from '../review/GuidedReview';
 import { LearnMistakes } from '../review/LearnMistakes';
+import { TimeSpentCard } from '../review/TimeSpentCard';
 import { SelfCompare, SelfReviewStep, type DraftMoment } from '../review/SelfReview';
 import {
   formatMoveClock,
@@ -749,6 +750,7 @@ function ReviewBoard({
       panelBottom={
         info.userColor && (
           <>
+            <TimeSpentCard moves={review.moves} clocks={info.clocks} userColor={info.userColor} />
             <RepertoireNote
               moves={review.moves.map((m) => m.san)}
               color={info.userColor}

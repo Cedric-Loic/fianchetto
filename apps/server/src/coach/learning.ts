@@ -22,6 +22,7 @@ import {
 import {
   DAILY_PUZZLE_GOAL,
   SKILL_FOR_THEME,
+  TIME_CONTROLS,
   type CardsResponse,
   type CurriculumResponse,
   type CurriculumStep,
@@ -40,6 +41,11 @@ const REVIEWED_GAMES = 20;
 
 /** Au-delà, une réussite compte de nouveau comme un essai « du premier coup ». */
 const RETRY_WINDOW_MS = 30 * 60_000;
+
+/** Partie lente de la semaine : fenêtre, texte et adresse proposés par la séance du jour. */
+const SLOW_GAME_WINDOW_MS = 7 * 86_400_000;
+const SLOW_GAME_LABEL = 'Partie lente de la semaine (15 | 10, avec la routine de réflexion)';
+const SLOW_GAME_HREF = '#/?slow=1';
 
 /** Jour local « 2026-10-26 ». */
 export function dayOf(ms: number): string {
@@ -428,6 +434,15 @@ export class LearningService {
     return null;
   }
 
+  /** Partie lente (cadence `slow`, contre le bot) terminée depuis moins de 7 jours ? */
+  #playedSlowGameThisWeek(userId: string, now: number): boolean {
+    return this.#store.history(userId).some((g) => {
+      if (g.mode !== 'bot' || !TIME_CONTROLS[g.timeControl]?.slow) return false;
+      const at = Date.parse(g.endedAt ?? g.startedAt);
+      return Number.isFinite(at) && now - at < SLOW_GAME_WINDOW_MS;
+    });
+  }
+
   dueCount(userId: string): number {
     return this.cards(userId).due.length;
   }
@@ -458,15 +473,19 @@ export class LearningService {
     const endgame = CURRICULUM.filter((m) => m.phase <= phase)
       .flatMap((m) => m.steps)
       .find((s) => s.type === 'endgame' && !stepDone(s, progress));
+    // Une partie lente par semaine (lot 6) passe avant l'étape de finale.
+    const followUp = !this.#playedSlowGameThisWeek(userId, now)
+      ? { label: SLOW_GAME_LABEL, href: SLOW_GAME_HREF }
+      : endgame
+        ? { label: `Finale : ${this.#titleOf(endgame)}`, href: hrefOf(endgame) }
+        : null;
     return planToday({
       day,
       dueCards: this.dueCount(userId),
       next,
       focus,
       done,
-      followUp: endgame
-        ? { label: `Finale : ${this.#titleOf(endgame)}`, href: hrefOf(endgame) }
-        : null,
+      followUp,
     });
   }
 

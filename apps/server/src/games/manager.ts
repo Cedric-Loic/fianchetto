@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import {
   opposite,
+  TIME_CONTROLS,
   type BotLevel,
   type Color,
   type GameConfig,
@@ -100,6 +101,8 @@ export class GameManager {
     blackName: string;
     ownerId?: string | null;
   }): GameSession {
+    // Cadence lente : contre le bot seulement.
+    if (TIME_CONTROLS[options.timeControl].slow) throw new InvalidGameRequest();
     const player = (name: string): PlayerInfo => ({
       name,
       rating: null,

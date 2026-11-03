@@ -7,10 +7,25 @@ import {
   type TimeControlId,
 } from '@sq/shared';
 
-/** Cadences concernées par le verrou souple « pas de blitz avant les puzzles du jour ». */
+/** Partie lente (15 | 10, 30 min) : contre le bot seulement, jamais classée. */
+export function isSlowTimeControl(id: TimeControlId): boolean {
+  return TIME_CONTROLS[id].slow;
+}
+
+/**
+ * Cadences concernées par le verrou souple « pas de blitz avant les puzzles du jour » : le blitz
+ * et le bullet, jamais les parties lentes (qui sont justement un travail de fond).
+ */
 export function isFastTimeControl(id: TimeControlId): boolean {
+  if (isSlowTimeControl(id)) return false;
   const category = TIME_CONTROLS[id].category;
   return category === 'blitz' || category === 'bullet';
+}
+
+/** `#/?slow=1` (lien de la séance du jour) : l'accueil présélectionne une partie lente. */
+export function wantsSlowGame(hash: string): boolean {
+  const query = /^#\/?\?(.*)$/.exec(hash)?.[1];
+  return query !== undefined && query.split('&').includes('slow=1');
 }
 
 /** Le verrou s'applique-t-il à cette cadence (tableau de bord chargé, journée non validée) ? */

@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import {
   GENERIC_ILLEGAL_MOVE_MESSAGE,
+  TIME_CONTROLS,
   type Color,
   type HintResponse,
   type Square,
@@ -12,6 +13,8 @@ import { Board } from '../game/Board';
 import { usePremoves } from '../game/usePremoves';
 import { useCoach } from '../game/useCoach';
 import { MoveList, MoveStrip } from '../game/MoveList';
+import { ThinkingRoutine } from '../game/ThinkingRoutine';
+import { useRoutineShortcut } from '../game/routine';
 import { MOBILE_QUERY, useMediaQuery } from '../lib/media';
 import { PlayerBar } from '../game/PlayerBar';
 import { send } from '../lib/net';
@@ -84,6 +87,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const me = state.viewer === 'public' ? null : state.viewer;
   const isBot = state.mode === 'bot';
   const classic = state.variant === 'classic';
+  // Partie lente : routine de réflexion dans le panneau (bouton, ou touche r).
+  const slow = TIME_CONTROLS[state.timeControl].slow;
+  useRoutineShortcut(slow && state.phase === 'playing');
   const user = useSession((s) => s.user);
   const endgame = useEndgameOf(state);
   const [orientation, setOrientation] = useState<Color>(me ?? 'w');
@@ -548,7 +554,9 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
             <Badge>{VARIANT_LABEL[state.variant]}</Badge>
             {state.rated && <Badge tone="accent">Classée</Badge>}
             {state.training && <Badge tone="info">Entraînement</Badge>}
+            {slow && <Badge testId="slow-badge">Partie lente · non classée</Badge>}
           </div>
+          {slow && !ended && <ThinkingRoutine />}
           {coach.prompt && (
             <div className="coach-ask" data-testid="coach-ask">
               <h3>Le coach te demande</h3>

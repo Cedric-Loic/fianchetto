@@ -10,6 +10,8 @@ const TC_HINT: Record<TimeControlId, string> = {
   'blitz-3+2': 'Blitz avec incrément',
   'blitz-5+0': 'Blitz : le classique',
   'rapid-10+0': 'Rapide : le temps de réfléchir',
+  'rapid-15+10': 'Partie lente avec incrément',
+  'classical-30+0': 'Partie lente : toute la réflexion',
   untimed: 'Sans pendule : à ton rythme',
 };
 
@@ -85,7 +87,8 @@ export function Onboarding(props: { onDone: () => void }) {
         <>
           <p className="muted">Elle sera proposée par défaut pour tes parties.</p>
           <div className="onboarding-choices">
-            {TIME_CONTROL_IDS.map((id) => (
+            {/* Les parties lentes sont réservées au bot : on les choisit sur l'accueil. */}
+            {TIME_CONTROL_IDS.filter((id) => !TIME_CONTROLS[id].slow).map((id) => (
               <Button
                 key={id}
                 data-testid={`onboarding-tc-${id}`}

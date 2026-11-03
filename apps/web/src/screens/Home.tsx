@@ -10,7 +10,14 @@ import {
 import { api, summarizePgn, type PgnSummary } from '../lib/api';
 import { useSession } from '../lib/session';
 import { DEFAULT_LAST_PLAY, pieceUrl, useSettings, type LastPlay } from '../lib/settings';
-import { blitzLockApplies, dailyGoal, days, isFastTimeControl } from '../lib/regularity';
+import {
+  blitzLockApplies,
+  dailyGoal,
+  days,
+  isFastTimeControl,
+  isSlowTimeControl,
+  wantsSlowGame,
+} from '../lib/regularity';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
@@ -36,34 +43,48 @@ type Mode = Variant | 'training';
 
 /**
  * Choix de la cadence. `locked` : verrou souple du coach, un cadenas sur le blitz et le bullet
- * (le clic reste possible, la confirmation est demandée par l'appelant).
+ * (le clic reste possible, la confirmation est demandée par l'appelant). `slow` : propose en plus
+ * le groupe « Parties lentes » (contre le bot seulement, jamais classées).
  */
 function TimeControls(props: {
   value: TimeControlId;
   onChange: (id: TimeControlId) => void;
   locked?: boolean;
+  slow?: boolean;
   /** Préfixe des `data-testid` (deux sélecteurs de cadence sur l'accueil). */
   testPrefix?: string;
 }) {
+  const button = (id: TimeControlId) => {
+    const locked = Boolean(props.locked) && isFastTimeControl(id);
+    return (
+      <Button
+        key={id}
+        pressed={id === props.value}
+        className={locked ? 'tc-locked' : undefined}
+        data-testid={`${props.testPrefix ?? 'tc'}-${id}`}
+        onClick={() => props.onChange(id)}
+      >
+        {locked && <IconLock size={14} />}
+        {TIME_CONTROLS[id].label}
+        {locked && <span className="sr-only"> (après les puzzles du jour)</span>}
+      </Button>
+    );
+  };
+  const regular = TIME_CONTROL_IDS.filter((id) => !isSlowTimeControl(id));
+  const slowIds = props.slow ? TIME_CONTROL_IDS.filter(isSlowTimeControl) : [];
   return (
-    <div className="time-controls">
-      {TIME_CONTROL_IDS.map((id) => {
-        const locked = Boolean(props.locked) && isFastTimeControl(id);
-        return (
-          <Button
-            key={id}
-            pressed={id === props.value}
-            className={locked ? 'tc-locked' : undefined}
-            data-testid={`${props.testPrefix ?? 'tc'}-${id}`}
-            onClick={() => props.onChange(id)}
-          >
-            {locked && <IconLock size={14} />}
-            {TIME_CONTROLS[id].label}
-            {locked && <span className="sr-only"> (après les puzzles du jour)</span>}
-          </Button>
-        );
-      })}
-    </div>
+    <>
+      <div className="time-controls">{regular.map(button)}</div>
+      {slowIds.length > 0 && (
+        <div className="slow-controls" role="group" aria-label="Parties lentes">
+          <div className="slow-head">
+            <strong>Parties lentes</strong>
+            <Badge testId="slow-unrated">non classée</Badge>
+          </div>
+          <div className="time-controls">{slowIds.map(button)}</div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -266,18 +287,25 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   );
   // Dernière configuration jouée (ou choisie au premier lancement) : valeurs de départ.
   const [initial] = useState<LastPlay>(() => useSettings.getState().lastPlay ?? DEFAULT_LAST_PLAY);
+  // `#/?slow=1` (séance du jour) : partie lente contre le bot présélectionnée.
+  const [slowPreset] = useState(() => wantsSlowGame(location.hash));
   const [variant, setVariant] = useState<Variant>(initial.variant);
-  const [trainingChoice, setTraining] = useState(initial.training);
+  const [trainingChoice, setTraining] = useState(initial.training && !slowPreset);
   // Entraînement : variante classique seulement.
   const training = trainingChoice && variant === 'classic';
   const mode: Mode = training ? 'training' : variant;
   const [levels, setLevels] = useState<BotLevelInfo[]>([]);
   const [level, setLevel] = useState(initial.level);
   const [color, setColor] = useState<'w' | 'b' | 'random'>(initial.color);
-  const [botTc, setBotTc] = useState<TimeControlId>(initial.timeControl);
+  const [botTc, setBotTc] = useState<TimeControlId>(
+    slowPreset ? 'rapid-15+10' : initial.timeControl,
+  );
   const [white, setWhite] = useState('Joueur 1');
   const [black, setBlack] = useState('Joueur 2');
-  const [seatTc, setSeatTc] = useState<TimeControlId>(initial.timeControl);
+  // Les cadences lentes n'existent que contre le bot.
+  const [seatTc, setSeatTc] = useState<TimeControlId>(
+    isSlowTimeControl(initial.timeControl) ? DEFAULT_LAST_PLAY.timeControl : initial.timeControl,
+  );
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<CoachDashboard | null>(null);
@@ -345,7 +373,14 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
   const remembered = useSettings((s) => s.lastPlay) ?? DEFAULT_LAST_PLAY;
   const quick: LastPlay =
     remembered.mode === 'bot' && !user
-      ? { ...remembered, mode: 'hotseat', training: false }
+      ? {
+          ...remembered,
+          mode: 'hotseat',
+          training: false,
+          timeControl: isSlowTimeControl(remembered.timeControl)
+            ? DEFAULT_LAST_PLAY.timeControl
+            : remembered.timeControl,
+        }
       : remembered;
   const quickLevel = levels.find((l) => l.level === quick.level);
   const quickSummary =
@@ -526,14 +561,21 @@ export function Home({ onStart }: { onStart: (gameId: string) => void }) {
               )}
               {!training && (
                 <TimeControls
+                  slow
                   value={botTc}
                   locked={!blitzOk && Boolean(coach?.blitzLocked)}
                   onChange={(id) => unlessLocked(id, () => setBotTc(id))}
                 />
               )}
+              {!training && isSlowTimeControl(botTc) && (
+                <p className="muted" data-testid="slow-note">
+                  Partie lente : non classée, avec la routine de réflexion à portée de clic.
+                </p>
+              )}
               <Button
                 variant="primary"
                 size="l"
+                data-testid="play-bot"
                 onClick={() =>
                   unlessLocked(
                     training ? 'untimed' : botTc,

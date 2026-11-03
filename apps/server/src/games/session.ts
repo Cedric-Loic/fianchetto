@@ -220,9 +220,9 @@ export class GameSession {
     this.#armSelectionTimer(opposite(botColor));
   }
 
-  /** Partie classée : contre le bot, hors entraînement. */
+  /** Partie classée : contre le bot, hors entraînement et hors cadence lente (jamais classée). */
   get rated(): boolean {
-    return this.mode === 'bot' && !this.training;
+    return this.mode === 'bot' && !this.training && !TIME_CONTROLS[this.timeControl].slow;
   }
 
   /** Demi-coups joués (reprises annulées déduites). */

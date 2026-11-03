@@ -26,8 +26,8 @@ import type { GameStore } from '../persistence/db.js';
 import type { LearningService } from './learning.js';
 import type { PuzzleService } from '../puzzles/service.js';
 
-/** Cadences locales considérées comme lentes (le plan recommande des parties 15+10). */
-const SLOW_LOCAL = new Set(['rapid-10+0', 'untimed']);
+/** Cadences locales considérées comme lentes (dont les parties lentes 15+10 et 30+0). */
+const SLOW_LOCAL = new Set(['rapid-10+0', 'rapid-15+10', 'classical-30+0', 'untimed']);
 /** Revues comptées au plus par jour quand seule la date de revue est connue (règle du coach). */
 const MAX_LEGACY_ANALYSES_PER_DAY = 2;
 

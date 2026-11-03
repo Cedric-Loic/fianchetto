@@ -3819,3 +3819,71 @@ button.skill-row:hover {
   color: var(--warning);
   font-weight: 700;
 }
+
+/* --- Parties lentes : choix de la cadence et routine de réflexion --- */
+.slow-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+}
+.slow-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-14);
+}
+.slow-controls .time-controls {
+  grid-template-columns: repeat(2, 1fr);
+}
+.routine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.routine-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: inset 3px 0 0 var(--info);
+  font-size: var(--fs-14);
+}
+.routine-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: routine;
+}
+.routine-steps li {
+  display: grid;
+  grid-template-columns: 1.6em 1fr;
+  counter-increment: routine;
+}
+.routine-steps li::before {
+  content: counter(routine) '.';
+  font-weight: 700;
+  color: var(--accent, inherit);
+}
+.routine-q {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.routine-check {
+  margin: 0;
+}
+.time-spent .time-spent-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}

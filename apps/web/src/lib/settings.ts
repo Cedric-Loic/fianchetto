@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TIME_CONTROL_IDS, type TimeControlId, type Variant } from '@sq/shared';
+import { TIME_CONTROLS, TIME_CONTROL_IDS, type TimeControlId, type Variant } from '@sq/shared';
 
 /*
  * Préférences (affichage, pseudo chess.com pour l'import). Seule donnée gardée dans le
@@ -56,13 +56,15 @@ export function parseLastPlay(value: unknown): LastPlay | null {
   ) {
     return null;
   }
+  // Une cadence lente n'existe que contre le bot : à deux sur l'écran, on revient à la cadence par défaut.
+  const slowAtTwo = v.mode === 'hotseat' && TIME_CONTROLS[tc as TimeControlId].slow;
   return {
     mode: v.mode,
     variant: v.variant,
     training: v.training === true && v.variant === 'classic' && v.mode === 'bot',
     level: v.level,
     color: v.color,
-    timeControl: tc as TimeControlId,
+    timeControl: slowAtTwo ? DEFAULT_LAST_PLAY.timeControl : (tc as TimeControlId),
   };
 }
 
@@ -88,6 +90,8 @@ export interface Settings {
   frenchNotation: boolean;
   /** Revue guidée en quiz : on devine ton coup avant que le coach ne l'explique. */
   quiz: boolean;
+  /** Partie lente : routine de réflexion affichée dans le panneau (touche r). */
+  routineOpen: boolean;
   /** Premier lancement guidé terminé (ou passé). */
   onboarded: boolean;
   /** Dernière partie lancée (mode, niveau, couleur, cadence). */
@@ -108,6 +112,7 @@ const DEFAULTS: Settings = {
   engine: false,
   frenchNotation: false,
   quiz: false,
+  routineOpen: false,
   onboarded: false,
   lastPlay: null,
 };
@@ -135,6 +140,7 @@ export function loadSettings(): Settings {
       engine: bool(parsed.engine, DEFAULTS.engine),
       frenchNotation: bool(parsed.frenchNotation, DEFAULTS.frenchNotation),
       quiz: bool(parsed.quiz, DEFAULTS.quiz),
+      routineOpen: bool(parsed.routineOpen, DEFAULTS.routineOpen),
       onboarded: bool(parsed.onboarded, DEFAULTS.onboarded),
       lastPlay: parseLastPlay(parsed.lastPlay),
       chessComUsername:

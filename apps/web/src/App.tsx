@@ -200,7 +200,7 @@ export function App() {
   else if (route.page === 'review')
     content = <Review key={hash} id={route.id} guided={route.guided} />;
   else if (route.page === 'home') {
-    content = <Home onStart={(id) => (location.hash = `#/game/${id}`)} />;
+    content = <Home key={hash} onStart={(id) => (location.hash = `#/game/${id}`)} />;
   } else if (!state) content = <Loading label="Connexion…" />;
   else if (state.phase === 'secret-selection') {
     // Clé : un nouveau chooser (ou un nouvel écran de passage) repart d'un choix vide.

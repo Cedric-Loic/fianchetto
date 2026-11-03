@@ -53,6 +53,22 @@ const SCREENS: Screen[] = [
     },
   },
   {
+    // Partie lente : badge « non classée » et routine de réflexion dépliée dans le panneau latéral.
+    name: 'partie-lente',
+    bars: 2 * (48 + 8),
+    evalWidth: 0,
+    open: async (page) => {
+      const bot = page.locator('.home-panel', { hasText: 'Contre le bot' });
+      await bot.getByTestId('level-1').click();
+      await bot.getByRole('button', { name: 'Blancs' }).click();
+      await bot.getByTestId('tc-rapid-15+10').click();
+      await bot.getByRole('button', { name: 'Jouer contre le bot' }).click();
+      await expect(page.getByTestId('slow-badge')).toBeVisible();
+      await page.getByTestId('routine-button').click();
+      await expect(page.getByTestId('routine-panel')).toBeVisible();
+    },
+  },
+  {
     // Partie de finale : bandeau d'objectif, coups restants et indice dans le panneau latéral.
     name: 'finale',
     bars: 2 * (48 + 8),

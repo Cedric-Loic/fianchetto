@@ -261,7 +261,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     if (!parsed.success) return reply.code(400).send({ error: 'BAD_REQUEST' });
     const user = currentUser(store, request);
     if (parsed.data.mode === 'hotseat') {
-      return { gameId: games.createHotseat({ ...parsed.data, ownerId: user?.id ?? null }).id };
+      try {
+        return { gameId: games.createHotseat({ ...parsed.data, ownerId: user?.id ?? null }).id };
+      } catch (error) {
+        // Cadence lente refusée en hot-seat.
+        if (error instanceof InvalidGameRequest)
+          return reply.code(400).send({ error: 'BAD_REQUEST' });
+        throw error;
+      }
     }
     if (!user) return reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
     try {
