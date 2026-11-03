@@ -8,22 +8,28 @@ l'écran de fin. À l'adversaire de la démasquer.
 - Variantes : **Classique** (échecs standard, coups possibles affichés en option) et
   **Secret Queen**, chacune avec son propre Elo.
 - Modes : contre un bot (5 niveaux, partie classée Elo) ou à deux sur le même écran (hot-seat).
-- **Coach** : tableau de bord (phase du programme, plan de la semaine, recommandations, profil de
-  faiblesses, courbes de progression, objectifs, bilan mensuel).
-- **Leçons** (coach) : les 10 leçons de la phase 1 (routine anti-gaffe, tactiques de base, mats,
-  ouverture), avec exercices validés par le serveur.
-- **Entraînement contre le bot** (coach) : indices progressifs, garde-fou avant une gaffe,
-  reprise de coups, bilan de fin de partie, rejouer à partir d'une erreur.
-- **Puzzles** (coach) : base Lichess au niveau ou par thème, révisions des puzzles ratés,
-  puzzles tirés de tes propres erreurs, classement puzzle (Glicko-2).
-- **Analyse** (coach) : revue de chaque partie (classe de chaque coup, explication des erreurs,
-  précision), import de parties PGN ou chess.com, mesure de ton point de départ.
-- Cadences : 1+0, 3+2, 5+0, 10+0 ou sans pendule.
+- Cadences : 1+0, 3+2, 5+0, 10+0, sans pendule, et **parties lentes** 15+10 et 30+0 (contre le
+  bot, non classées).
 - Serveur autoritatif : le secret adverse ne quitte jamais le serveur avant la fin de partie.
 
-> **État : étapes 0 à 15 terminées** (plateforme et coach complets ; leçons des phases 2 à 4 à venir) (Secret Queen, puis plateforme et variante classique).
-> Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Suite prévue (coach personnel) :
-> [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md).
+**Coach personnel (1000 → 1600 Elo)**, organisé en trois paliers : P1 1000-1200, P2 1200-1400,
+P3 1400-1600 (conseillés, rien n'est verrouillé).
+
+- **Aujourd'hui** : séance du jour (~28 min : révisions dues, étape du parcours, puzzles sur la
+  compétence la plus faible, une partie lente par semaine).
+- **Apprendre** : parcours par palier avec 64 leçons, dont 10 parties classiques commentées (exercices
+  validés par le serveur, indices progressifs), **cours de finales** par chapitre (pas à pas, quiz, partie contre le moteur avec
+  limite de coups, base exacte roi + pion), ouvertures et un **examen de palier** (20 questions, réussite à 80 %).
+- **S'entraîner** : puzzles Lichess (niveau, thème, révisions, mes erreurs, classement Glicko-2),
+  **entraîneur de calcul** (plateau figé), révisions espacées (1, 3, 7, 21, 60 jours),
+  entraînement contre le bot (indices, garde-fou avant une gaffe, reprise de coups).
+- **Mes parties** : revue de chaque partie (classe des coups, explications, précision), **revue
+  réflexive** en deux temps, import PGN ou chess.com, échiquier d'analyse.
+- **Progrès** : 14 compétences, profil de pensée, courbes, objectifs, bilan mensuel, classement.
+
+> **État : étapes 0 à 15 terminées** (plateforme, coach et feuille de route pédagogique complets).
+> Recette et preuves : [`docs/RECETTE.md`](docs/RECETTE.md). Plan d'origine du coach :
+> [`docs/PLAN-COACH.md`](docs/PLAN-COACH.md). Arbitrages : [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Prérequis
 
@@ -63,7 +69,8 @@ apps/
 packages/
   shared/        contrats partagés (types + schémas Zod), Secret<T>
   engine/        règles : position réelle, légalité, fins de partie, projection par joueur
-  coach/         coach : classes des coups, précision, explications des erreurs, lecture PGN
+  coach/         coach : classes des coups, leçons, finales (dont base roi + pion), parcours,
+                 compétences, tableau de bord
   bot/           bot à information imparfaite + analyse de fin de partie
 tests/
   e2e/           parcours utilisateur (Playwright)
@@ -102,49 +109,46 @@ docs/
    cliquables) et la **Menace** (touche x). **▶ Revue guidée** parcourt les moments clés avec
    le coach ; **Apprends de tes erreurs** te fait retrouver le bon coup à chaque erreur.
 8. **Navigation** : six rubriques. **Aujourd'hui** (séance du jour, révisions dues), **Jouer**,
-   **Apprendre** (parcours par palier : P1 1000-1200, P2 1200-1400, P3 1400-1600, avec leçons,
-   finales, ouvertures, parties commentées et un examen par palier), **S'entraîner** (puzzles,
-   calcul, révisions, finales, ouvertures), **Mes parties** (revue, import, analyse) et
-   **Progrès** (compétences, profil de pensée, courbes, classement).
-   8 bis. **Coach** : ta page d'accueil d'entraînement. En tête, la **séance du jour** (~28 min :
-   révisions dues, étape du parcours, puzzles sur ta compétence la plus faible, bilan), puis
-   tes **14 compétences** (niveau, tendance) et le **parcours** en modules (ordre conseillé, rien
-   n'est verrouillé). Le reste de la page : où tu en es (phase du plan et
-   critères pour passer à la suivante), ce qu'il reste à faire cette semaine, et quoi faire
-   maintenant ; les courbes suivent ton Elo chess.com (lu dans tes parties importées), ton
-   classement puzzle et ta précision.
-9. **Leçons** (menu, 30 + parties classiques commentées) : lis la leçon, suis la partie commentée
-   coup par coup (← →), puis fais les exercices : trouve le coup ou désigne des cases, avec des
-   **indices progressifs** (un exercice réussi avec indice ne compte pas du premier coup) ; la
-   leçon est validée à 80 %. Tes exercices ratés et tes erreurs de parties reviennent dans
-   **Révisions** (`#/reviews`) à 1, 3, 7, 21 puis 60 jours.
+   **Apprendre** (parcours par palier, leçons, finales, ouvertures, parties commentées, examen),
+   **S'entraîner** (puzzles, calcul, révisions, finales, ouvertures), **Mes parties** (revue,
+   import, analyse) et **Progrès** (compétences, profil de pensée, courbes, classement). La séance
+   du jour enchaîne révisions, étape du parcours, puzzles sur ta compétence la plus faible et
+   bilan ; tes 14 compétences (niveau, tendance) et le parcours en modules sont dans Apprendre et
+   Progrès. Les courbes suivent ton Elo chess.com (lu dans tes parties importées), ton classement
+   puzzle et ta précision.
+9. **Leçons** : lis la leçon, suis la partie commentée coup par coup (← →), puis fais les
+   exercices : trouve le coup ou désigne des cases, avec des **indices progressifs** (un exercice
+   réussi avec indice ne compte pas du premier coup) ; la leçon est validée à 80 %. Tes exercices
+   ratés et tes erreurs de parties reviennent dans **Révisions** (`#/reviews`) à 1, 3, 7, 21
+   puis 60 jours.
 10. **Entraînement** (accueil → Classique → Contre le bot → case « Entraînement avec le coach ») :
     partie non classée et sans pendule ; 💡 Indice (1 clic : l'idée, 2 : la pièce, 3 : le coup),
     ↶ Reprendre le coup, et le coach demande « Es-tu sûr ? » avant une gaffe (désactivable dans
     ⚙ Réglages). À la fin : la revue s'ouvre avec le **bilan du coach** (3 moments clés et un
     conseil). La **partie coachée** (réglage actif par défaut, jamais en Secret Queen) te pose une
     question avant de jouer quand une de tes pièces est menacée ou qu'une pièce adverse est en
-    prise : tu désignes les cases, le coach corrige. Dans toute revue, **↺ Rejouer d'ici** relance la partie depuis la position d'avant
-    ton erreur.
-11. **Puzzles** (menu ; lance d'abord `pnpm puzzles:import` une fois) :
-
-- **Au niveau** : légèrement au-dessus de ton classement puzzle ;
-- **Thème** : fourchette, clouage, mat en 2… (le thème du jour suit le plan de progression) ;
-- **Révisions** : les puzzles ratés reviennent après 1, 3, 7 puis 21 jours ;
-- **Mes erreurs** : les positions où tu t'es trompé dans tes parties analysées.
-  💡 Indice : montre la pièce à jouer (une réussite avec indice ne compte pas au classement).
-
+    prise : tu désignes les cases, le coach corrige. Dans toute revue, **↺ Rejouer d'ici** relance
+    la partie depuis la position d'avant ton erreur.
+11. **Puzzles** (lance d'abord `pnpm puzzles:import` une fois) :
+    - **Au niveau** : légèrement au-dessus de ton classement puzzle ;
+    - **Thème** : fourchette, clouage, mat en 2… (le thème du jour suit le plan de progression) ;
+    - **Révisions** : les puzzles ratés reviennent après 1, 3, 7 puis 21 jours ;
+    - **Mes erreurs** : les positions où tu t'es trompé dans tes parties analysées.
+      💡 Indice : montre la pièce à jouer (une réussite avec indice ne compte pas au classement).
 12. **Finales** (Apprendre) : chaque chapitre se fait en trois temps : le cours (pas à pas et quiz),
     puis la partie contre le moteur, avec indices et limite de coups. Un échec revient en
     révision (1, 3, 7, 21 puis 60 jours). **Calcul** (`#/calc`) : plateau figé, tu saisis ta ligne
-    de 1 à 3 coups sans bouger les pièces, puis tu réponds à une question. **Revue réflexive** :
-    avant le moteur, tu marques tes moments d'hésitation et leur cause ; ton profil de pensée
-    s'affiche dans Progrès. **Parties lentes** (15 | 10 ou 30 min, contre le bot, non classées) :
-    routine de réflexion en un clic (touche r) et bilan du temps passé sur tes erreurs.
-13. **Analyse** (menu) : importe tes parties chess.com (ton pseudo, 20 à 100 dernières) ou un
-    fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ. L'import chess.com
-    est le seul accès à Internet de l'application, uniquement quand tu cliques. L'onglet
-    **Échiquier d'analyse** charge une FEN ou un PGN, avec le moteur en direct.
+    de 1 à 3 coups sans bouger les pièces, puis tu réponds à une question. **Examen de palier**
+    (`#/exam/1`, `#/exam/2`, `#/exam/3`) : 20 questions tirées du palier, réussite à 80 %, bilan
+    par compétence ; passer au palier suivant est conseillé, jamais bloquant.
+13. **Revue réflexive** (Mes parties) : avant le moteur, tu marques tes moments d'hésitation et
+    leur cause ; ton profil de pensée s'affiche dans Progrès. **Parties lentes** (15+10 ou 30+0,
+    contre le bot, non classées) : routine de réflexion en un clic (touche r) et bilan du temps
+    passé sur tes erreurs.
+14. **Import et analyse** (Mes parties) : importe tes parties chess.com (ton pseudo, 20 à 100
+    dernières) ou un fichier PGN, analyse-les (« Tout analyser ») et lis ton point de départ.
+    L'import chess.com est le seul accès à Internet de l'application, uniquement quand tu cliques.
+    L'onglet **Échiquier d'analyse** charge une FEN ou un PGN, avec le moteur en direct.
 
 ## Comment le secret est protégé (résumé)
 
@@ -167,7 +171,7 @@ Détails et limites assumées (base SQLite, canaux auxiliaires) : [`docs/SECURIT
 | 7     | Coach : revue de partie, import PGN et chess.com                     | ✅   |
 | 8     | Coach : puzzles (Lichess, thèmes, révisions, mes erreurs)            | ✅   |
 | 9     | Coach : entraînement (indices, garde-fou, reprise), bilan            | ✅   |
-| 10    | Coach : leçons (moteur et 10 leçons de la phase 1)                   | ✅   |
+| 10    | Coach : leçons (moteur et leçons de la phase 1)                      | ✅   |
 | 11    | Coach : tableau de bord                                              | ✅   |
 | 12    | Interface et logo, premove partout, analyse interactive              | ✅   |
 | 13    | Régularité (série, thème du jour, garde-fou dégressif)               | ✅   |
