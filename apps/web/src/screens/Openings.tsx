@@ -385,8 +385,8 @@ export function Openings() {
   return (
     <div className="page">
       <div className="panel page-panel">
-        <a href="#/lessons" className="back-link">
-          ← Leçons
+        <a href="#/learn" className="back-link">
+          ← Apprendre
         </a>
         <h2>Répertoire d’ouvertures</h2>
         <p className="muted">

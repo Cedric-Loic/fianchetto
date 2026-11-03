@@ -8,15 +8,16 @@ import { IconLogout, IconMenu, IconSettings, IconUser } from './icons';
 
 /** Rubrique de la barre de navigation à surligner (selon la page affichée). */
 export type NavSection =
-  'play' | 'coach' | 'lessons' | 'puzzles' | 'analyse' | 'leaderboard' | 'login' | null;
+  'today' | 'play' | 'learn' | 'train' | 'games' | 'progress' | 'login' | null;
 
+/** Six rubriques, organisées par intention. */
 const LINKS: { section: NavSection; href: string; label: string }[] = [
+  { section: 'today', href: '#/today', label: "Aujourd'hui" },
   { section: 'play', href: '#/', label: 'Jouer' },
-  { section: 'coach', href: '#/coach', label: 'Coach' },
-  { section: 'lessons', href: '#/lessons', label: 'Leçons' },
-  { section: 'puzzles', href: '#/puzzles', label: 'Puzzles' },
-  { section: 'analyse', href: '#/analyse', label: 'Analyse' },
-  { section: 'leaderboard', href: '#/leaderboard', label: 'Classement' },
+  { section: 'learn', href: '#/learn', label: 'Apprendre' },
+  { section: 'train', href: '#/train', label: "S'entraîner" },
+  { section: 'games', href: '#/analyse', label: 'Mes parties' },
+  { section: 'progress', href: '#/progress', label: 'Progrès' },
 ];
 
 /**
@@ -63,6 +64,7 @@ export function NavBar({ section, hash }: { section: NavSection; hash: string })
               href={l.href}
               className="nav-link"
               aria-current={current(l.section)}
+              data-testid={`nav-${l.section}`}
               onClick={close}
             >
               {l.label}

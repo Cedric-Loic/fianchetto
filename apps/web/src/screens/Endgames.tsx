@@ -38,8 +38,8 @@ export function Endgames() {
   return (
     <div className="page">
       <div className="panel page-panel">
-        <a href="#/lessons" className="back-link">
-          ← Leçons
+        <a href="#/learn" className="back-link">
+          ← Apprendre
         </a>
         <h2>Finales contre le bot</h2>
         <p className="muted">

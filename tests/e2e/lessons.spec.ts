@@ -28,7 +28,8 @@ async function clickSquare(page: Page, square: string, black = false) {
 test('leçon : explications, six exercices réussis, leçon validée', async ({ page }) => {
   await register(page);
 
-  await page.getByRole('link', { name: 'Leçons' }).click();
+  await page.locator('nav').getByRole('link', { name: 'Apprendre', exact: true }).click();
+  await page.getByTestId('learn-lessons').click();
   await page.getByTestId('lesson-routine').click();
   await expect(page.getByRole('heading', { name: /La routine anti-gaffe/ })).toBeVisible();
   await expect(page.getByText('Les trois questions')).toBeVisible();

@@ -205,7 +205,7 @@ test('captures du lot 3 (bureau et téléphone)', async ({ page }) => {
     await page.waitForTimeout(300);
     await shot(`accueil-${label}`);
 
-    await page.goto('/#/coach');
+    await page.goto('/#/progress');
     await expect(page.getByTestId('coach-next')).toBeVisible();
     await shot(`coach-${label}`);
     await page.getByTestId('coach-week').scrollIntoViewIfNeeded();

@@ -151,7 +151,7 @@ function CoachBanner({ data }: { data: CoachDashboard }) {
           Série : {days(data.streak.current)} · Aujourd'hui : {goal.text}
         </span>
       </div>
-      <Button variant="primary" href={task?.href ?? reco?.href ?? '#/coach'}>
+      <Button variant="primary" href={task?.href ?? reco?.href ?? '#/today'}>
         Y aller
       </Button>
     </section>
@@ -162,7 +162,7 @@ function CoachBanner({ data }: { data: CoachDashboard }) {
  * Carte « Partie en cours » : adversaire, variante et nombre de coups joués, lus dans le PGN
  * public de la partie ; à défaut, simple invitation à reprendre.
  */
-function ResumeCard(props: { gameId: string; username: string; onResume: () => void }) {
+export function ResumeCard(props: { gameId: string; username: string; onResume: () => void }) {
   const [summary, setSummary] = useState<PgnSummary | null>(null);
   useEffect(() => {
     let cancelled = false;

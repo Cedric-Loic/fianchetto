@@ -2,18 +2,21 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
-import { Coach } from './screens/Coach';
 import { Endgames } from './screens/Endgames';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
+import { Learn } from './screens/Learn';
 import { Openings } from './screens/Openings';
 import { Login } from './screens/Login';
 import { LessonPage, Lessons } from './screens/Lessons';
 import { Profile } from './screens/Profile';
+import { Progress } from './screens/Progress';
 import { Reviews } from './screens/Reviews';
 import { Puzzles } from './screens/Puzzles';
 import { Selection } from './screens/Selection';
+import { Today } from './screens/Today';
+import { Train } from './screens/Train';
 import { NavBar, type NavSection } from './ui/NavBar';
 import { Loading } from './ui/Spinner';
 
@@ -29,7 +32,11 @@ type Route =
   | { page: 'profile'; username: string }
   | { page: 'analyse'; tab: 'import' | 'board'; fen: string | null }
   | { page: 'puzzles'; mode?: 'theme' | 'review' | 'mine'; theme?: string }
+  | { page: 'today' }
   | { page: 'coach' }
+  | { page: 'learn'; module: string | null }
+  | { page: 'train' }
+  | { page: 'progress' }
   | { page: 'lessons' }
   | { page: 'endgames' }
   | { page: 'openings' }
@@ -60,7 +67,16 @@ function parseHash(h: string): Route {
     return { page: 'analyse', tab: 'board', fen };
   }
   if (h === '#/puzzles') return { page: 'puzzles' };
+  // Ancienne adresse du coach : redirigée vers « Aujourd'hui » (voir App).
   if (h === '#/coach') return { page: 'coach' };
+  if (h === '#/today') return { page: 'today' };
+  if (h === '#/train') return { page: 'train' };
+  if (h === '#/progress') return { page: 'progress' };
+  // Parcours, éventuellement sur un module : #/learn?module=<id>.
+  m = /^#\/learn(?:\?module=([\w-]+))?$/.exec(h);
+  if (m) return { page: 'learn', module: m[1] ?? null };
+  // « Mes parties » : même page que l'ancienne Analyse.
+  if (h === '#/games') return { page: 'analyse', tab: 'import', fen: null };
   // Liens du coach : #/puzzles/theme/fork, #/puzzles/review, #/puzzles/mine.
   m = /^#\/puzzles\/theme\/([A-Za-z0-9]+)$/.exec(h);
   if (m?.[1]) return { page: 'puzzles', mode: 'theme', theme: m[1] };
@@ -78,26 +94,35 @@ function parseHash(h: string): Route {
   return { page: 'home' };
 }
 
-/** Rubrique de la barre de navigation correspondant à la page. */
+/** Rubrique de la barre de navigation correspondant à la page (la rubrique parente). */
 function sectionOf(route: Route): NavSection {
   switch (route.page) {
+    case 'today':
+    case 'coach':
+      return 'today';
     case 'home':
     case 'game':
       return 'play';
-    case 'reviews':
-      return 'coach';
+    case 'learn':
     case 'lessons':
     case 'lesson':
     case 'endgames':
     case 'openings':
-      return 'lessons';
+      return 'learn';
+    case 'train':
+    case 'puzzles':
+    case 'reviews':
+      return 'train';
     case 'analyse':
     case 'review':
-      return 'analyse';
+      return 'games';
+    case 'progress':
+    case 'leaderboard':
+      return 'progress';
+    case 'login':
+      return 'login';
     case 'profile':
       return null;
-    default:
-      return route.page;
   }
 }
 
@@ -115,6 +140,12 @@ export function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, [refresh]);
+
+  // #/coach n'existe plus : redirection vers « Aujourd'hui ».
+  const redirect = route.page === 'coach';
+  useEffect(() => {
+    if (redirect) location.replace('#/today');
+  }, [redirect]);
 
   useEffect(() => {
     useGame.getState().reset();
@@ -143,7 +174,10 @@ export function App() {
     content = (
       <Puzzles key={hash} initialMode={route.mode ?? 'rated'} initialTheme={route.theme ?? null} />
     );
-  } else if (route.page === 'coach') content = <Coach />;
+  } else if (route.page === 'today' || route.page === 'coach') content = <Today />;
+  else if (route.page === 'progress') content = <Progress />;
+  else if (route.page === 'learn') content = <Learn module={route.module} />;
+  else if (route.page === 'train') content = <Train />;
   else if (route.page === 'reviews') content = <Reviews />;
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'endgames') content = <Endgames />;

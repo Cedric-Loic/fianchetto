@@ -22,7 +22,7 @@ test('import PGN, analyse, revue avec explication, point de départ', async ({ p
   await page.getByRole('button', { name: "S'inscrire" }).click();
   await expect(page.getByTestId('nav-user')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Analyse' }).click();
+  await page.locator('nav').getByRole('link', { name: 'Mes parties', exact: true }).click();
   await page.getByTestId('chesscom-username').fill('moi_cc');
   await page.getByTestId('pgn-input').fill(PGN);
   await page.getByRole('button', { name: 'Importer le PGN' }).click();
@@ -55,14 +55,12 @@ test('import PGN, analyse, revue avec explication, point de départ', async ({ p
   await expect(page.locator('img[data-square="f3"]')).toHaveAttribute('alt', 'wn');
 
   // Point de départ mesuré sur la partie analysée.
-  await page.getByRole('link', { name: 'Analyse' }).click();
+  await page.locator('nav').getByRole('link', { name: 'Mes parties', exact: true }).click();
   await expect(page.getByTestId('baseline')).toContainText('1parties analysées');
   await page.screenshot({ path: 'test-results/analyse-imports.png', fullPage: true });
 });
 
-test('page Coach : séance du jour, compétences, parcours ; écran Révisions vide', async ({
-  page,
-}) => {
+test("pages Aujourd'hui, Progrès et Apprendre ; écran Révisions vide", async ({ page }) => {
   await page.goto('/#/login');
   await page.getByRole('button', { name: 'Pas de compte ? Créer un compte' }).click();
   await page.getByLabel('Pseudo').fill(`cp${Date.now() % 1_000_000_000}`);
@@ -71,18 +69,29 @@ test('page Coach : séance du jour, compétences, parcours ; écran Révisions v
   await expect(page.getByTestId('nav-user')).toBeVisible();
 
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.goto('/#/coach');
+  // Aujourd'hui : séance du jour, révisions dues, prochaine étape du parcours.
+  await page.goto('/#/today');
   const session = page.getByTestId('coach-session');
   await expect(session).toContainText('Séance du jour');
   await expect(session.locator('.session-steps li').first()).toBeVisible();
   await expect(page.getByTestId('session-start')).toHaveText('Commencer');
+  await expect(page.getByTestId('today-reviews-count')).toContainText('Aucune carte due');
+  await expect(page.getByTestId('path-next')).toBeVisible();
+  await page.screenshot({ path: 'test-results/aujourdhui.png' });
+
+  // Progrès : compétences (14), objectifs et classement.
+  await page.goto('/#/progress');
   await expect(page.locator('[data-testid^="skill-"]')).toHaveCount(14);
   await expect(page.getByTestId('coach-skills')).toContainText('pas encore mesuré');
-  await expect(page.getByTestId('coach-path')).toContainText('Parcours');
-  await page.screenshot({
-    path: '/tmp/claude-0/-home-user-fianchetto/f669a99c-69be-5c7c-a668-8806c175000f/scratchpad/coach.png',
-  });
+  await expect(page.getByTestId('coach-targets')).toBeVisible();
+  await expect(page.getByTestId('leaderboard')).toContainText('Classement');
 
+  // Apprendre : le parcours conseillé et les paliers.
+  await page.goto('/#/learn');
+  await expect(page.getByTestId('coach-path')).toContainText('Parcours');
+  await expect(page.getByTestId('stage-P1')).toBeVisible();
+
+  await page.goto('/#/today');
   await page.getByTestId('to-reviews').click();
   await expect(page).toHaveURL(/#\/reviews$/);
   await expect(page.getByTestId('reviews-count')).toContainText('0 carte due');

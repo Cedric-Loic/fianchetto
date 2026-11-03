@@ -24,7 +24,7 @@ test('tableau de bord : phase, semaine, profil, courbes, lien vers les puzzles',
   await expect(page.getByTestId('nav-user')).toBeVisible();
 
   // Tableau de bord vide : phase 1, invitation à analyser.
-  await page.locator('nav').getByRole('link', { name: 'Coach', exact: true }).click();
+  await page.locator('nav').getByRole('link', { name: 'Progrès', exact: true }).click();
   await expect(page.getByTestId('coach-phase')).toContainText('Phase 1 · Ne plus rien donner');
   await expect(page.getByTestId('coach-reco').getByRole('link').first()).toHaveAttribute(
     'href',
@@ -32,14 +32,14 @@ test('tableau de bord : phase, semaine, profil, courbes, lien vers les puzzles',
   );
 
   // Une partie importée et analysée.
-  await page.locator('nav').getByRole('link', { name: 'Analyse', exact: true }).click();
+  await page.locator('nav').getByRole('link', { name: 'Mes parties', exact: true }).click();
   await page.getByTestId('chesscom-username').fill('moi_cc');
   await page.getByTestId('pgn-input').fill(PGN);
   await page.getByRole('button', { name: 'Importer le PGN' }).click();
   await page.getByTestId('imported-games').getByRole('link', { name: 'Analyser' }).click();
   await expect(page.getByTestId('move-card')).toBeVisible({ timeout: 60_000 });
 
-  await page.locator('nav').getByRole('link', { name: 'Coach', exact: true }).click();
+  await page.locator('nav').getByRole('link', { name: 'Progrès', exact: true }).click();
   await expect(page.getByTestId('task-reviews')).toContainText('1 / 2');
   await expect(page.getByTestId('task-slow-games')).toContainText('1 / 2');
   await expect(page.getByTestId('coach-weaknesses')).toContainText('Pièce laissée en prise');

@@ -55,8 +55,8 @@ export function Reviews() {
   return (
     <div className="page">
       <section className="panel page-panel" data-testid="reviews">
-        <a href="#/coach" className="back-link">
-          ← Coach
+        <a href="#/train" className="back-link">
+          ← S'entraîner
         </a>
         <h2>Révisions</h2>
         <p className="muted" data-testid="reviews-count">

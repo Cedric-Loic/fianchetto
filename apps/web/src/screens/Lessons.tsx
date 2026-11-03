@@ -1,31 +1,14 @@
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import type { LessonSummary, LessonView } from '@sq/shared';
 import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
-import type {
-  DisplayedPiece,
-  LegalMove,
-  LessonExercise,
-  LessonSummary,
-  LessonView,
-  PuzzleStep,
-  Square,
-} from '@sq/shared';
+  ExercisePlayer,
+  type ExerciseAnswer,
+  type ExerciseVerdict,
+} from '../exercise/ExercisePlayer';
 import { Board } from '../game/Board';
-import { usePremoves } from '../game/usePremoves';
 import { api } from '../lib/api';
-import { carryIds, piecesFromFen } from '../lib/fen';
+import { piecesFromFen } from '../lib/fen';
 import { useSession } from '../lib/session';
-import { useSettings } from '../lib/settings';
-import { playSound } from '../lib/sound';
-import { useStreak } from '../lib/streak';
-import { applyLocalMoves, type LocalMove } from '../lib/virtual';
-import { SIDE } from './labels';
 import { BoardLayout } from '../ui/BoardLayout';
 import { Button } from '../ui/Button';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
@@ -65,6 +48,24 @@ function LoginNeeded() {
   return <LoginRequired title="Leçons" text="Connecte-toi pour suivre ta progression." />;
 }
 
+/** Carte d'une leçon : numéro, titre, résumé et état (validée, meilleur score). */
+export function LessonCard({ lesson: l, number }: { lesson: LessonSummary; number: number }) {
+  return (
+    <a href={`#/lessons/${l.id}`} className="lesson-card" data-testid={`lesson-${l.id}`}>
+      <span className="lesson-number">{number}</span>
+      <span className="lesson-body">
+        <strong>{l.title}</strong>
+        <span className="muted">
+          {l.summary} · {l.minutes} min
+        </span>
+      </span>
+      <span className={`lesson-status${l.passed ? ' win' : ''}`}>
+        {l.passed ? '✓ Validée' : l.best !== null ? `${l.best}/${l.exercises}` : ''}
+      </span>
+    </a>
+  );
+}
+
 /** Liste des leçons, par phase du plan, avec la progression. */
 export function Lessons() {
   const user = useSession((s) => s.user);
@@ -79,6 +80,9 @@ export function Lessons() {
   return (
     <div className="page">
       <div className="panel page-panel">
+        <a href="#/learn" className="back-link">
+          ← Apprendre
+        </a>
         <h2>Leçons</h2>
         <p className="muted">
           {passed} leçon{passed > 1 ? 's' : ''} validée{passed > 1 ? 's' : ''} sur {lessons.length}.
@@ -106,23 +110,7 @@ export function Lessons() {
               {lessons
                 .filter((l) => l.phase === phase)
                 .map((l, i) => (
-                  <a
-                    key={l.id}
-                    href={`#/lessons/${l.id}`}
-                    className="lesson-card"
-                    data-testid={`lesson-${l.id}`}
-                  >
-                    <span className="lesson-number">{i + 1}</span>
-                    <span className="lesson-body">
-                      <strong>{l.title}</strong>
-                      <span className="muted">
-                        {l.summary} · {l.minutes} min
-                      </span>
-                    </span>
-                    <span className={`lesson-status${l.passed ? ' win' : ''}`}>
-                      {l.passed ? '✓ Validée' : l.best !== null ? `${l.best}/${l.exercises}` : ''}
-                    </span>
-                  </a>
+                  <LessonCard key={l.id} lesson={l} number={i + 1} />
                 ))}
             </div>
           </div>
@@ -132,294 +120,20 @@ export function Lessons() {
   );
 }
 
-/** Indices progressifs : textes cumulés, demandés un à un au serveur. */
-function useHints(lessonId: string, index: number, available: number) {
-  const [texts, setTexts] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const ask = useCallback(async () => {
-    if (loading || texts.length >= available) return;
-    setLoading(true);
-    const res = await api.lessonHint(lessonId, index, texts.length + 1);
-    setLoading(false);
-    if (res) setTexts((t) => (t.length === texts.length ? [...t, res.hint] : t));
-  }, [loading, texts.length, available, lessonId, index]);
-  return { texts, ask, loading, left: available - texts.length };
-}
-
-type Hints = ReturnType<typeof useHints>;
-
-/** Bouton « Indice (n restants) » et indices déjà obtenus. */
-function HintPanel({ hints, active }: { hints: Hints; active: boolean }) {
-  return (
-    <>
-      {active && hints.left > 0 && (
-        <Button
-          size="s"
-          variant="outline"
-          disabled={hints.loading}
-          onClick={() => void hints.ask()}
-          data-testid="exercise-hint"
-        >
-          Indice ({hints.left} restant{hints.left > 1 ? 's' : ''})
-        </Button>
-      )}
-      {hints.texts.length > 0 && (
-        <ul className="hint-list" data-testid="hint-list">
-          {hints.texts.map((t, i) => (
-            <li key={i}>{t}</li>
-          ))}
-        </ul>
-      )}
-    </>
-  );
-}
-
-type ExerciseProps = {
-  lessonId: string;
-  index: number;
-  exercise: LessonExercise;
-  onDone: (firstTry: boolean) => void;
-  /** Panneau latéral : en-tête (retour, titre) et suite (bouton suivant). */
-  header: ReactNode;
-  footer: ReactNode;
-};
-
-/** Exercice « désigne les cases » : sélection multiple, validation par le serveur. */
-function SquaresBoard(props: ExerciseProps) {
-  const { exercise } = props;
-  const [picked, setPicked] = useState<Square[]>([]);
-  const [phase, setPhase] = useState<'playing' | 'solved' | 'failed'>('playing');
-  const [correct, setCorrect] = useState<Square[]>([]);
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const record = useStreak((s) => s.record);
-  const hints = useHints(props.lessonId, props.index, exercise.hints);
-  const playing = phase === 'playing';
-
-  const toggle = (sq: Square) => {
-    if (!playing || busy) return;
-    setPicked((p) => (p.includes(sq) ? p.filter((x) => x !== sq) : p.length < 8 ? [...p, sq] : p));
-  };
-  const validate = async () => {
-    if (!playing || busy || picked.length === 0) return;
-    setBusy(true);
-    const res = await api.lessonSquares(props.lessonId, props.index, picked, hints.texts.length);
-    setBusy(false);
-    if (!res) return;
-    setExplanation(res.explanation);
-    const ok = res.status === 'solved';
-    setCorrect(res.correct ?? []);
-    setPhase(ok ? 'solved' : 'failed');
-    playSound(ok ? 'success' : 'failure');
-    record(ok);
-    props.onDone(ok && hints.texts.length === 0);
-  };
-
-  const marks = [
-    ...(playing ? picked.map((square) => ({ square, kind: 'pick' as const })) : []),
-    ...(phase === 'failed' ? correct.map((square) => ({ square, kind: 'correct' as const })) : []),
-  ];
-  return (
-    <BoardLayout
-      className="exercise"
-      testId="exercises"
-      board={
-        <Board
-          pieces={piecesFromFen(exercise.fen)}
-          orientation={exercise.color}
-          movable={null}
-          onSquareClick={toggle}
-          squareMarks={marks}
-        />
-      }
-      side={
-        <>
-          {props.header}
-          <p>
-            <strong>{exercise.prompt}</strong>
-          </p>
-          <p className="muted">Clique les cases concernées (re-clic pour retirer).</p>
-          <HintPanel hints={hints} active={playing} />
-          {playing && (
-            <Button
-              variant="primary"
-              disabled={busy || picked.length === 0}
-              onClick={() => void validate()}
-              data-testid="squares-validate"
-            >
-              Valider
-            </Button>
-          )}
-          {!playing && (
-            <div className={`move-card puzzle-status ${phase}`} data-testid="exercise-status">
-              {phase === 'solved' && <p className="win">✓ Réussi !</p>}
-              {phase === 'failed' && (
-                <p className="loss">✗ Pas tout à fait. Les bonnes cases sont marquées en vert.</p>
-              )}
-              {explanation && <p data-testid="exercise-explanation">{explanation}</p>}
-            </div>
-          )}
-          {props.footer}
-        </>
-      }
-    />
-  );
-}
-
-/** Un exercice « trouve le coup » : le serveur valide chaque coup. */
-function ExerciseBoard(props: ExerciseProps) {
-  const { exercise } = props;
-  const showLegalMoves = useSettings((s) => s.showLegalMoves);
-  const [pieces, setPieces] = useState<DisplayedPiece[]>(() => piecesFromFen(exercise.fen));
-  const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
-  const [legal, setLegal] = useState<LegalMove[]>(exercise.legalMoves);
-  const [step, setStep] = useState(0);
-  const [phase, setPhase] = useState<'playing' | 'solved' | 'failed'>('playing');
-  const [progress, setProgress] = useState(false);
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  /** Éclair sur la case d'arrivée de mon coup : bon (vert) ou faux (rouge). */
-  const [flash, setFlash] = useState<{
-    square: Square;
-    tone: 'success' | 'error';
-    id: number;
-  } | null>(null);
-  const record = useStreak((s) => s.record);
-  const hints = useHints(props.lessonId, props.index, exercise.hints);
-  /** Coups refusés : après deux, le premier indice est proposé d'office. */
-  const refused = useRef(0);
-  /** Mon coup envoyé, affiché tout de suite en attendant la réponse du serveur. */
-  const [pending, setPending] = useState<LocalMove | null>(null);
-  // Premoves pendant la réponse adverse, oubliés dès que l'exercice est terminé.
-  const premoveOn = useSettings((s) => s.premoves);
-  const queue = usePremoves(phase, premoveOn);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(
-    () => () => {
-      for (const t of timers.current) clearTimeout(t);
-    },
-    [],
-  );
-
-  const apply = (s: PuzzleStep) => {
-    setPieces((prev) => carryIds(prev, piecesFromFen(s.fen), s.uci));
-    setLastMove({ from: s.uci.slice(0, 2) as Square, to: s.uci.slice(2, 4) as Square });
-  };
-  const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(fn, ms));
-
-  const onMove = async (move: LocalMove) => {
-    if (phase !== 'playing' || busy) return;
-    setBusy(true);
-    setPending(move);
-    const res = await api.lessonMove(
-      props.lessonId,
-      props.index,
-      step,
-      `${move.from}${move.to}${move.promotion ?? ''}`,
-      hints.texts.length,
-    );
-    setPending(null);
-    if (!res || res.status === 'illegal') {
-      // Coup (ou premove) refusé : la pièce revient, les premoves suivants sont annulés.
-      queue.clear();
-      setBusy(false);
-      refused.current += 1;
-      if (refused.current === 2 && hints.texts.length === 0 && exercise.hints > 0) {
-        void hints.ask();
-      }
-      return;
-    }
-    const failed = res.status === 'failed';
-    setFlash((f) => ({
-      square: move.to,
-      tone: failed ? 'error' : 'success',
-      id: (f?.id ?? 0) + 1,
-    }));
-    if (res.status === 'failed') {
-      playSound('failure');
-      record(false);
-      setExplanation(res.explanation);
-      setPhase('failed');
-      // Solution jouée automatiquement, coup par coup.
-      (res.solution ?? []).forEach((s, i) => later(() => apply(s), 600 * (i + 1)));
-      later(() => setBusy(false), 600 * ((res.solution?.length ?? 0) + 1));
-      props.onDone(false);
-      return;
-    }
-    const [mine, reply] = res.steps;
-    if (mine) apply(mine);
-    const finish = () => {
-      setLegal(res.legalMoves);
-      setStep((s) => s + 2);
-      if (res.status === 'solved') {
-        playSound('success');
-        record(true);
-        setExplanation(res.explanation);
-        setPhase('solved');
-        props.onDone(hints.texts.length === 0);
-      } else setProgress(true);
-      setBusy(false);
-    };
-    if (reply)
-      later(() => {
-        apply(reply);
-        finish();
-      }, 450);
-    else finish();
-  };
-
-  // Position de nouveau jouable : le premier premove part comme un coup normal.
-  const playable = phase === 'playing' && !busy;
-  const nextPremove = playable ? queue.next : undefined;
-  const playPremove = useEffectEvent((move: LocalMove) => {
-    queue.shift();
-    void onMove(move);
-  });
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- chaque premove ne part qu'une fois
-    if (nextPremove) playPremove(nextPremove);
-  }, [nextPremove]);
-
-  return (
-    <BoardLayout
-      className="exercise"
-      testId="exercises"
-      board={
-        <Board
-          pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
-          orientation={exercise.color}
-          movable={playable ? exercise.color : null}
-          premoveColor={premoveOn && phase === 'playing' && busy ? exercise.color : null}
-          premoves={queue.premoves}
-          onPremove={queue.add}
-          onCancelPremove={queue.clear}
-          legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
-          lastMove={lastMove}
-          flash={flash}
-          onMove={(from, to, promotion) =>
-            void onMove(promotion ? { from, to, promotion } : { from, to })
-          }
-        />
-      }
-      side={
-        <>
-          {props.header}
-          <p>
-            <strong>{exercise.prompt}</strong>
-          </p>
-          <p className="muted">Trait aux {SIDE[exercise.color]}.</p>
-          <div className={`move-card puzzle-status ${phase}`} data-testid="exercise-status">
-            {phase === 'playing' && <p>{progress ? '✓ Bien vu ! Continue.' : 'À toi de jouer.'}</p>}
-            {phase === 'solved' && <p className="win">✓ Réussi !</p>}
-            {phase === 'failed' && <p className="loss">✗ Ce n'est pas ça. Voici la solution.</p>}
-            {explanation && <p data-testid="exercise-explanation">{explanation}</p>}
-          </div>
-          <HintPanel hints={hints} active={phase === 'playing'} />
-          {props.footer}
-        </>
-      }
-    />
-  );
+/** Jugement d'une réponse d'exercice de leçon par le serveur (coup ou cases). */
+async function judgeLesson(
+  lessonId: string,
+  index: number,
+  answer: ExerciseAnswer,
+  hints: number,
+): Promise<ExerciseVerdict | null> {
+  if (answer.kind === 'move') {
+    return api.lessonMove(lessonId, index, answer.step, answer.uci, hints);
+  }
+  if (answer.kind === 'squares') {
+    return api.lessonSquares(lessonId, index, answer.squares, hints);
+  }
+  return null; // pas de QCM dans les leçons pour l'instant
 }
 
 /** Une leçon : explications et exemples, puis les exercices un par un, puis le bilan. */
@@ -472,13 +186,12 @@ export function LessonPage({ id, only = null }: { id: string; only?: number | nu
   };
 
   if (exercise && current !== null) {
-    const Exercise = exercise.kind === 'squares' ? SquaresBoard : ExerciseBoard;
     return (
-      <Exercise
+      <ExercisePlayer
         key={`${attempt}-${current}`}
-        lessonId={lesson.id}
-        index={current}
-        exercise={exercise}
+        spec={exercise}
+        judge={(answer, hints) => judgeLesson(lesson.id, current, answer, hints)}
+        hint={(level) => api.lessonHint(lesson.id, current, level).then((r) => r?.hint ?? null)}
         onDone={onDone}
         header={
           <>

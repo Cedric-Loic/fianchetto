@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { PUZZLE_THEME_LABELS, type CoachDashboard } from '@sq/shared';
 import { LineChart } from '../game/LineChart';
 import { api } from '../lib/api';
@@ -8,7 +8,8 @@ import { Button } from '../ui/Button';
 import { IconCheck, IconFlame, IconPuzzle, IconTarget } from '../ui/icons';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
-import { CoachPlan } from './CoachPlan';
+import { useCoachPlan } from '../lib/coachPlan';
+import { SkillsCard } from './CoachPlan';
 
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
 
@@ -20,18 +21,22 @@ const monthName = (key: string) =>
   new Date(`${key}-15T12:00:00`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
 /**
- * Tableau de bord du coach : phase du programme, plan de la semaine, recommandations, profil de
- * faiblesses, courbes de progression, objectifs du plan et bilan mensuel.
+ * Contenu de la rubrique Progrès : compétences, régularité, phase du programme, plan de la
+ * semaine, recommandations, profil de faiblesses, courbes, objectifs du plan et bilan mensuel.
+ * `footer` : bloc ajouté en bas (classement).
  */
-export function Coach() {
+export function Coach({ footer }: { footer?: ReactNode }) {
   const user = useSession((s) => s.user);
+  const plan = useCoachPlan(user !== null, { skills: true, curriculum: true });
   const [data, setData] = useState<CoachDashboard | null>(null);
   useEffect(() => {
     if (user) void api.dashboard().then(setData);
   }, [user]);
 
   if (!user) {
-    return <LoginRequired title="Coach" text="Connecte-toi pour suivre ton plan de progression." />;
+    return (
+      <LoginRequired title="Progrès" text="Connecte-toi pour suivre ton plan de progression." />
+    );
   }
   if (!data) return <Loading label="Chargement du tableau de bord…" />;
   const { phase, week, weaknesses: w } = data;
@@ -53,7 +58,17 @@ export function Coach() {
 
   return (
     <div className="page coach">
-      <CoachPlan />
+      {plan.skills && (
+        <SkillsCard
+          skills={plan.skills}
+          hasModule={(s) => plan.curriculum?.modules.some((m) => m.skill === s) ?? false}
+          onPick={(s) => {
+            // Le parcours est dans « Apprendre » : on y ouvre le module de la compétence.
+            const m = plan.curriculum?.modules.find((x) => x.skill === s);
+            if (m) location.hash = `#/learn?module=${m.id}`;
+          }}
+        />
+      )}
 
       <section
         className="panel banner coach-next"
@@ -173,7 +188,7 @@ export function Coach() {
             </ol>
           )}
           <p className="muted">
-            Aussi : <a href="#/lessons">les leçons</a> et{' '}
+            Aussi : <a href="#/learn">le parcours d'apprentissage</a> et{' '}
             <a href="#/endgames" data-testid="coach-endgames">
               les finales contre le bot
             </a>
@@ -413,6 +428,7 @@ export function Coach() {
           </table>
         </div>
       </div>
+      {footer}
     </div>
   );
 }

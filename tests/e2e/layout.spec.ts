@@ -43,13 +43,13 @@ test('390 px : accueil, menu repliable, partie contre le bot, puzzles sans défi
 
   // Menu replié : rubriques cachées, bouton à trois traits.
   const nav = page.locator('nav');
-  await expect(nav.getByRole('link', { name: 'Puzzles', exact: true })).toBeHidden();
-  await navigate(page, 'Classement');
-  await expect(page).toHaveURL(/#\/leaderboard$/);
-  await expect(nav.getByRole('link', { name: 'Puzzles', exact: true })).toBeHidden();
+  await expect(nav.getByRole('link', { name: 'Apprendre', exact: true })).toBeHidden();
+  await navigate(page, 'Progrès');
+  await expect(page).toHaveURL(/#\/progress$/);
+  await expect(nav.getByRole('link', { name: 'Apprendre', exact: true })).toBeHidden();
   // Rubrique courante surlignée.
   await page.getByTestId('nav-toggle').click();
-  await expect(nav.getByRole('link', { name: 'Classement', exact: true })).toHaveAttribute(
+  await expect(nav.getByRole('link', { name: 'Progrès', exact: true })).toHaveAttribute(
     'aria-current',
     'page',
   );
@@ -79,7 +79,8 @@ test('390 px : accueil, menu repliable, partie contre le bot, puzzles sans défi
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390 - 4);
   expect(box?.width).toBeGreaterThan(340);
 
-  await navigate(page, 'Puzzles');
+  await navigate(page, "S'entraîner");
+  await page.getByTestId('train-puzzles').getByRole('link').click();
   await expect(page.getByTestId('puzzle-status')).toBeVisible();
   await expect(page.getByTestId('board')).toBeVisible();
   await expectNoHorizontalScroll(page);

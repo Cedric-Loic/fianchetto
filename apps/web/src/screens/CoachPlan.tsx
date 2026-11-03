@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type {
   CurriculumResponse,
   DailySession,
@@ -11,53 +11,11 @@ import { api } from '../lib/api';
 import { Button } from '../ui/Button';
 import { IconCheck, IconHourglass, IconTarget } from '../ui/icons';
 
-/** Les trois blocs pédagogiques du Coach : séance du jour, compétences, parcours. */
-export function CoachPlan() {
-  const [session, setSession] = useState<DailySession | null>(null);
-  const [skills, setSkills] = useState<SkillLevel[] | null>(null);
-  const [curriculum, setCurriculum] = useState<CurriculumResponse | null>(null);
-  const [due, setDue] = useState<number | null>(null);
-  const [highlight, setHighlight] = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = () => {
-      void api.coachSession().then((r) => r && setSession(r.session));
-      void api.coachSkills().then((r) => r && setSkills(r.skills));
-      void api.coachCurriculum().then((r) => r && setCurriculum(r));
-      void api.reviewCards().then((r) => r && setDue(r.due.length));
-    };
-    load();
-    // Retour sur l'onglet : l'état est redemandé au serveur (rien n'est coché côté client).
-    const onVisible = () => document.visibilityState === 'visible' && load();
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
-
-  const openModule = (skill: SkillId) => {
-    const m = curriculum?.modules.find((x) => x.skill === skill);
-    if (!m) return;
-    setHighlight(m.id);
-    document.getElementById(`module-${m.id}`)?.scrollIntoView({ block: 'center' });
-  };
-
-  return (
-    <>
-      {session && <SessionCard session={session} due={due} onChange={setSession} />}
-      {skills && (
-        <SkillsCard
-          skills={skills}
-          hasModule={(s) => curriculum?.modules.some((m) => m.skill === s) ?? false}
-          onPick={openModule}
-        />
-      )}
-      {curriculum && <PathCard curriculum={curriculum} highlight={highlight} />}
-    </>
-  );
-}
-
-function SessionCard(props: {
+/** Séance du jour : étapes cochées par le serveur, bouton « Commencer / Continuer ». */
+export function SessionCard(props: {
   session: DailySession;
-  due: number | null;
+  /** Cartes dues : affiche le bouton « Révisions » de la séance (absent si la page l'affiche). */
+  due?: number | null;
   onChange: (s: DailySession) => void;
 }) {
   const { session } = props;
@@ -119,9 +77,11 @@ function SessionCard(props: {
             ✓ Séance terminée, bravo !
           </span>
         )}
-        <Button href="#/reviews" data-testid="to-reviews">
-          Révisions{props.due ? ` (${props.due})` : ''}
-        </Button>
+        {props.due !== undefined && (
+          <Button href="#/reviews" data-testid="to-reviews">
+            Révisions{props.due ? ` (${props.due})` : ''}
+          </Button>
+        )}
         {session.followUp && (
           <Button variant="link" href={session.followUp.href} data-testid="session-followup">
             Application : {session.followUp.label}
@@ -132,7 +92,8 @@ function SessionCard(props: {
   );
 }
 
-function SkillsCard(props: {
+/** Compétences, les plus faibles d'abord ; `onPick` ouvre le module du parcours correspondant. */
+export function SkillsCard(props: {
   skills: SkillLevel[];
   hasModule: (s: SkillId) => boolean;
   onPick: (s: SkillId) => void;
@@ -192,7 +153,8 @@ function SkillsCard(props: {
   );
 }
 
-function PathCard({
+/** Parcours de la phase : modules et étapes, prochaine étape conseillée (`highlight` : module). */
+export function PathCard({
   curriculum,
   highlight,
 }: {

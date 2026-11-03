@@ -44,7 +44,7 @@ test('accueil : verrou souple du blitz avec confirmation, niveau du bot conseill
   await expect(bot.getByTestId('tc-blitz-3+2')).toHaveAttribute('aria-pressed', 'true');
 
   // Tableau de bord : série, objectif du jour, minutes de la semaine.
-  await page.locator('nav').getByRole('link', { name: 'Coach', exact: true }).click();
+  await page.locator('nav').getByRole('link', { name: 'Progrès', exact: true }).click();
   await expect(page.getByTestId('day-streak')).toContainText('0 jour');
   await expect(page.getByTestId('daily-goal')).toContainText('0 / 10 puzzles');
   await expect(page.getByTestId('week-minutes')).toContainText('/ 3 h');

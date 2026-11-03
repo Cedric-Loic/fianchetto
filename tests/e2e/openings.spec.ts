@@ -25,8 +25,8 @@ test('répertoire : réviser une ligne, erreur puis ligne recommencée jusqu’a
   await page.getByRole('button', { name: "S'inscrire" }).click();
   await expect(page.getByTestId('nav-user')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Leçons' }).click();
-  await page.getByTestId('lessons-openings').click();
+  await page.locator('nav').getByRole('link', { name: 'Apprendre', exact: true }).click();
+  await page.getByTestId('learn-openings').click();
   await expect(page.getByRole('heading', { name: 'Répertoire d’ouvertures' })).toBeVisible();
   await expect(page.getByTestId('openings-due')).toContainText('Aucune ligne due');
   await expect(page.getByTestId('openings-review')).toContainText('Apprendre une nouvelle ligne');

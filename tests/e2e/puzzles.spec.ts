@@ -19,7 +19,8 @@ test('puzzle par thème : coup adverse animé, échec puis solution, réussite c
   await page.getByRole('button', { name: "S'inscrire" }).click();
   await expect(page.getByTestId('nav-user')).toBeVisible();
 
-  await page.locator('nav').getByRole('link', { name: 'Puzzles', exact: true }).click();
+  await page.locator('nav').getByRole('link', { name: "S'entraîner", exact: true }).click();
+  await page.getByTestId('train-puzzles').getByRole('link').click();
   await expect(page.getByTestId('puzzle-rating')).toContainText('1500');
   // Base de démonstration des tests : sinon (serveur de dev déjà lancé), test sauté.
   await page.getByTestId('puzzle-mode-theme').click();

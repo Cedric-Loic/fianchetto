@@ -10,7 +10,7 @@ async function clickSquare(page: Page, square: string) {
   await page.mouse.click(box.x + (x + 0.5) * size, box.y + (y + 0.5) * size);
 }
 
-test('finale contre le bot : ouvrir depuis les leçons, le bot répond, échec puis Réessayer', async ({
+test('finale contre le bot : ouvrir depuis Apprendre, le bot répond, échec puis Réessayer', async ({
   page,
 }) => {
   await page.goto('/#/login');
@@ -20,8 +20,8 @@ test('finale contre le bot : ouvrir depuis les leçons, le bot répond, échec p
   await page.getByRole('button', { name: "S'inscrire" }).click();
   await expect(page.getByTestId('nav-user')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Leçons' }).click();
-  await page.getByTestId('lessons-endgames').click();
+  await page.locator('nav').getByRole('link', { name: 'Apprendre', exact: true }).click();
+  await page.getByTestId('learn-endgames').click();
   await expect(page.getByRole('heading', { name: 'Finales contre le bot' })).toBeVisible();
   await expect(page.getByTestId('endgame-lucena')).toContainText('Position de Lucena');
   await page.getByTestId('endgame-play-lucena').click();

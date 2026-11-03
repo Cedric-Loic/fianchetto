@@ -85,7 +85,7 @@ test('captures d’écran (bureau et téléphone)', async ({ page }) => {
       () => expect(page.getByTestId('analysis-board')).toBeVisible(),
     ],
     ['puzzles', '/#/puzzles', () => expect(page.getByTestId('puzzle-status')).toBeVisible()],
-    ['coach', '/#/coach', () => expect(page.getByTestId('coach-phase')).toBeVisible()],
+    ['coach', '/#/progress', () => expect(page.getByTestId('coach-phase')).toBeVisible()],
     ['lecons', '/#/lessons', () => expect(page.getByTestId('lesson-routine')).toBeVisible()],
     ['lecon', '/#/lessons/routine', () => expect(page.getByTestId('exercises')).toBeVisible()],
     ['classement', '/#/leaderboard', () => expect(page.locator('h2')).toBeVisible()],
