@@ -1334,17 +1334,6 @@ textarea:focus-visible {
 .board-layout .board {
   width: var(--board-size);
 }
-/* Échiquier d'analyse : les onglets prennent leur hauteur, la mise en page le reste. */
-.analyse-shell.board-shell {
-  display: flex;
-  flex-direction: column;
-  height: calc(100dvh - var(--nav-height));
-}
-.analyse-shell.board-shell > .board-layout {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
 .player-bar {
   display: flex;
   align-items: center;
@@ -1444,6 +1433,9 @@ textarea:focus-visible {
 /* Panneau trop rempli (revue, entraînement) : il défile ; seule la liste des coups rétrécit. */
 .side-panel > * {
   flex-shrink: 0;
+}
+.side-panel > .tabs {
+  margin-bottom: 0;
 }
 .side-panel > .move-list {
   flex-shrink: 1;
@@ -2394,7 +2386,7 @@ textarea:focus-visible {
 .variation-card .btn {
   margin-bottom: var(--space-2);
 }
-.analyse-shell .analyse-tabs {
+.analyse-shell > .analyse-tabs {
   max-width: 960px;
   margin: var(--space-4) auto 0;
   width: calc(100% - 2 * var(--space-4));
@@ -3103,10 +3095,6 @@ textarea:focus-visible {
   }
   .focus-overlay {
     padding: var(--space-2);
-  }
-  .analyse-shell.board-shell {
-    display: block;
-    height: auto;
   }
   .board-column {
     width: 100%;

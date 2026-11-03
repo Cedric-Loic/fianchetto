@@ -101,8 +101,8 @@ const SCREENS: Screen[] = [
   },
   {
     name: 'analyse',
-    // Onglets au-dessus (≈ 60 px), pas de barres de noms sur l'échiquier libre.
-    bars: 60,
+    // Onglets dans le panneau, pas de barres de noms sur l'échiquier libre.
+    bars: 0,
     evalWidth: 38,
     open: async (page) => {
       await page.goto('/#/analyse/board');

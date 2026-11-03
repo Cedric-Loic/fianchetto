@@ -42,6 +42,8 @@ export interface AnalysisBoardProps {
   lockMainline?: boolean;
   /** Noms affichés au-dessus et au-dessous du plateau, par camp. */
   names?: Partial<Record<Color, ReactNode>>;
+  /** En-tête du panneau latéral (onglets de la page), avant tout le reste. */
+  panelHeader?: ReactNode;
   /** Contenu du panneau latéral, avant et après le moteur et la liste des coups. */
   panelTop?: ReactNode;
   panelBottom?: ReactNode;
@@ -231,6 +233,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
       }
       side={
         <>
+          {props.panelHeader}
           {props.panelTop}
           {!guided && (
             <>
