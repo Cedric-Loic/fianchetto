@@ -88,6 +88,7 @@ test('étape 1 sans moteur, marquage d’un moment, étape 2 avec comparaison', 
 
   // Progrès : profil de pensée ; Aujourd'hui : conseil.
   await page.goto('/#/progress');
+  await page.getByTestId('progress-tab-games').click();
   await expect(page.getByTestId('thinking-no-threat-check')).toBeVisible();
   await expect(page.getByTestId('thinking-advice')).toContainText('Que menace son dernier coup');
   await page.goto('/#/today');
@@ -99,6 +100,7 @@ test('« Passer cette étape » : la revue normale, rien n’est créé', async 
   await register(page);
   // Sans revue réflexive : profil de pensée vide.
   await page.goto('/#/progress');
+  await page.getByTestId('progress-tab-games').click();
   await expect(page.getByTestId('thinking-profile')).toContainText('Pas encore de revue réflexive');
 
   const url = await openReview(page);
@@ -113,5 +115,6 @@ test('« Passer cette étape » : la revue normale, rien n’est créé', async 
   await page.goto(url);
   await expect(page.getByTestId('self-step')).toBeVisible({ timeout: 60_000 });
   await page.goto('/#/progress');
+  await page.getByTestId('progress-tab-games').click();
   await expect(page.getByTestId('thinking-profile')).toContainText('Pas encore de revue réflexive');
 });

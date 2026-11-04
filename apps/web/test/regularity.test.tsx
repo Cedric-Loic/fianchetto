@@ -132,6 +132,8 @@ describe('Coach : régularité et bilan mensuel', () => {
     expect(screen.getByTestId('coach-theme-of-day').getAttribute('href')).toBe(
       '#/puzzles/theme/fork',
     );
+    // Le bilan mensuel est dans l'onglet « Évolution ».
+    fireEvent.click(screen.getByTestId('progress-tab-evolution'));
     const verdict = screen.getByTestId('month-verdict');
     expect(verdict.textContent).toContain('En retard');
     expect(verdict.querySelector('.verdict-behind')).not.toBeNull();
@@ -158,6 +160,7 @@ describe('Coach : profil (lot 4d)', () => {
       }),
     );
     render(<Coach />);
+    fireEvent.click(await screen.findByTestId('progress-tab-games'));
     const profile = await screen.findByTestId('coach-weaknesses');
     expect(profile.textContent).toContain('Clouage permis');
     expect(profile.textContent).toContain('Finale mal convertie');
@@ -172,6 +175,7 @@ describe('Coach : profil (lot 4d)', () => {
       dashboard({ weaknesses: { ...dashboard().weaknesses, games: 1 } }),
     );
     render(<Coach />);
+    fireEvent.click(await screen.findByTestId('progress-tab-games'));
     await screen.findByTestId('coach-weaknesses');
     expect(screen.queryByTestId('coach-clock')).toBeNull();
   });

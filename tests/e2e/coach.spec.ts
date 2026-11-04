@@ -84,7 +84,9 @@ test("pages Aujourd'hui, Progrès et Apprendre ; écran Révisions vide", async 
   await page.goto('/#/progress');
   await expect(page.locator('[data-testid^="skill-"]')).toHaveCount(14);
   await expect(page.getByTestId('coach-skills')).toContainText('pas encore mesuré');
+  await page.getByTestId('progress-tab-evolution').click();
   await expect(page.getByTestId('coach-targets')).toBeVisible();
+  await page.getByTestId('progress-tab-ranking').click();
   await expect(page.getByTestId('leaderboard')).toContainText('Classement');
 
   // Apprendre : le parcours conseillé et les paliers.

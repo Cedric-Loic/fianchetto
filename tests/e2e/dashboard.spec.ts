@@ -43,10 +43,13 @@ test('tableau de bord : phase, semaine, profil, courbes, lien vers les puzzles',
   await page.locator('nav').getByRole('link', { name: 'Progrès', exact: true }).click();
   await expect(page.getByTestId('task-reviews')).toContainText('1 / 2');
   await expect(page.getByTestId('task-slow-games')).toContainText('1 / 2');
+  await page.getByTestId('progress-tab-games').click();
   await expect(page.getByTestId('coach-weaknesses')).toContainText('Pièce laissée en prise');
+  await page.getByTestId('progress-tab-evolution').click();
   await expect(page.getByTestId('curve-chesscom-rapid').locator('svg')).toBeVisible();
   await expect(page.getByTestId('coach-months')).toContainText('980');
   await page.screenshot({ path: 'test-results/coach.png', fullPage: true });
+  await page.getByTestId('progress-tab-overview').click();
 
   // La recommandation principale mène aux puzzles du bon thème.
   await page

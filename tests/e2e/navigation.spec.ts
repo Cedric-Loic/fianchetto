@@ -153,3 +153,21 @@ test('partie introuvable : message et retour, pas de chargement sans fin', async
   await page.getByRole('link', { name: "Retour à l'accueil" }).click();
   await expect(page).toHaveURL(/#\/$/);
 });
+
+test('Progrès : quatre onglets, régularité toujours visible, page raccourcie', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await register(page);
+  await page.goto('/#/progress');
+  await expect(page.getByTestId('coach-skills')).toBeVisible();
+  await expect(page.getByTestId('coach-regularity')).toBeVisible();
+  await expect(page.getByTestId('coach-months')).toHaveCount(0);
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(height).toBeLessThan(3200);
+
+  await page.getByTestId('progress-tab-evolution').click();
+  await expect(page.getByTestId('coach-months')).toBeVisible();
+  await expect(page.getByTestId('coach-skills')).toHaveCount(0);
+  await expect(page.getByTestId('coach-regularity')).toBeVisible();
+  await page.getByTestId('progress-tab-ranking').click();
+  await expect(page.getByTestId('leaderboard')).toBeVisible();
+});
