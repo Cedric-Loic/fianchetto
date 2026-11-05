@@ -8,6 +8,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
+import { Tabs } from '../ui/Tabs';
 import { IconPlay } from '../ui/icons';
 
 /** Paliers du cours (même découpage que le parcours « Apprendre »). */
@@ -31,6 +32,7 @@ export function Endgames() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [exam, setExam] = useState<ExamSummary | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   useEffect(() => {
     if (!user) return;
     void api.endgames().then((r) => setEndgames(r?.endgames ?? []));
@@ -66,54 +68,93 @@ export function Endgames() {
             Impossible de lancer la finale. Réessaie dans un instant.
           </p>
         )}
-        {STAGES.map(({ stage, label, elo }) => {
-          const list = endgames.filter((e) => e.stage === stage);
-          if (list.length === 0) return null;
-          const done = list.filter((e) => e.passed).length;
+        {(() => {
+          const stages = STAGES.map((st) => {
+            const list = endgames.filter((e) => e.stage === st.stage);
+            return { ...st, list, done: list.filter((e) => e.passed).length };
+          }).filter((st) => st.list.length > 0);
+          // Un palier à la fois : par défaut, le premier qui n'est pas terminé.
+          const current =
+            stages.find((st) => String(st.stage) === picked) ??
+            stages.find((st) => st.done < st.list.length) ??
+            stages[0];
+          if (!current) return null;
           return (
-            <section key={stage} className="endgame-stage" data-testid={`endgame-stage-${stage}`}>
-              <h3 className="endgame-stage-title">
-                {label} <span className="muted">· {elo} Elo</span>
-                <Badge tone={done === list.length ? 'accent' : 'neutral'}>
-                  <span data-testid={`endgame-stage-${stage}-count`}>
-                    {done} / {list.length} réussies
-                  </span>
-                </Badge>
-              </h3>
-              {stage === 1 && (
-                <div className="exam-mini" data-testid="exam-mini">
-                  <Button
-                    size="s"
-                    variant="secondary"
-                    href="#/exam/1/mini"
-                    data-testid="exam-mini-start"
-                  >
-                    Mini-test : 5 questions
-                  </Button>
-                  {exam?.miniPassed && (
-                    <Badge tone="accent" testId="exam-mini-passed">
-                      ✓ Mini-test réussi
-                    </Badge>
-                  )}
-                </div>
-              )}
-              <div className="lesson-list">
-                {list.map((e, i) => (
-                  <EndgameCard
-                    key={e.id}
-                    endgame={e}
-                    number={i + 1}
-                    busy={busy !== null}
-                    onPlay={() => void play(e.id)}
-                  />
-                ))}
-              </div>
-            </section>
+            <>
+              <Tabs
+                label="Paliers"
+                value={String(current.stage)}
+                onChange={setPicked}
+                items={stages.map((st) => ({
+                  id: String(st.stage),
+                  testId: `endgame-tab-${st.stage}`,
+                  label: (
+                    <>
+                      P{st.stage} · {st.elo}{' '}
+                      <span className="muted">
+                        {st.done}/{st.list.length}
+                      </span>
+                    </>
+                  ),
+                }))}
+              />
+              {renderStage(current)}
+            </>
           );
-        })}
+        })()}
       </div>
     </div>
   );
+
+  /** Un palier : finales réussies, mini-test (palier 1), cartes des finales. */
+  function renderStage({
+    stage,
+    label,
+    elo,
+    list,
+    done,
+  }: (typeof STAGES)[number] & { list: EndgameSummary[]; done: number }) {
+    return (
+      <section
+        className="endgame-stage"
+        data-testid={`endgame-stage-${stage}`}
+        role="tabpanel"
+        aria-label={label}
+      >
+        <h3 className="endgame-stage-title">
+          {label} <span className="muted">· {elo} Elo</span>
+          <Badge tone={done === list.length ? 'accent' : 'neutral'}>
+            <span data-testid={`endgame-stage-${stage}-count`}>
+              {done} / {list.length} réussies
+            </span>
+          </Badge>
+        </h3>
+        {stage === 1 && (
+          <div className="exam-mini" data-testid="exam-mini">
+            <Button size="s" variant="secondary" href="#/exam/1/mini" data-testid="exam-mini-start">
+              Mini-test : 5 questions
+            </Button>
+            {exam?.miniPassed && (
+              <Badge tone="accent" testId="exam-mini-passed">
+                ✓ Mini-test réussi
+              </Badge>
+            )}
+          </div>
+        )}
+        <div className="lesson-list">
+          {list.map((e, i) => (
+            <EndgameCard
+              key={e.id}
+              endgame={e}
+              number={i + 1}
+              busy={busy !== null}
+              onPlay={() => void play(e.id)}
+            />
+          ))}
+        </div>
+      </section>
+    );
+  }
 }
 
 /** Une finale : titre, objectif complet, badges d'état, puis les deux temps (cours, partie). */

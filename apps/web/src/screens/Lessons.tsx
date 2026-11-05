@@ -12,6 +12,7 @@ import { useNavKeys } from '../lib/navKeys';
 import { Button } from '../ui/Button';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
+import { Tabs } from '../ui/Tabs';
 import { IconBook, IconNext } from '../ui/icons';
 import { StreakBadge } from '../ui/StreakBadge';
 
@@ -72,12 +73,21 @@ export function LessonCard({ lesson: l, number }: { lesson: LessonSummary; numbe
 export function Lessons() {
   const user = useSession((s) => s.user);
   const [lessons, setLessons] = useState<LessonSummary[] | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   useEffect(() => {
     if (user) void api.lessons().then((r) => setLessons(r?.lessons ?? []));
   }, [user]);
   if (!user) return <LoginNeeded />;
   if (lessons === null) return <Loading label="Chargement des leçons…" />;
-  const phases = [...new Set(lessons.map((l) => l.phase))];
+  const phases = [...new Set(lessons.map((l) => l.phase))].map((phase) => {
+    const list = lessons.filter((l) => l.phase === phase);
+    return { phase, list, done: list.filter((l) => l.passed).length };
+  });
+  // Un palier à la fois : par défaut, le premier qui n'est pas terminé.
+  const current =
+    phases.find((p) => String(p.phase) === picked) ??
+    phases.find((p) => p.done < p.list.length) ??
+    phases[0];
   const passed = lessons.filter((l) => l.passed).length;
   return (
     <div className="page">
@@ -105,18 +115,40 @@ export function Lessons() {
             Le serveur n'a renvoyé aucune leçon.
           </EmptyState>
         )}
-        {phases.map((phase) => (
-          <div key={phase} className="lesson-phase">
-            <h3>{PHASES[phase] ?? `Palier ${phase}`}</h3>
-            <div className="lesson-list">
-              {lessons
-                .filter((l) => l.phase === phase)
-                .map((l, i) => (
+        {current && (
+          <>
+            <Tabs
+              label="Paliers"
+              value={String(current.phase)}
+              onChange={setPicked}
+              items={phases.map((p) => ({
+                id: String(p.phase),
+                testId: `lesson-tab-${p.phase}`,
+                label: (
+                  <>
+                    {PHASES[p.phase] ?? `Palier ${p.phase}`}{' '}
+                    <span className="muted">
+                      {p.done}/{p.list.length}
+                    </span>
+                  </>
+                ),
+              }))}
+            />
+            <div
+              key={current.phase}
+              className="lesson-phase"
+              role="tabpanel"
+              aria-label={PHASES[current.phase] ?? `Palier ${current.phase}`}
+              data-testid={`lesson-phase-${current.phase}`}
+            >
+              <div className="lesson-list">
+                {current.list.map((l, i) => (
                   <LessonCard key={l.id} lesson={l} number={i + 1} />
                 ))}
+              </div>
             </div>
-          </div>
-        ))}
+          </>
+        )}
       </div>
     </div>
   );

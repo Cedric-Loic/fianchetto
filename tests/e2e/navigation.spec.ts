@@ -68,7 +68,7 @@ test('anciennes adresses : redirigées ou toujours valides, rubrique parente sur
   const pages: [string, string, string][] = [
     ['/#/lessons', 'lesson-routine', 'Apprendre'],
     ['/#/lessons/routine', 'start-exercises', 'Apprendre'],
-    ['/#/endgames', 'endgame-lucena', 'Apprendre'],
+    ['/#/endgames', 'endgame-stage-1', 'Apprendre'],
     ['/#/exam/1', 'exam-intro', 'Apprendre'],
     ['/#/openings', 'openings-due', 'Apprendre'],
     ['/#/puzzles', 'puzzle-rating', "S'entraîner"],

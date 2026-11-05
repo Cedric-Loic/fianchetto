@@ -32,6 +32,8 @@ test('finale contre le bot : ouvrir depuis Apprendre, le bot répond, échec pui
   await page.locator('nav').getByRole('link', { name: 'Apprendre', exact: true }).click();
   await page.getByTestId('learn-endgames').click();
   await expect(page.getByRole('heading', { name: 'Finales contre le bot' })).toBeVisible();
+  // Un palier à la fois : Lucena est au palier 2.
+  await page.getByTestId('endgame-tab-2').click();
   await expect(page.getByTestId('endgame-lucena')).toContainText('Position de Lucena');
   await page.getByTestId('endgame-play-lucena').click();
 
@@ -56,6 +58,7 @@ test('finale contre le bot : ouvrir depuis Apprendre, le bot répond, échec pui
   await expect(page.getByTestId('move-list').locator('button.move')).toHaveCount(0);
 
   await page.goto('/#/endgames');
+  await page.getByTestId('endgame-tab-2').click();
   await expect(page.getByTestId('endgame-lucena')).toContainText('1 essai');
 });
 
@@ -68,7 +71,10 @@ test('cours de finales : paliers, lien vers le cours, coups restants et indices'
   // Sections par palier avec leur compteur, finale jamais tentée : le cours d'abord.
   await expect(page.getByTestId('endgame-stage-1')).toBeVisible();
   await expect(page.getByTestId('endgame-stage-1-count')).toContainText('0 /');
+  await expect(page.getByTestId('endgame-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await page.getByTestId('endgame-tab-2').click();
   await expect(page.getByTestId('endgame-stage-2')).toBeVisible();
+  await expect(page.getByTestId('endgame-stage-1')).toHaveCount(0);
   const card = page.getByTestId('endgame-lucena');
   await expect(card).toContainText('en 35 coups max');
   await expect(card).toContainText('1. Cours');

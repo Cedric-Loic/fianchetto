@@ -75,6 +75,7 @@ const SCREENS: Screen[] = [
     evalWidth: 0,
     open: async (page) => {
       await page.goto('/#/endgames');
+      await page.getByTestId('endgame-tab-2').click();
       await page.getByTestId('endgame-play-lucena').click();
       await expect(page.getByTestId('endgame-moves')).toBeVisible();
     },

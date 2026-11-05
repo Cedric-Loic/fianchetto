@@ -1087,7 +1087,7 @@ textarea:focus-visible {
 .sq[data-rank]::before,
 .sq[data-file]::after {
   position: absolute;
-  font-size: clamp(11px, 1.7vw, 14px);
+  font-size: clamp(12px, 1.7vw, 14px);
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
@@ -4010,4 +4010,34 @@ button.skill-row:hover {
 }
 .vision-prompt .vision-target {
   font-size: var(--fs-40);
+}
+
+/* --- Écrans tactiles : cibles d'au moins 44 px (recommandations Apple et Google) --------- */
+@media (pointer: coarse), (max-width: 899px) {
+  .btn,
+  .tab {
+    min-height: 44px;
+  }
+  .back-link,
+  .position-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* Liens de texte (listes de leçons, séance du jour, classement…) : zone de toucher agrandie
+     sans changer la mise en page des cartes et boutons. */
+  main a:not([class]) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .walkthrough .wt-moves button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  main input[type='checkbox'],
+  main input[type='radio'] {
+    width: 22px;
+    height: 22px;
+  }
 }
