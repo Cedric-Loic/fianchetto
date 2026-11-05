@@ -44,6 +44,21 @@ test('répertoire : réviser une ligne, erreur puis ligne recommencée jusqu’a
   for (const [i, uci] of line.entries()) {
     await play(page, uci);
     if (i + 1 < line.length) await expect(status).toContainText(`coup ${i + 2} sur 8`);
+    if (i === 1) {
+      // Flèches : ← coup précédent, ↓ début, → coup suivant, ↑ position actuelle.
+      const e4 = page.locator('img[data-square="e4"]');
+      const f3 = page.locator('img[data-square="f3"]');
+      await expect(f3).toHaveAttribute('alt', 'wn');
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('ArrowLeft');
+      await expect(f3).toHaveCount(0);
+      await page.keyboard.press('ArrowDown');
+      await expect(e4).toHaveCount(0);
+      await page.keyboard.press('ArrowRight');
+      await expect(e4).toHaveAttribute('alt', 'wp');
+      await page.keyboard.press('ArrowUp');
+      await expect(f3).toHaveAttribute('alt', 'wn');
+    }
   }
   await expect(page.getByTestId('opening-done')).toContainText('Elle reviendra demain');
   await expect(page.getByTestId('opening-played')).toContainText('8. Nd5#');

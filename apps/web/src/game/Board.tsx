@@ -485,6 +485,14 @@ export function Board(props: BoardProps) {
           ['--square-dark' as string]: theme.dark,
         }}
         onKeyDown={onKeyDown}
+        onMouseDown={(e) => {
+          // Un clic ne donne pas le focus aux cases : les flèches restent aux raccourcis de
+          // navigation (coup précédent, suivant…). Le focus clavier (Tab) reste possible.
+          if (e.target instanceof Element && e.target.closest('.promotion')) return;
+          e.preventDefault();
+          const active = document.activeElement;
+          if (active instanceof HTMLElement && !boardRef.current?.contains(active)) active.blur();
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

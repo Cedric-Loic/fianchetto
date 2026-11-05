@@ -84,7 +84,7 @@ function ignoredTarget(target: EventTarget | null): boolean {
 /**
  * Échiquier d'analyse : plateau jouable des deux côtés (coups légaux calculés localement, sur
  * une position publique uniquement), arbre de variantes, barre d'évaluation, moteur en direct,
- * navigation au clavier (← → ↑ ↓ Début Fin, f = retourner).
+ * navigation au clavier (← → coup précédent, suivant ; ↑ fin, ↓ début ; f = retourner).
  */
 export function AnalysisBoard(props: AnalysisBoardProps) {
   const own = useAnalysisTree(props.initialFen ?? '', props.controller ? [] : props.mainline);
@@ -135,7 +135,7 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
     if (id) ctl.select(id);
   };
 
-  // Clavier : ← → coup précédent / suivant, ↑ ↓ variante voisine, Début / Fin, f = retourner.
+  // Clavier : ← → coup précédent / suivant, ↑ fin, ↓ début (comme Fin / Début), f = retourner.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || ignoredTarget(e.target)) return;
@@ -146,8 +146,8 @@ export function AnalysisBoard(props: AnalysisBoardProps) {
       const actions: Record<string, () => void> = {
         ArrowLeft: () => go(tree.prev(current)),
         ArrowRight: () => go(tree.next(current)),
-        ArrowUp: () => go(tree.sibling(current, -1)),
-        ArrowDown: () => go(tree.sibling(current, 1)),
+        ArrowUp: () => go(tree.end(current)),
+        ArrowDown: () => go(tree.rootId),
         Home: () => go(tree.rootId),
         End: () => go(tree.end(current)),
         f: () => setFlipped((f) => !f),

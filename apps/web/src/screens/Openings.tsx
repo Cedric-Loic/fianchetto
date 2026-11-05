@@ -19,6 +19,7 @@ import { useSettings } from '../lib/settings';
 import { playSound } from '../lib/sound';
 import { SIDE } from './labels';
 import { BoardLayout } from '../ui/BoardLayout';
+import { useBoardHistory, useNavKeys } from '../lib/navKeys';
 import { SideBadge } from '../ui/SideBadge';
 import { Button } from '../ui/Button';
 import { LoginRequired } from '../ui/EmptyState';
@@ -78,6 +79,8 @@ function OpeningTrainer(props: {
   /** Une erreur a déjà été commise sur cette ligne (révision échouée). */
   const failed = useRef(false);
   const [hadError, setHadError] = useState(false);
+  /** Nombre de départs de la ligne : chaque « Recommencer » repart d'un historique vide. */
+  const [run, setRun] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(
     () => () => {
@@ -117,6 +120,7 @@ function OpeningTrainer(props: {
   };
 
   const restart = () => {
+    setRun((r) => r + 1);
     setPieces(piecesFromFen(START_FEN));
     setLastMove(null);
     setPly(0);
@@ -179,6 +183,10 @@ function OpeningTrainer(props: {
   };
 
   const played = steps.slice(0, ply).map((s) => s.san);
+  // ← → ↑ ↓ : revoir les coups de la ligne (jouable seulement au présent).
+  const history = useBoardHistory({ pieces, lastMove }, `${line.id}:${run}`);
+  useNavKeys(history.nav);
+  const live = history.isLive;
   return (
     <BoardLayout
       className="exercise"
@@ -186,12 +194,16 @@ function OpeningTrainer(props: {
       toPlay={<SideBadge color={line.color} />}
       board={
         <Board
-          pieces={pieces}
+          pieces={history.frame.pieces}
           orientation={line.color}
-          movable={phase === 'playing' && myTurn(ply) && ply < steps.length ? line.color : null}
-          legalMoves={showLegalMoves && phase === 'playing' ? (steps[ply]?.legalMoves ?? []) : null}
-          lastMove={lastMove}
-          flash={flash}
+          movable={
+            live && phase === 'playing' && myTurn(ply) && ply < steps.length ? line.color : null
+          }
+          legalMoves={
+            live && showLegalMoves && phase === 'playing' ? (steps[ply]?.legalMoves ?? []) : null
+          }
+          lastMove={history.frame.lastMove}
+          flash={live ? flash : null}
           onMove={(from, to) => onMove(from, to)}
         />
       }

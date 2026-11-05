@@ -8,6 +8,7 @@ import { playSound } from '../lib/sound';
 import { useStreak } from '../lib/streak';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { BoardLayout } from '../ui/BoardLayout';
+import { useBoardHistory, useNavKeys } from '../lib/navKeys';
 import { SideBadge } from '../ui/SideBadge';
 import { Button } from '../ui/Button';
 
@@ -391,6 +392,10 @@ function MoveExercise(props: ExercisePlayerProps) {
 
   // Position de nouveau jouable : le premier premove part comme un coup normal.
   const playable = phase === 'playing' && !busy;
+  // ← → ↑ ↓ : revoir les positions de l'exercice (jouable seulement au présent).
+  const history = useBoardHistory({ pieces, lastMove }, spec.fen);
+  useNavKeys(history.nav);
+  const live = history.isLive;
   const nextPremove = playable ? queue.next : undefined;
   const playPremove = useEffectEvent((move: LocalMove) => {
     queue.shift();
@@ -408,16 +413,20 @@ function MoveExercise(props: ExercisePlayerProps) {
       toPlay={<SideBadge color={spec.color} />}
       board={
         <Board
-          pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
+          pieces={
+            live
+              ? applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])
+              : history.frame.pieces
+          }
           orientation={spec.color}
-          movable={playable ? spec.color : null}
-          premoveColor={premoveOn && phase === 'playing' && busy ? spec.color : null}
-          premoves={queue.premoves}
+          movable={playable && live ? spec.color : null}
+          premoveColor={premoveOn && phase === 'playing' && busy && live ? spec.color : null}
+          premoves={live ? queue.premoves : []}
           onPremove={queue.add}
           onCancelPremove={queue.clear}
-          legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
-          lastMove={lastMove}
-          flash={flash}
+          legalMoves={showLegalMoves && phase === 'playing' && live ? legal : null}
+          lastMove={history.frame.lastMove}
+          flash={live ? flash : null}
           onMove={(from, to, promotion) =>
             void onMove(promotion ? { from, to, promotion } : { from, to })
           }

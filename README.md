@@ -113,9 +113,8 @@ Déjà téléchargée ? Ajoute `--file chemin.csv.zst`.
 | Premove                  | contre le bot, en puzzles et en leçons ; clic droit pour annuler |
 | Mode concentration       | ⛶                                                                |
 | Routine de réflexion     | `r` (parties lentes)                                             |
-| Coup précédent, suivant  | ← → (revue et analyse)                                           |
-| Variante voisine         | ↑ ↓                                                              |
-| Début, fin de partie     | Début, Fin                                                       |
+| Coup précédent, suivant  | ← → (partie, puzzle, leçon, ouverture, revue, analyse)           |
+| Fin, début               | ↑ ↓ (ou Fin, Début en revue et analyse)                          |
 | Retourner l'échiquier    | `f`                                                              |
 | Afficher la menace       | `x`                                                              |
 
