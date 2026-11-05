@@ -73,11 +73,13 @@ pnpm install
 ```
 
 ```bash
-pnpm dev
+pnpm start
 ```
 
-Ouvre ensuite <http://127.0.0.1:5173>, crée un compte local et clique sur **Jouer**. Le serveur
-écoute sur `127.0.0.1:3001` ; les deux n'écoutent que sur la boucle locale.
+`pnpm start` compile le site puis le sert avec le serveur, sur un seul port : ouvre
+<http://127.0.0.1:3001>, crée un compte local et clique sur **Jouer**. Tout n'écoute que sur la
+boucle locale. Pour modifier le code, `pnpm dev` (rechargement à chaud, <http://127.0.0.1:5173>)
+est environ trois fois plus lent à charger chaque page.
 
 Pour les puzzles, importe une fois la base Lichess (≈ 250 Mo lus en flux, 150 000 puzzles de 600
 à 2000 gardés dans `data/puzzles.db`) :
@@ -239,6 +241,7 @@ config/
 
 | Commande              | Effet                                                                      |
 | --------------------- | -------------------------------------------------------------------------- |
+| `pnpm start`          | compile le site et le sert avec le serveur (http://127.0.0.1:3001)         |
 | `pnpm dev`            | lance le serveur et le web, avec rechargement à chaud                      |
 | `pnpm check`          | formatage (Prettier), lint (ESLint), types (tsc), tests unitaires (Vitest) |
 | `pnpm test`           | tests unitaires seulement                                                  |

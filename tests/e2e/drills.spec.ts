@@ -260,3 +260,48 @@ test('vision : coordonnées, couleur des cases, cavalier', async ({ page }) => {
   await page.getByTestId(`vision-knight-${distance}`).click();
   await expect(page.getByTestId('vision-score')).toHaveText('1');
 });
+
+test('puzzles (serveur simulé) : indice, échec, solution à la demande, puis réussite', async ({
+  page,
+}) => {
+  let n = 0;
+  await page.route('**/api/puzzles/stats', (route) =>
+    route.fulfill({
+      json: {
+        rating: 1500,
+        deviation: 200,
+        attempts: 0,
+        solved: 0,
+        available: { lichess: 10, mine: 0, due: 0 },
+        themeOfDay: 'fork',
+        themes: [],
+      },
+    }),
+  );
+  await page.route('**/api/puzzles/next', (route) =>
+    route.fulfill({ json: { attempt: attempt(`Z${n++}`) } }),
+  );
+  await page.route('**/api/puzzles/*/hint', (route) => route.fulfill({ json: { from: 'a1' } }));
+  await mockMoves(page);
+  await register(page);
+  await page.goto('/#/puzzles');
+  await expect(page.locator('img[data-square="b6"]')).toHaveAttribute('alt', 'bp');
+  await expect(page.getByTestId('side-badge')).toContainText('Tu joues les Blancs');
+  await page.getByTestId('puzzle-hint').click();
+  await expect(page.locator('.sq.selected')).toHaveCount(1);
+  // Mauvais coup : échec, solution rejouée seulement sur demande.
+  await clickSquare(page, 'a1');
+  await clickSquare(page, 'a7');
+  await expect(page.getByTestId('puzzle-status')).toContainText("Ce n'est pas le bon coup");
+  await expect(page.locator('img[data-square="a8"]')).toHaveCount(0);
+  await page.getByTestId('show-solution').click();
+  await expect(page.locator('img[data-square="a8"]')).toHaveAttribute('alt', 'wr');
+  await expect(page.getByTestId('show-solution')).toHaveCount(0);
+  // Puzzle suivant : réussi.
+  await page.getByTestId('next-puzzle').click();
+  await expect(page.locator('img[data-square="a1"]')).toHaveAttribute('alt', 'wr');
+  await expect(page.locator('img[data-square="b6"]')).toHaveAttribute('alt', 'bp');
+  await clickSquare(page, 'a1');
+  await clickSquare(page, 'a8');
+  await expect(page.getByTestId('puzzle-status')).toContainText('Réussi');
+});

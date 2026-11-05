@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/main.ts",
     "start": "tsx src/main.ts",
+    "serve": "tsx src/main.ts --web",
     "typecheck": "tsc -p tsconfig.json",
     "puzzles:import": "tsx scripts/import-puzzles.ts"
   },

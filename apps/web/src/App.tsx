@@ -2,24 +2,9 @@ import { lazy, Suspense, useEffect, useState, type MouseEvent } from 'react';
 import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
-import { Calc } from './screens/Calc';
-import { Rush } from './screens/Rush';
-import { Threats } from './screens/Threats';
-import { Vision } from './screens/Vision';
-import { Woodpecker } from './screens/Woodpecker';
-import { Exam } from './screens/Exam';
-import { Endgames } from './screens/Endgames';
 import { GameScreen } from './screens/GameScreen';
 import { Home } from './screens/Home';
-import { Leaderboard } from './screens/Leaderboard';
-import { Learn } from './screens/Learn';
-import { Openings } from './screens/Openings';
 import { Login } from './screens/Login';
-import { LessonPage, Lessons } from './screens/Lessons';
-import { Profile } from './screens/Profile';
-import { Progress } from './screens/Progress';
-import { Reviews } from './screens/Reviews';
-import { Puzzles } from './screens/Puzzles';
 import { Selection } from './screens/Selection';
 import { Today } from './screens/Today';
 import { Train } from './screens/Train';
@@ -30,6 +15,28 @@ import { Loading } from './ui/Spinner';
 
 // Revue et échiquier d'analyse chargés à la demande : chess.js (exploration de variantes sur
 // des positions publiques) n'est jamais dans le code de l'écran de partie.
+// Écrans secondaires chargés à la demande aussi : l'accueil, la partie et la connexion
+// s'affichent sans attendre le code des autres écrans.
+const Calc = lazy(() => import('./screens/Calc').then((m) => ({ default: m.Calc })));
+const Rush = lazy(() => import('./screens/Rush').then((m) => ({ default: m.Rush })));
+const Threats = lazy(() => import('./screens/Threats').then((m) => ({ default: m.Threats })));
+const Vision = lazy(() => import('./screens/Vision').then((m) => ({ default: m.Vision })));
+const Woodpecker = lazy(() =>
+  import('./screens/Woodpecker').then((m) => ({ default: m.Woodpecker })),
+);
+const Exam = lazy(() => import('./screens/Exam').then((m) => ({ default: m.Exam })));
+const Endgames = lazy(() => import('./screens/Endgames').then((m) => ({ default: m.Endgames })));
+const Leaderboard = lazy(() =>
+  import('./screens/Leaderboard').then((m) => ({ default: m.Leaderboard })),
+);
+const Learn = lazy(() => import('./screens/Learn').then((m) => ({ default: m.Learn })));
+const Openings = lazy(() => import('./screens/Openings').then((m) => ({ default: m.Openings })));
+const Profile = lazy(() => import('./screens/Profile').then((m) => ({ default: m.Profile })));
+const Progress = lazy(() => import('./screens/Progress').then((m) => ({ default: m.Progress })));
+const Reviews = lazy(() => import('./screens/Reviews').then((m) => ({ default: m.Reviews })));
+const Puzzles = lazy(() => import('./screens/Puzzles').then((m) => ({ default: m.Puzzles })));
+const Lessons = lazy(() => import('./screens/Lessons').then((m) => ({ default: m.Lessons })));
+const LessonPage = lazy(() => import('./screens/Lessons').then((m) => ({ default: m.LessonPage })));
 const Analyse = lazy(() => import('./screens/Analyse').then((m) => ({ default: m.Analyse })));
 const Review = lazy(() => import('./screens/Review').then((m) => ({ default: m.Review })));
 

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @sq/server --filter @sq/web dev",
+    "start": "pnpm --filter @sq/web build && pnpm --filter @sq/server serve",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",

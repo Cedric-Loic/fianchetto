@@ -13,7 +13,7 @@ export interface NavHandlers {
  * Cibles qui gardent les flèches pour elles : saisie de texte, listes, onglets, et le plateau
  * quand il a le focus clavier (il y déplace le curseur de case en case).
  */
-export function navIgnored(target: EventTarget | null): boolean {
+function navIgnored(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target instanceof HTMLInputElement && ['checkbox', 'radio'].includes(target.type)) {
     return false;

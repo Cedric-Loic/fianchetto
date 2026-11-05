@@ -2936,14 +2936,6 @@ textarea:focus-visible {
   border-color: var(--accent);
   color: var(--accent-hover);
 }
-.tabs.tabs-scroll {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.tabs.tabs-scroll .tab {
-  flex: 1 0 auto;
-}
 
 /* --- Revue --- */
 .eval-bar {

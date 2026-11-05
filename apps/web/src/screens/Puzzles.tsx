@@ -1,9 +1,7 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   PUZZLE_THEME_LABELS,
   PUZZLE_THEMES,
-  type DisplayedPiece,
-  type LegalMove,
   type PuzzleAttempt,
   type PuzzleMode,
   type PuzzleStats,
@@ -11,14 +9,10 @@ import {
   type Square,
 } from '@sq/shared';
 import { Board } from '../game/Board';
-import { usePremoves } from '../game/usePremoves';
+import { PuzzlePlay, type PuzzleResult } from '../game/PuzzlePlay';
 import { api } from '../lib/api';
-import { carryIds, piecesFromFen } from '../lib/fen';
 import { useSession } from '../lib/session';
-import { useSettings } from '../lib/settings';
-import { playSound } from '../lib/sound';
 import { useStreak } from '../lib/streak';
-import { applyLocalMoves, type LocalMove } from '../lib/virtual';
 import { SIDE } from './labels';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -26,7 +20,6 @@ import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
 import { BoardLayout } from '../ui/BoardLayout';
-import { useBoardHistory, useNavKeys } from '../lib/navKeys';
 import { SideBadge } from '../ui/SideBadge';
 import { IconBulb, IconNext } from '../ui/icons';
 import { RatingDelta, StreakBadge } from '../ui/StreakBadge';
@@ -52,66 +45,39 @@ const EMPTY_MESSAGE: Record<PuzzleMode, string> = {
   woodpecker: 'Aucun lot Woodpecker en cours.',
 };
 
-const STEP_DELAY = 450;
-
 /**
  * Puzzles : base Lichess au niveau ou par thème, révisions des puzzles ratés, positions tirées de
  * mes erreurs. Le serveur valide chaque coup ; l'écran affiche les positions reçues.
  */
 export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string | null }) {
   const user = useSession((s) => s.user);
-  const showLegalMoves = useSettings((s) => s.showLegalMoves);
   const [mode, setMode] = useState<PuzzleMode>(props.initialMode ?? 'rated');
   const [theme, setTheme] = useState<string | null>(props.initialTheme ?? null);
   const [round, setRound] = useState(0);
   const [stats, setStats] = useState<PuzzleStats | null>(null);
   const [attempt, setAttempt] = useState<PuzzleAttempt | null>(null);
-  const [pieces, setPieces] = useState<DisplayedPiece[]>([]);
-  const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
-  const [legal, setLegal] = useState<LegalMove[]>([]);
   const [progress, setProgress] = useState(false);
   const [solution, setSolution] = useState<PuzzleStep[] | null>(null);
+  const [solutionShown, setSolutionShown] = useState(false);
   const [ratingChange, setRatingChange] = useState<{ before: number; after: number } | null>(null);
   const [hint, setHint] = useState<Square | null>(null);
-  const [busy, setBusy] = useState(false);
-  /** Éclair sur la case d'arrivée de mon coup : bon (vert) ou faux (rouge). */
-  const [flash, setFlash] = useState<{
-    square: Square;
-    tone: 'success' | 'error';
-    id: number;
-  } | null>(null);
+  const [busy, setBusy] = useState(true);
   const record = useStreak((s) => s.record);
-  /** Mon coup envoyé, affiché tout de suite en attendant la réponse du serveur. */
-  const [pending, setPending] = useState<LocalMove | null>(null);
-  // Premoves pendant la réponse adverse : file vidée à chaque nouveau puzzle et à la fin du
-  // puzzle (réussi ou raté).
-  const premoveOn = useSettings((s) => s.premoves);
-  const queue = usePremoves(`${attempt?.attemptId ?? ''}:${phase}`, premoveOn);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  const later = (fn: () => void, ms: number) => {
-    timers.current.push(setTimeout(fn, ms));
-  };
-  const apply = (step: PuzzleStep) => {
-    setPieces((prev) => carryIds(prev, piecesFromFen(step.fen), step.uci));
-    setLastMove({ from: step.uci.slice(0, 2) as Square, to: step.uci.slice(2, 4) as Square });
-  };
 
   // Statistiques (classement puzzle, disponibilités), rafraîchies à chaque puzzle terminé.
   useEffect(() => {
     if (user) void api.puzzleStats().then(setStats);
   }, [user, round, phase]);
 
-  // Puzzle suivant : position de départ, puis coup adverse animé.
+  // Puzzle suivant (le plateau joue lui-même le coup adverse de départ).
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    for (const t of timers.current) clearTimeout(t);
-    timers.current = [];
     void api.puzzleNext(mode, mode === 'theme' ? theme : null).then((res) => {
       if (cancelled) return;
       setSolution(null);
+      setSolutionShown(false);
       setRatingChange(null);
       setHint(null);
       setProgress(false);
@@ -120,105 +86,19 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
         setPhase(res.error === 'NO_BANK' ? 'no-bank' : 'empty');
         return;
       }
-      const a = res.data.attempt;
-      setAttempt(a);
-      setPieces(piecesFromFen(a.fenBefore));
-      setLastMove(null);
-      setLegal(a.legalMoves);
+      setAttempt(res.data.attempt);
       setPhase('playing');
-      setBusy(true);
-      later(() => {
-        apply(a.setup);
-        setBusy(false);
-      }, 500);
     });
     return () => {
       cancelled = true;
     };
   }, [user, mode, theme, round]);
 
-  useEffect(
-    () => () => {
-      for (const t of timers.current) clearTimeout(t);
-    },
-    [],
-  );
-
-  const onMove = async (move: LocalMove) => {
-    if (!attempt || phase !== 'playing' || busy) return;
-    setBusy(true);
-    setHint(null);
-    setPending(move);
-    const res = await api.puzzleMove(
-      attempt.attemptId,
-      `${move.from}${move.to}${move.promotion ?? ''}`,
-    );
-    setPending(null);
-    if (!res || res.status === 'illegal') {
-      // Coup (ou premove) refusé : la pièce revient, les premoves suivants n'ont plus de sens.
-      queue.clear();
-      setBusy(false);
-      return;
-    }
-    const [mine, reply] = res.steps;
-    if (mine) apply(mine);
-    const failed = res.status === 'failed';
-    setFlash((f) => ({
-      square: move.to,
-      tone: failed ? 'error' : 'success',
-      id: (f?.id ?? 0) + 1,
-    }));
-    if (failed) {
-      playSound('failure');
-      record(false);
-      setSolution(res.solution);
-      setRatingChange(res.rating);
-      setPhase('failed');
-      setBusy(false);
-      return;
-    }
-    setProgress(true);
-    const finish = () => {
-      setLegal(res.legalMoves);
-      if (res.status === 'solved') {
-        playSound('success');
-        record(true);
-        setRatingChange(res.rating);
-        setPhase('solved');
-      }
-      setBusy(false);
-    };
-    if (reply) {
-      later(() => {
-        apply(reply);
-        finish();
-      }, STEP_DELAY);
-    } else finish();
-  };
-
-  // Quand la position redevient jouable, le premier premove part comme un coup normal (jugé par
-  // le serveur : un mauvais coup fait rater le puzzle, un coup illégal vide la file).
-  const playable = phase === 'playing' && !busy && attempt !== null;
-  // ← → ↑ ↓ : revoir les positions du puzzle (le plateau n'est jouable qu'au présent).
-  const history = useBoardHistory({ pieces, lastMove }, attempt?.attemptId ?? '');
-  useNavKeys(history.nav);
-  const live = history.isLive;
-  const nextPremove = playable ? queue.next : undefined;
-  const playPremove = useEffectEvent((move: LocalMove) => {
-    queue.shift();
-    void onMove(move);
-  });
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- chaque premove ne part qu'une fois
-    if (nextPremove) playPremove(nextPremove);
-  }, [nextPremove]);
-
-  const showSolution = () => {
-    if (!solution) return;
-    setBusy(true);
-    solution.forEach((step, i) => later(() => apply(step), (i + 1) * 700));
-    later(() => setBusy(false), (solution.length + 1) * 700);
-    setSolution([]);
+  const onDone = (result: PuzzleResult) => {
+    record(result.success);
+    setRatingChange(result.rating);
+    if (!result.success) setSolution(result.solution);
+    setPhase(result.success ? 'solved' : 'failed');
   };
 
   const askHint = () => {
@@ -239,26 +119,24 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
       className="puzzles"
       toPlay={attempt && <SideBadge color={color} />}
       board={
-        <Board
-          pieces={
-            live
-              ? applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])
-              : history.frame.pieces
-          }
-          orientation={color}
-          movable={playable && live ? color : null}
-          premoveColor={premoveOn && phase === 'playing' && busy && live ? color : null}
-          premoves={live ? queue.premoves : []}
-          onPremove={queue.add}
-          onCancelPremove={queue.clear}
-          legalMoves={showLegalMoves && phase === 'playing' && live ? legal : null}
-          lastMove={history.frame.lastMove}
-          highlighted={live ? hint : null}
-          flash={live ? flash : null}
-          onMove={(from, to, promotion) =>
-            void onMove(promotion ? { from, to, promotion } : { from, to })
-          }
-        />
+        attempt ? (
+          <PuzzlePlay
+            key={attempt.attemptId}
+            attempt={attempt}
+            premoves
+            hint={hint}
+            showSolution={solutionShown}
+            onDone={onDone}
+            onProgress={() => setProgress(true)}
+            onBusyChange={(b) => {
+              setBusy(b);
+              // Un coup part : l'indice n'a plus lieu d'être.
+              if (b) setHint(null);
+            }}
+          />
+        ) : (
+          <Board pieces={[]} orientation="w" movable={null} />
+        )
       }
       side={
         <>
@@ -377,8 +255,8 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
                 Indice
               </Button>
             )}
-            {phase === 'failed' && solution && solution.length > 0 && (
-              <Button onClick={showSolution} data-testid="show-solution">
+            {phase === 'failed' && solution && solution.length > 0 && !solutionShown && (
+              <Button onClick={() => setSolutionShown(true)} data-testid="show-solution">
                 Voir la solution
               </Button>
             )}
@@ -387,10 +265,7 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
                 variant={ended ? 'primary' : 'outline'}
                 data-testid="next-puzzle"
                 disabled={busy}
-                onClick={() => {
-                  queue.clear();
-                  setRound((r) => r + 1);
-                }}
+                onClick={() => setRound((r) => r + 1)}
               >
                 {ended ? 'Puzzle suivant' : 'Passer'}
                 <IconNext size={18} />

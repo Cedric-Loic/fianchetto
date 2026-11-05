@@ -61,11 +61,6 @@ export interface RequestOptions {
   timeoutMs?: number;
 }
 
-/** Statut 0 : le serveur n'a pas répondu (arrêté, réseau coupé, délai dépassé, annulation). */
-export function isNetworkError(res: Result<unknown>): boolean {
-  return !res.ok && res.status === 0;
-}
-
 /**
  * Appel REST détaillé (statut et code d'erreur en cas d'échec). Statut 0 : pas de réponse du
  * serveur, avec `error` = `NETWORK`, `TIMEOUT` ou `ABORTED`.

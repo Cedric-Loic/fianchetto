@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import cookie from '@fastify/cookie';
+import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
@@ -75,6 +76,11 @@ export interface ServerOptions {
    * désactiver. Défaut : un Stockfish dédié, créé à la demande.
    */
   createAnalysisEngine?: (() => LiveEngine) | null;
+  /**
+   * Dossier du site compilé (`apps/web/dist`) à servir sur le même port (mode production,
+   * `pnpm start`) ; absent : le site est servi par Vite (`pnpm dev`).
+   */
+  webRoot?: string;
 }
 export type { BotDriver };
 export { WorkerBot } from './bot/driver.js';
@@ -285,6 +291,22 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     }
   });
 
+  if (options.webRoot) {
+    // Mode production : fichiers du site compilé. Les fichiers de `assets/` portent une empreinte
+    // dans leur nom (cache d'un an) ; `index.html` est toujours revalidé.
+    void app.register(fastifyStatic, {
+      root: options.webRoot,
+      index: 'index.html',
+      wildcard: false,
+      cacheControl: false,
+      setHeaders: (reply, filePath) => {
+        void reply.header(
+          'cache-control',
+          /[\\/]assets[\\/]/.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache',
+        );
+      },
+    });
+  }
   void app.register(websocket);
   void app.register((scope, _options, done) => {
     scope.get('/ws', { websocket: true }, (socket, request) => {
