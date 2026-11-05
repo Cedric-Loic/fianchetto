@@ -118,7 +118,8 @@ export function SkillsCard(props: {
                 aria-label={SKILL_LABELS[s.id]}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={s.level ?? undefined}
+                aria-valuenow={s.level ?? 0}
+                aria-valuetext={s.level === null ? 'pas encore mesuré' : undefined}
               >
                 <span className="progress-bar" style={{ width: `${s.level ?? 0}%` }} />
               </span>
@@ -167,7 +168,7 @@ export function PathCard({
   const next = curriculum.next;
   return (
     <section className="panel page-panel" data-testid="coach-path">
-      <h2>Parcours · phase {curriculum.phase}</h2>
+      <h2>Parcours · palier {curriculum.phase}</h2>
       {next && (
         <p className="muted">
           <IconTarget size={16} /> Prochaine étape conseillée :{' '}
@@ -176,36 +177,45 @@ export function PathCard({
           </a>
         </p>
       )}
-      <div className="coach-grid">
-        {curriculum.modules.map((m) => {
-          const done = m.steps.filter((s) => s.done).length;
-          return (
-            <div
-              key={m.id}
-              id={`module-${m.id}`}
-              className={`path-module${highlight === m.id ? ' highlight' : ''}`}
-            >
-              <h3>
-                {m.title}{' '}
-                <span className="muted">
-                  {done}/{m.steps.length}
-                </span>
-              </h3>
-              <ul className="path-steps">
-                {m.steps.map((s) => (
-                  <li
-                    key={`${s.type}-${s.id}`}
-                    className={`${s.done ? 'done' : ''}${next?.step.id === s.id && next.step.type === s.type ? ' next' : ''}`}
-                  >
-                    <span aria-hidden>{s.done ? '✓' : '○'}</span>
-                    <a href={s.href}>{s.title}</a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
+      {/* Replié par défaut : les leçons sont déjà listées par palier ; ouvert si un module est visé. */}
+      <details className="path-details" open={highlight !== null}>
+        <summary>Voir le parcours conseillé, module par module</summary>
+        <div className="coach-grid">
+          {curriculum.modules.map((m) => {
+            const done = m.steps.filter((s) => s.done).length;
+            return (
+              <div
+                key={m.id}
+                id={`module-${m.id}`}
+                className={`path-module${highlight === m.id ? ' highlight' : ''}`}
+              >
+                <h3>
+                  {m.title}{' '}
+                  <span className="muted">
+                    {done}/{m.steps.length}
+                  </span>
+                </h3>
+                <ul className="path-steps">
+                  {m.steps.map((s) => (
+                    <li
+                      key={`${s.type}-${s.id}`}
+                      className={`${s.done ? 'done' : ''}${next?.step.id === s.id && next.step.type === s.type ? ' next' : ''}`}
+                    >
+                      <span aria-hidden>{s.done ? '✓' : '○'}</span>
+                      {s.type !== 'lesson' && (
+                        <span className="path-kind">
+                          {s.type === 'endgame' ? 'Finale' : 'Ouverture'}
+                        </span>
+                      )}
+                      <a href={s.href}>{s.title}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </details>
     </section>
   );
 }

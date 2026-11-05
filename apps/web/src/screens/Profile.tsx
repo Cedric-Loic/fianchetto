@@ -59,7 +59,7 @@ export function Profile({ username }: { username: string }) {
             Les parties terminées apparaissent ici, avec leur revue.
           </EmptyState>
         ) : (
-          <div className="table-scroll">
+          <div className="table-scroll" role="region" tabIndex={0} aria-label="Parties du joueur">
             <table className="table">
               <thead>
                 <tr>

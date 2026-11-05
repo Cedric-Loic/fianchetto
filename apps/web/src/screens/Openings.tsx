@@ -19,6 +19,7 @@ import { useSettings } from '../lib/settings';
 import { playSound } from '../lib/sound';
 import { SIDE } from './labels';
 import { BoardLayout } from '../ui/BoardLayout';
+import { SideBadge } from '../ui/SideBadge';
 import { Button } from '../ui/Button';
 import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
@@ -182,6 +183,7 @@ function OpeningTrainer(props: {
     <BoardLayout
       className="exercise"
       testId="opening-trainer"
+      toPlay={<SideBadge color={line.color} />}
       board={
         <Board
           pieces={pieces}
@@ -199,9 +201,7 @@ function OpeningTrainer(props: {
           <p>
             <strong>{line.title}</strong>
           </p>
-          <p className="muted">
-            Avec les {SIDE[line.color]} · {line.group}
-          </p>
+          <p className="muted">{line.group}</p>
           <p>{line.idea}</p>
           <p className="muted" data-testid="opening-played">
             {played.length > 0 ? lineText(played, san) : 'Position initiale.'}

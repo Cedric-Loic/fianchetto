@@ -204,11 +204,14 @@ test('Apprendre : carte « Examen du palier » (jamais passé, meilleur score, v
   await page.goto('/#/learn');
   await expect(page.getByTestId('exam-state-P1')).toHaveText('Meilleur score : 12 / 20');
   await expect(page.getByTestId('exam-start-P1')).toHaveAttribute('href', '#/exam/1');
+  await page.screenshot({ path: 'test-results/exam-learn.png' });
+  // Un palier à la fois : les autres cartes d'examen sont derrière leur onglet.
+  await page.getByTestId('stage-tab-P2').click();
   await expect(page.getByTestId('exam-state-P2')).toContainText('✓ Validé');
+  await page.getByTestId('stage-tab-P3').click();
   await expect(page.getByTestId('exam-start-P3')).toBeDisabled();
   await expect(page.getByTestId('exam-unavailable-P3')).toContainText('pas assez');
-  await page.getByTestId('exam-card-P1').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: 'test-results/exam-learn.png' });
+  await page.getByTestId('stage-tab-P1').click();
   await page.getByTestId('exam-start-P1').click();
   await expect(page).toHaveURL(/#\/exam\/1$/);
   await expect(page.getByTestId('exam-best')).toContainText('Meilleur score : 12 / 20');

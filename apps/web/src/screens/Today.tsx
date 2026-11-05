@@ -104,11 +104,11 @@ export function Today() {
                   {next.step.title}
                 </a>
               </p>
-              <p className="muted">Phase {plan.curriculum?.phase}, conseillée sans être imposée.</p>
+              <p className="muted">Palier {plan.curriculum?.phase}, conseillé sans être imposée.</p>
             </>
           ) : (
             <p className="muted">
-              {plan.curriculum ? 'Parcours de la phase terminé : bravo !' : 'Chargement…'}
+              {plan.curriculum ? 'Parcours du palier terminé : bravo !' : 'Chargement…'}
             </p>
           )}
           <Button href="#/learn">

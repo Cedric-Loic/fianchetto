@@ -9,6 +9,7 @@ import { piecesFromFen } from '../lib/fen';
 import { playSound } from '../lib/sound';
 import { useSan } from '../lib/notation';
 import { BoardLayout } from '../ui/BoardLayout';
+import { SideBadge } from '../ui/SideBadge';
 import { Button } from '../ui/Button';
 import { IconBulb, IconNext, IconRetry } from '../ui/icons';
 import { ModeBanner } from './ModeBanner';
@@ -282,6 +283,7 @@ export function LearnMistakes(props: {
     <BoardLayout
       className="review learn-mode"
       testId="learn-mode"
+      toPlay={<SideBadge color={move.color} />}
       board={
         <Board
           pieces={pieces}

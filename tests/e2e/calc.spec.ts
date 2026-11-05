@@ -75,7 +75,8 @@ test('calcul : profondeur, saisie au clic et au clavier, question, résultat, so
   await expect(page.getByTestId('calc-depth')).toBeVisible();
   await page.getByTestId('calc-depth-2').click();
   await expect(page.getByTestId('calc')).toBeVisible();
-  await expect(page.getByTestId('calc')).toContainText('Trait aux Blancs');
+  await expect(page.getByTestId('calc')).toContainText('Le plateau ne bouge pas');
+  await expect(page.getByTestId('side-badge')).toContainText('Tu joues les Blancs');
   // Aucune solution dans le DOM avant la réponse.
   await expect(page.getByTestId('calc-solution')).toHaveCount(0);
   await expect(page.getByTestId('calc')).not.toContainText('Solution');

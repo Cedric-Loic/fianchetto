@@ -7,10 +7,10 @@ import { carryIds, piecesFromFen } from '../lib/fen';
 import { useSan } from '../lib/notation';
 import { playSound } from '../lib/sound';
 import { BoardLayout } from '../ui/BoardLayout';
+import { SideBadge } from '../ui/SideBadge';
 import { Button } from '../ui/Button';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
-import { SIDE } from './labels';
 
 /*
  * Entraîneur de calcul : la position reste figée, le joueur saisit sa ligne (ses coups et les
@@ -269,6 +269,7 @@ function CalcProblemView(props: {
     <BoardLayout
       className="exercise calc"
       testId="calc"
+      toPlay={<SideBadge color={problem.color} />}
       board={
         <Board
           pieces={pieces}
@@ -296,8 +297,8 @@ function CalcProblemView(props: {
             <strong>{problem.prompt}</strong>
           </p>
           <p className="muted">
-            Trait aux {SIDE[problem.color]}. Le plateau ne bouge pas : écris {problem.plies}{' '}
-            demi-coup{problem.plies > 1 ? 's' : ''} (tes coups et les répliques adverses).
+            Le plateau ne bouge pas : écris {problem.plies} demi-coup{problem.plies > 1 ? 's' : ''}{' '}
+            (tes coups et les répliques adverses).
           </p>
 
           <ol className="calc-line" data-testid="calc-line" aria-label="Ta ligne">

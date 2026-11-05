@@ -70,6 +70,7 @@ test('exercice de cases : indice, mauvaise réponse corrigée', async ({ page })
   await register(page);
   await page.goto('/#/lessons/routine?exercise=3');
   await expect(page.getByText('Désigne-les')).toBeVisible();
+  await expect(page.getByTestId('side-badge')).toContainText(/Tu joues les (Blancs|Noirs)/);
   await expect(page.getByTestId('exercise-explanation')).toHaveCount(0);
   await page.getByTestId('exercise-hint').click();
   await expect(page.getByTestId('hint-list').locator('li')).toHaveCount(1);

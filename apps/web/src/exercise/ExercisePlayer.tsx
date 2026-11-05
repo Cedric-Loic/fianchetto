@@ -7,8 +7,8 @@ import { useSettings } from '../lib/settings';
 import { playSound } from '../lib/sound';
 import { useStreak } from '../lib/streak';
 import { applyLocalMoves, type LocalMove } from '../lib/virtual';
-import { SIDE } from '../screens/labels';
 import { BoardLayout } from '../ui/BoardLayout';
+import { SideBadge } from '../ui/SideBadge';
 import { Button } from '../ui/Button';
 
 /**
@@ -166,6 +166,7 @@ function SquaresExercise(props: ExercisePlayerProps) {
     <BoardLayout
       className="exercise"
       testId="exercises"
+      toPlay={<SideBadge color={spec.color} />}
       board={
         <Board
           pieces={piecesFromFen(spec.fen)}
@@ -245,6 +246,7 @@ function ChoiceExercise(props: ExercisePlayerProps) {
     <BoardLayout
       className="exercise"
       testId="exercises"
+      toPlay={<SideBadge color={spec.color} />}
       board={<Board pieces={piecesFromFen(spec.fen)} orientation={spec.color} movable={null} />}
       side={
         <>
@@ -403,6 +405,7 @@ function MoveExercise(props: ExercisePlayerProps) {
     <BoardLayout
       className="exercise"
       testId="exercises"
+      toPlay={<SideBadge color={spec.color} />}
       board={
         <Board
           pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
@@ -426,7 +429,6 @@ function MoveExercise(props: ExercisePlayerProps) {
           <p>
             <strong>{spec.prompt}</strong>
           </p>
-          <p className="muted">Trait aux {SIDE[spec.color]}.</p>
           <Status
             phase={phase}
             playing={<p>{progress ? '✓ Bien vu ! Continue.' : 'À toi de jouer.'}</p>}

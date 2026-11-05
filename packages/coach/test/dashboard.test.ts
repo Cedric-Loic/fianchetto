@@ -230,8 +230,8 @@ describe('tableau de bord', () => {
       input({ games: clean, lessons, puzzleAttempts: solved, puzzleRating: 1800 }),
     );
     expect(d.phase.current).toBe(2);
-    expect(d.phase.criteria.find((c) => c.label === 'Leçons de la phase 2 validées')).toEqual({
-      label: 'Leçons de la phase 2 validées',
+    expect(d.phase.criteria.find((c) => c.label === 'Leçons du palier 2 validées')).toEqual({
+      label: 'Leçons du palier 2 validées',
       value: '7 / 10',
       target: 'au moins 8',
       met: false,

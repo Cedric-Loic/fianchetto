@@ -418,7 +418,7 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         met: enoughGames && (last10Stats?.blunder ?? 9) < 1,
       },
       {
-        label: 'Leçons de la phase 1 validées',
+        label: 'Leçons du palier 1 validées',
         value: `${passed1} / ${phase1Lessons.length}`,
         target: 'au moins 8',
         met: passed1 >= 8,
@@ -452,7 +452,7 @@ export function buildDashboard(input: DashboardInput): CoachDashboard {
         met: input.puzzleRating >= 1700,
       },
       {
-        label: 'Leçons de la phase 2 validées',
+        label: 'Leçons du palier 2 validées',
         value: `${passed2} / ${phase2Lessons.length}`,
         target: 'au moins 8',
         met: passed2 >= 8,

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, type MouseEvent } from 'react';
 import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
@@ -20,6 +20,8 @@ import { Selection } from './screens/Selection';
 import { Today } from './screens/Today';
 import { Train } from './screens/Train';
 import { NavBar, type NavSection } from './ui/NavBar';
+import { EmptyState } from './ui/EmptyState';
+import { Button } from './ui/Button';
 import { Loading } from './ui/Spinner';
 
 // Revue et échiquier d'analyse chargés à la demande : chess.js (exploration de variantes sur
@@ -136,6 +138,80 @@ function sectionOf(route: Route): NavSection {
   }
 }
 
+/** Attente de la partie : si elle est introuvable ou tarde trop, on le dit et on propose de sortir. */
+function GameLoading() {
+  const missing = useGame((s) => s.gameMissing);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 8000);
+    return () => clearTimeout(t);
+  }, []);
+  if (!missing && !slow) return <Loading label="Connexion…" />;
+  return (
+    <div className="page">
+      <div className="panel page-panel" data-testid="game-missing">
+        <EmptyState
+          icon="♟"
+          title={missing ? 'Partie introuvable' : 'Connexion au serveur lente'}
+          action={
+            <Button variant="primary" href="#/">
+              Retour à l'accueil
+            </Button>
+          }
+        >
+          {missing
+            ? "Cette partie n'existe plus ou n'est pas la tienne (le lien date peut-être d'avant un redémarrage du serveur)."
+            : 'Le serveur ne répond pas encore. Vérifie que « pnpm dev » tourne, puis recharge la page.'}
+        </EmptyState>
+      </div>
+    </div>
+  );
+}
+
+/** Titre de la page : alimente l'onglet du navigateur et le titre de niveau 1 (lecteurs d'écran). */
+function titleOf(route: Route): string {
+  switch (route.page) {
+    case 'home':
+      return 'Jouer';
+    case 'game':
+      return 'Partie';
+    case 'login':
+      return 'Connexion';
+    case 'leaderboard':
+      return 'Classement';
+    case 'profile':
+      return `Profil de ${route.username}`;
+    case 'analyse':
+      return route.tab === 'board' ? "Échiquier d'analyse" : 'Mes parties';
+    case 'puzzles':
+      return 'Puzzles';
+    case 'today':
+    case 'coach':
+      return "Aujourd'hui";
+    case 'learn':
+      return 'Apprendre';
+    case 'train':
+      return "S'entraîner";
+    case 'calc':
+      return 'Calcul';
+    case 'progress':
+      return 'Progrès';
+    case 'lessons':
+    case 'lesson':
+      return 'Leçons';
+    case 'endgames':
+      return 'Finales';
+    case 'openings':
+      return 'Ouvertures';
+    case 'reviews':
+      return 'Révisions';
+    case 'exam':
+      return route.kind === 'mini' ? 'Mini-test de finales' : `Examen du palier ${route.stage}`;
+    case 'review':
+      return 'Revue de partie';
+  }
+}
+
 export function App() {
   const [hash, setHash] = useState(() => location.hash);
   const route = parseHash(hash);
@@ -150,6 +226,11 @@ export function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, [refresh]);
+
+  const title = titleOf(route);
+  useEffect(() => {
+    document.title = `${title} · Fianchetto`;
+  }, [title]);
 
   // #/coach n'existe plus : redirection vers « Aujourd'hui ».
   const redirect = route.page === 'coach';
@@ -201,18 +282,31 @@ export function App() {
     content = <Review key={hash} id={route.id} guided={route.guided} />;
   else if (route.page === 'home') {
     content = <Home key={hash} onStart={(id) => (location.hash = `#/game/${id}`)} />;
-  } else if (!state) content = <Loading label="Connexion…" />;
+  } else if (!state) content = <GameLoading />;
   else if (state.phase === 'secret-selection') {
     // Clé : un nouveau chooser (ou un nouvel écran de passage) repart d'un choix vide.
     const key = `${state.selection?.chooser}-${state.selection?.handoffPending}`;
     content = <Selection key={key} state={state} />;
   } else content = <GameScreen state={state} onLeave={() => (location.hash = '#/')} />;
 
+  // Lien d'évitement : le routage par l'URL interdit un simple `href="#main"`, on déplace le focus.
+  const skip = (e: MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    document.getElementById('main')?.focus();
+  };
+
   return (
     <>
+      <a href="#main" className="skip-link" onClick={skip}>
+        Aller au contenu
+      </a>
       {/* Mode concentration : pas de barre de navigation, l'échiquier seul. */}
       {!(focus && route.page === 'game') && <NavBar section={sectionOf(route)} hash={hash} />}
-      <Suspense fallback={<Loading label="Chargement…" />}>{content}</Suspense>
+      <main id="main" tabIndex={-1}>
+        {/* Titre de niveau 1 des pages qui n'ont pas de grand titre visible (l'accueil a le sien). */}
+        {route.page !== 'home' && <h1 className="sr-only">{title}</h1>}
+        <Suspense fallback={<Loading label="Chargement…" />}>{content}</Suspense>
+      </main>
     </>
   );
 }

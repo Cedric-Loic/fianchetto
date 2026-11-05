@@ -431,24 +431,17 @@ export function Board(props: BoardProps) {
           key={square}
           role="gridcell"
           data-cell={square}
+          // Coordonnées dessinées en CSS (::before / ::after) : elles ne comptent pas comme texte
+          // visible et le nom accessible de la case reste celui de `aria-label`.
+          data-rank={x === 0 ? square[1] : undefined}
+          data-file={y === 7 ? square[0] : undefined}
           tabIndex={square === focusSquare ? 0 : -1}
           aria-label={squareLabel(square, bySquare.get(square), crownSet.has(square))}
           aria-selected={selected === square}
           className={classes.join(' ')}
           style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
           onFocus={() => setCursor(square)}
-        >
-          {x === 0 && (
-            <span className="coord rank" aria-hidden="true">
-              {square[1]}
-            </span>
-          )}
-          {y === 7 && (
-            <span className="coord file" aria-hidden="true">
-              {square[0]}
-            </span>
-          )}
-        </div>,
+        ></div>,
       );
     }
     // Rangée sans boîte propre (`display: contents`) : structure de grille pour l'accessibilité.
@@ -480,155 +473,161 @@ export function Board(props: BoardProps) {
   ];
 
   return (
-    <div
-      ref={boardRef}
-      className="board"
-      data-testid="board"
-      role="grid"
-      aria-label={`Échiquier, ${orientation === 'w' ? 'Blancs' : 'Noirs'} en bas`}
-      style={{ ['--square-light' as string]: theme.light, ['--square-dark' as string]: theme.dark }}
-      onKeyDown={onKeyDown}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={resetDrag}
-      onLostPointerCapture={resetDrag}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      {rows}
-      <p className="sr-only" aria-live="polite" data-testid="board-announce">
-        {said}
-      </p>
-      {props.squareMarks?.map((m) => {
-        const [x, y] = squareXY(m.square, orientation);
-        return (
-          <div
-            key={`mark-${m.square}-${m.kind}`}
-            className={`square-mark mark-${m.kind}`}
-            aria-hidden="true"
-            data-testid="square-mark"
-            data-square={m.square}
-            style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
-          />
-        );
-      })}
-      {props.flash &&
-        (() => {
-          const [x, y] = squareXY(props.flash.square, orientation);
+    <>
+      <div
+        ref={boardRef}
+        className="board"
+        data-testid="board"
+        role="grid"
+        aria-label={`Échiquier, ${orientation === 'w' ? 'Blancs' : 'Noirs'} en bas`}
+        style={{
+          ['--square-light' as string]: theme.light,
+          ['--square-dark' as string]: theme.dark,
+        }}
+        onKeyDown={onKeyDown}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={resetDrag}
+        onLostPointerCapture={resetDrag}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {rows}
+        {props.squareMarks?.map((m) => {
+          const [x, y] = squareXY(m.square, orientation);
           return (
             <div
-              key={`flash-${props.flash.id}`}
-              className={`square-flash ${props.flash.tone}`}
+              key={`mark-${m.square}-${m.kind}`}
+              className={`square-mark mark-${m.kind}`}
               aria-hidden="true"
-              data-testid="square-flash"
-              data-tone={props.flash.tone}
+              data-testid="square-mark"
+              data-square={m.square}
               style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
             />
           );
-        })()}
-      {pieces.map((p) => {
-        const [x, y] = squareXY(p.square, orientation);
-        const dragging = drag?.id === p.id;
-        const src = pieceUrl(settings.pieces, p.color, p.type);
-        // Pendant le glisser, le CENTRE de la pièce suit le pointeur ; un fantôme reste en place.
-        return [
-          dragging && (
+        })}
+        {props.flash &&
+          (() => {
+            const [x, y] = squareXY(props.flash.square, orientation);
+            return (
+              <div
+                key={`flash-${props.flash.id}`}
+                className={`square-flash ${props.flash.tone}`}
+                aria-hidden="true"
+                data-testid="square-flash"
+                data-tone={props.flash.tone}
+                style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
+              />
+            );
+          })()}
+        {pieces.map((p) => {
+          const [x, y] = squareXY(p.square, orientation);
+          const dragging = drag?.id === p.id;
+          const src = pieceUrl(settings.pieces, p.color, p.type);
+          // Pendant le glisser, le CENTRE de la pièce suit le pointeur ; un fantôme reste en place.
+          return [
+            dragging && (
+              <img
+                key={`${p.id}-ghost`}
+                className="piece ghost"
+                aria-hidden="true"
+                src={src}
+                alt=""
+                draggable={false}
+                style={{ transform: `translate(${x * 100}%, ${y * 100}%)` }}
+              />
+            ),
             <img
-              key={`${p.id}-ghost`}
-              className="piece ghost"
+              key={p.id}
+              className={`piece${dragging ? ' dragging' : ''}${dropped === p.id ? ' no-anim' : ''}`}
               aria-hidden="true"
               src={src}
-              alt=""
+              alt={`${p.color}${p.type}`}
+              data-square={p.square}
               draggable={false}
-              style={{ transform: `translate(${x * 100}%, ${y * 100}%)` }}
-            />
-          ),
-          <img
-            key={p.id}
-            className={`piece${dragging ? ' dragging' : ''}${dropped === p.id ? ' no-anim' : ''}`}
-            aria-hidden="true"
-            src={src}
-            alt={`${p.color}${p.type}`}
-            data-square={p.square}
-            draggable={false}
-            style={{
-              transform: dragging
-                ? `translate(${drag.x - drag.size / 2}px, ${drag.y - drag.size / 2}px)`
-                : `translate(${x * 100}%, ${y * 100}%)`,
-            }}
-          />,
-        ];
-      })}
-      {hints.map((square) => {
-        const [x, y] = squareXY(square, orientation);
-        return (
-          <div
-            key={`hint-${square}`}
-            className={`hint${bySquare.has(square) ? ' capture' : ''}`}
-            aria-hidden="true"
-            data-testid="legal-hint"
-            style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
-          />
-        );
-      })}
-      {props.crowns?.map((square) => {
-        const [x, y] = squareXY(square, orientation);
-        return (
-          <div
-            key={`crown-${square}`}
-            className="crown"
-            aria-hidden="true"
-            data-testid="secret-marker"
-            style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
-          >
-            ♛
-          </div>
-        );
-      })}
-      {allArrows.length > 0 && (
-        <svg className="arrows" viewBox="0 0 8 8" data-testid="arrows" aria-hidden="true">
-          {allArrows.map(({ a, k, c, o, i }, n) => (
-            <ArrowShape
-              key={`${a.from}${a.to}${c}${n}`}
-              arrow={a}
-              orientation={orientation}
-              color={c}
-              opacity={o}
-              index={i}
-              kind={k}
-            />
-          ))}
-        </svg>
-      )}
-      {promotion && (
-        <div
-          ref={promotionRef}
-          className="promotion"
-          role="group"
-          aria-label="Promotion"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {(['q', 'r', 'b', 'n'] as const).map((type) => (
-            <button
-              key={type}
-              aria-label={PROMOTION_NAMES[type]}
-              onClick={() => {
-                props.onMove?.(promotion.from, promotion.to, type);
-                setPromotion(null);
+              style={{
+                transform: dragging
+                  ? `translate(${drag.x - drag.size / 2}px, ${drag.y - drag.size / 2}px)`
+                  : `translate(${x * 100}%, ${y * 100}%)`,
               }}
+            />,
+          ];
+        })}
+        {hints.map((square) => {
+          const [x, y] = squareXY(square, orientation);
+          return (
+            <div
+              key={`hint-${square}`}
+              className={`hint${bySquare.has(square) ? ' capture' : ''}`}
+              aria-hidden="true"
+              data-testid="legal-hint"
+              style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
+            />
+          );
+        })}
+        {props.crowns?.map((square) => {
+          const [x, y] = squareXY(square, orientation);
+          return (
+            <div
+              key={`crown-${square}`}
+              className="crown"
+              aria-hidden="true"
+              data-testid="secret-marker"
+              style={{ left: `${x * 12.5}%`, top: `${y * 12.5}%` }}
             >
-              <img src={pieceUrl(settings.pieces, movable ?? 'w', type)} alt={type} />
-            </button>
-          ))}
-          <button
-            className="cancel"
-            aria-label="Annuler la promotion"
-            onClick={() => setPromotion(null)}
+              ♛
+            </div>
+          );
+        })}
+        {allArrows.length > 0 && (
+          <svg className="arrows" viewBox="0 0 8 8" data-testid="arrows" aria-hidden="true">
+            {allArrows.map(({ a, k, c, o, i }, n) => (
+              <ArrowShape
+                key={`${a.from}${a.to}${c}${n}`}
+                arrow={a}
+                orientation={orientation}
+                color={c}
+                opacity={o}
+                index={i}
+                kind={k}
+              />
+            ))}
+          </svg>
+        )}
+        {promotion && (
+          <div
+            ref={promotionRef}
+            className="promotion"
+            role="group"
+            aria-label="Promotion"
+            onPointerDown={(e) => e.stopPropagation()}
           >
-            ✕
-          </button>
-        </div>
-      )}
-    </div>
+            {(['q', 'r', 'b', 'n'] as const).map((type) => (
+              <button
+                key={type}
+                aria-label={PROMOTION_NAMES[type]}
+                onClick={() => {
+                  props.onMove?.(promotion.from, promotion.to, type);
+                  setPromotion(null);
+                }}
+              >
+                <img src={pieceUrl(settings.pieces, movable ?? 'w', type)} alt={type} />
+              </button>
+            ))}
+            <button
+              className="cancel"
+              aria-label="Annuler la promotion"
+              onClick={() => setPromotion(null)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+      {/* Annonces des coups : hors de la grille (une grille ne contient que des rangées). */}
+      <p className="sr-only" aria-live="polite" data-testid="board-announce">
+        {said}
+      </p>
+    </>
   );
 }
