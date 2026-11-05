@@ -26,6 +26,7 @@ import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
 import { BoardLayout } from '../ui/BoardLayout';
+import { SideBadge } from '../ui/SideBadge';
 import { IconBulb, IconNext } from '../ui/icons';
 import { RatingDelta, StreakBadge } from '../ui/StreakBadge';
 
@@ -229,6 +230,7 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
   return (
     <BoardLayout
       className="puzzles"
+      toPlay={attempt && <SideBadge color={color} />}
       board={
         <Board
           pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}

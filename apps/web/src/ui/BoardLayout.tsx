@@ -15,6 +15,8 @@ export interface BoardLayoutProps {
   below?: ReactNode;
   /** Contenu du panneau latéral ; pas de panneau si absent. */
   side?: ReactNode;
+  /** Pastille du camp à jouer (`SideBadge`), en tête du panneau latéral. */
+  toPlay?: ReactNode;
   /** Éléments rendus après le panneau (barre d'actions fixe du téléphone, fenêtres). */
   after?: ReactNode;
   /** Panneau élargi (jusqu'à 560 px) pour les écrans riches en texte (leçons). */
@@ -69,6 +71,7 @@ export function BoardLayout(props: BoardLayoutProps) {
           className="panel side-panel"
           {...(props.sideTestId ? { 'data-testid': props.sideTestId } : {})}
         >
+          {props.toPlay}
           {props.side}
         </aside>
       )}

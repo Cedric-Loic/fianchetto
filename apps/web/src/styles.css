@@ -1464,6 +1464,34 @@ textarea:focus-visible {
 .side-panel > .move-list {
   flex-shrink: 1;
 }
+/* Pastille « Tu joues les Blancs / les Noirs » : disque plein, anneau contrasté sur tout thème. */
+.side-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  font-weight: 700;
+  font-size: var(--fs-16);
+}
+.side-disc {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px var(--text),
+    inset 0 -3px 5px rgb(0 0 0 / 0.18);
+}
+.side-badge.w .side-disc {
+  background: #ffffff;
+}
+.side-badge.b .side-disc {
+  background: #101010;
+}
 .turn-banner {
   font-family: var(--font-display);
   font-size: var(--fs-20);

@@ -33,6 +33,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
 import { BoardLayout } from '../ui/BoardLayout';
+import { SideBadge } from '../ui/SideBadge';
 import {
   IconBulb,
   IconChart,
@@ -532,6 +533,13 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   return (
     <BoardLayout
       className={mobile ? 'game-mobile' : ''}
+      toPlay={
+        ended ? null : isBot ? (
+          me && <SideBadge color={me} />
+        ) : (
+          <SideBadge color={board.turn} mode="turn" />
+        )
+      }
       top={bar(top)}
       bottom={bar(bottom)}
       board={
