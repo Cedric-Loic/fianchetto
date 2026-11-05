@@ -15,6 +15,7 @@ import {
 } from '@sq/shared';
 import { Secret } from '@sq/shared/secret';
 import type { PersistedAny, SessionRecord, SessionSecrets } from '../games/session.js';
+import { DrillStore } from './drills.js';
 import { PuzzleStore } from './puzzles.js';
 
 /**
@@ -119,6 +120,8 @@ export class GameStore {
   readonly #initialRating: number;
   /** Puzzles : base Lichess attachée et données de l'utilisateur. */
   readonly puzzles: PuzzleStore;
+  /** Entraînement rapide (étape 17) : menace, Woodpecker, contre la montre. */
+  readonly drills: DrillStore;
 
   /**
    * `initialRating` : Elo d'un joueur qui n'a encore joué aucune partie classée de la variante.
@@ -322,6 +325,8 @@ export class GameStore {
       this.#db,
       options.puzzlesPath ?? (path === ':memory:' ? ':memory:' : join(dirname(path), 'puzzles.db')),
     );
+    // Après `puzzles` : les requêtes de tirage lisent la base attachée `bank`.
+    this.drills = new DrillStore(this.#db);
   }
 
   /**

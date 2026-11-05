@@ -3971,3 +3971,51 @@ button.skill-row:hover {
   text-align: left;
   min-width: 0;
 }
+
+/* --- Entraînement rapide (étape 17) ------------------------------------------------------- */
+.rush-score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.rush-points {
+  font-family: var(--font-display);
+  font-size: var(--fs-40);
+  font-weight: 600;
+  line-height: 1;
+}
+.rush-strike {
+  font-size: var(--fs-20);
+  font-weight: 700;
+  margin-right: var(--space-2);
+}
+/* Vision : coordonnées masquées pendant l'exercice (sinon il suffirait de les lire). */
+.vision .sq[data-rank]::before,
+.vision .sq[data-file]::after {
+  content: none;
+}
+.vision-cover {
+  width: var(--board-size);
+  height: var(--board-size);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+}
+.vision-cover .vision-target {
+  font-size: calc(var(--board-size) / 4);
+}
+.vision-target {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+.vision-prompt {
+  font-size: var(--fs-20);
+}
+.vision-prompt .vision-target {
+  font-size: var(--fs-40);
+}

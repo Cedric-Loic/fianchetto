@@ -30,3 +30,4 @@ export * from './skills.js';
 export * from './self-review.js';
 export * from './calc.js';
 export * from './exam.js';
+export * from './drills.js';

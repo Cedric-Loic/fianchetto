@@ -48,6 +48,8 @@ const EMPTY_MESSAGE: Record<PuzzleMode, string> = {
   theme: 'Aucun puzzle disponible pour ce thème.',
   review: 'Aucune révision due aujourd’hui : reviens demain, ou résous d’autres puzzles.',
   mine: 'Pas encore de puzzles tirés de tes parties : analyse des parties (menu Analyse).',
+  rush: 'Aucun puzzle disponible.',
+  woodpecker: 'Aucun lot Woodpecker en cours.',
 };
 
 const STEP_DELAY = 450;

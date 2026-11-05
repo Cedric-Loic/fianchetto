@@ -15,7 +15,9 @@ import type {
   PuzzleMoveResponse,
   PuzzleSource,
   PuzzleStats,
+  WoodpeckerState,
 } from '@sq/shared';
+import { WOODPECKER_MAX_CYCLES } from '@sq/shared';
 import type { PositionAnalysis } from '@sq/bot';
 import { EngineUnavailableError } from '../engine-unavailable.js';
 import { legalMoves, playLine as line, playStep as play } from '../chess-utils.js';
@@ -24,6 +26,11 @@ import type { GameStore } from '../persistence/db.js';
 /** Tolérance (points de % de gain) pour accepter un autre coup que le meilleur, dans mes erreurs. */
 const OWN_TOLERANCE = 5;
 const MAX_LIVE_ATTEMPTS = 500;
+/** Contre la montre : départ sous le classement puzzle, puis difficulté croissante. */
+const RUSH_START_BELOW = 500;
+const RUSH_STEP = 50;
+/** Woodpecker : puzzles nettement sous le niveau (le but est la vitesse de reconnaissance). */
+const WOODPECKER_RANGE = { below: 500, above: -150 } as const;
 
 export interface PuzzleServiceOptions {
   /**
@@ -53,6 +60,8 @@ interface Live {
   /** Indice dans `moves` du prochain coup attendu du joueur. */
   step: number;
   rated: boolean;
+  /** Mode de tirage : `rush` et `woodpecker` ne comptent ni au classement ni aux révisions. */
+  mode: PuzzleMode;
   hinted: boolean;
   finished: boolean;
   /** Instant d'affichage (ms) : durée de la tentative. */
@@ -139,8 +148,26 @@ export class PuzzleService {
     userId: string,
     mode: PuzzleMode,
     theme: string | null,
+    /** Contre la montre : rang du puzzle dans la série (0 pour le premier). */
+    index = 0,
   ): PuzzleAttempt | 'NO_BANK' | 'NO_PUZZLE' {
     const p = this.#store.puzzles;
+    if (mode === 'woodpecker') {
+      if (p.bankSize() === 0) return 'NO_BANK';
+      const row = this.#store.drills.woodpecker(userId);
+      const id = row && row.cycle <= WOODPECKER_MAX_CYCLES ? row.puzzleIds[row.position] : null;
+      return (id ? this.#startLichess(userId, id, false, 'woodpecker') : null) ?? 'NO_PUZZLE';
+    }
+    if (mode === 'rush') {
+      if (p.bankSize() === 0) return 'NO_BANK';
+      const base = Math.max(400, this.#glicko(userId).rating - RUSH_START_BELOW);
+      const target = base + RUSH_STEP * Math.max(0, index);
+      for (const width of [75, 200, 600, 3000]) {
+        const puzzle = p.pickLichess(userId, { min: target - width, max: target + width }, null);
+        if (puzzle) return this.#startLichess(userId, puzzle.id, false, 'rush') ?? 'NO_PUZZLE';
+      }
+      return 'NO_PUZZLE';
+    }
     if (mode === 'mine') {
       this.syncOwn(userId);
       const own = p.pickOwn(userId);
@@ -151,7 +178,7 @@ export class PuzzleService {
         const attempt =
           due.source === 'mine'
             ? this.#startOwn(userId, due.puzzleId)
-            : this.#startLichess(userId, due.puzzleId, false);
+            : this.#startLichess(userId, due.puzzleId, false, 'review');
         if (attempt) return attempt;
       }
       return 'NO_PUZZLE';
@@ -196,7 +223,12 @@ export class PuzzleService {
     };
   }
 
-  #startLichess(userId: string, id: string, rated: boolean): PuzzleAttempt | null {
+  #startLichess(
+    userId: string,
+    id: string,
+    rated: boolean,
+    mode: PuzzleMode = 'rated',
+  ): PuzzleAttempt | null {
     const puzzle = this.#store.puzzles.getLichess(id);
     if (!puzzle) return null;
     const chess = new Chess(puzzle.fen);
@@ -214,6 +246,7 @@ export class PuzzleService {
         chess,
         step: 1,
         rated,
+        mode,
         hinted: false,
         finished: false,
         shownAt: this.#now(),
@@ -241,6 +274,7 @@ export class PuzzleService {
         chess,
         step: 1,
         rated: false,
+        mode: 'mine',
         hinted: false,
         finished: false,
         shownAt: this.#now(),
@@ -328,6 +362,9 @@ export class PuzzleService {
   /** Fin d'une tentative : enregistrement, classement, révisions. */
   #finish(live: Live, success: boolean): { before: number; after: number } | null {
     live.finished = true;
+    if (live.mode === 'woodpecker') this.#advanceWoodpecker(live, success);
+    // Entraînement rapide : ni classement, ni révision, ni statistiques de puzzles.
+    if (live.mode === 'rush' || live.mode === 'woodpecker') return null;
     const p = this.#store.puzzles;
     // Un indice rend la réussite non classée (l'échec, lui, compte).
     const rated = live.rated && live.rating !== null && !(success && live.hinted);
@@ -350,6 +387,80 @@ export class PuzzleService {
     if (!after) return null;
     p.setGlicko(live.userId, after);
     return { before: Math.round(before.rating), after: Math.round(after.rating) };
+  }
+
+  // --- Woodpecker -------------------------------------------------------------------------------
+
+  /** Puzzle du lot terminé : le cycle avance ; au dernier puzzle, le cycle est archivé. */
+  #advanceWoodpecker(live: Live, success: boolean): void {
+    const drills = this.#store.drills;
+    const row = drills.woodpecker(live.userId);
+    // Tentative périmée (lot recommencé entre-temps, ou puzzle déjà compté) : ignorée.
+    if (!row || row.puzzleIds[row.position] !== live.puzzleId) return;
+    row.position++;
+    row.solved += success ? 1 : 0;
+    row.ms += Math.max(0, this.#now() - live.shownAt);
+    if (row.position >= row.puzzleIds.length) {
+      row.history.push({
+        cycle: row.cycle,
+        solved: row.solved,
+        total: row.puzzleIds.length,
+        ms: Math.round(row.ms),
+      });
+      row.cycle++;
+      row.position = 0;
+      row.solved = 0;
+      row.ms = 0;
+    }
+    drills.saveWoodpecker(live.userId, row, this.#now());
+  }
+
+  woodpeckerState(userId: string): WoodpeckerState {
+    const bank = this.#store.puzzles.bankSize() > 0;
+    const row = this.#store.drills.woodpecker(userId);
+    if (!row) return { set: null, bank };
+    const last = row.history.at(-1);
+    return {
+      bank,
+      set: {
+        size: row.puzzleIds.length,
+        cycle: Math.min(row.cycle, WOODPECKER_MAX_CYCLES),
+        position: row.position,
+        solved: row.solved,
+        ms: Math.round(row.ms),
+        targetMs: last ? Math.round(last.ms / 2) : null,
+        history: row.history,
+        finished: row.cycle > WOODPECKER_MAX_CYCLES,
+      },
+    };
+  }
+
+  /** Nouveau lot (remplace l'ancien) : `size` puzzles nettement sous le classement puzzle. */
+  startWoodpecker(userId: string, size: number): WoodpeckerState | 'NO_BANK' {
+    if (this.#store.puzzles.bankSize() === 0) return 'NO_BANK';
+    const rating = this.#glicko(userId).rating;
+    const ids = new Set<string>();
+    for (const widen of [0, 300, 3000]) {
+      const range = {
+        min: rating - WOODPECKER_RANGE.below - widen,
+        max: rating - WOODPECKER_RANGE.above + widen,
+      };
+      for (const p of this.#store.drills.pickMany(range, size)) {
+        if (ids.size < size) ids.add(p.id);
+      }
+      if (ids.size >= size) break;
+    }
+    this.#store.drills.saveWoodpecker(
+      userId,
+      { puzzleIds: [...ids], cycle: 1, position: 0, solved: 0, ms: 0, history: [] },
+      this.#now(),
+    );
+    return this.woodpeckerState(userId);
+  }
+
+  resetWoodpecker(userId: string): WoodpeckerState {
+    this.#store.drills.deleteWoodpecker(userId);
+    return this.woodpeckerState(userId);
   }
 
   /** Classement et puzzles disponibles, sans thème du jour (entrée du tableau de bord). */

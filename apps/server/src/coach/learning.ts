@@ -276,6 +276,10 @@ export class LearningService {
     for (const a of this.#store.calcAttempts(userId)) {
       evidence.push({ skill: 'calculation', success: a.lineOk, at: a.at });
     }
+    // Étape 17 : « Trouve la menace ».
+    for (const a of this.#store.drills.threatAttempts(userId)) {
+      evidence.push({ skill: 'threats', success: a.correct, at: a.at });
+    }
     for (const p of this.#store.coachPrompts(userId)) {
       const skill: SkillId = p.kind === 'threat' ? 'threats' : 'piece-safety';
       evidence.push({ skill, success: p.correct, at: p.at });

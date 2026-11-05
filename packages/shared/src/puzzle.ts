@@ -17,9 +17,11 @@ export type PuzzleSource = z.infer<typeof PuzzleSourceSchema>;
  * - `rated` : au niveau (classement puzzle), légèrement au-dessus ;
  * - `theme` : même chose, filtré par thème ;
  * - `review` : révisions (puzzles ratés, répétition espacée) ;
- * - `mine` : positions de mes erreurs.
+ * - `mine` : positions de mes erreurs ;
+ * - `rush` : contre la montre, difficulté croissante selon `index` (étape 17, non classé) ;
+ * - `woodpecker` : puzzle suivant du lot Woodpecker en cours (étape 17, non classé).
  */
-export const PuzzleModeSchema = z.enum(['rated', 'theme', 'review', 'mine']);
+export const PuzzleModeSchema = z.enum(['rated', 'theme', 'review', 'mine', 'rush', 'woodpecker']);
 export type PuzzleMode = z.infer<typeof PuzzleModeSchema>;
 
 /** Un demi-coup joué dans un puzzle, avec la position qui en résulte. */

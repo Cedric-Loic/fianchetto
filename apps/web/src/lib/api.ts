@@ -1,6 +1,11 @@
 import type {
   BotLevelInfo,
   CalcAnswerResponse,
+  RushRecords,
+  RushResultRequest,
+  ThreatAnswerResponse,
+  ThreatNextResponse,
+  WoodpeckerState,
   CalcNextResponse,
   CalcStepResponse,
   CardsResponse,
@@ -215,6 +220,16 @@ export const api = {
     request<SelfReviewResponse>('POST', `/api/reviews/${id}/self`, body),
   thinkingProfile: () => call<ThinkingProfile>('GET', '/api/coach/thinking'),
   // Entraîneur de calcul : la solution n'arrive qu'avec la réponse.
+  // Entraînement rapide (étape 17).
+  threatNext: () => request<ThreatNextResponse>('GET', '/api/threats/next'),
+  threatAnswer: (id: string, uci: string) =>
+    request<ThreatAnswerResponse>('POST', `/api/threats/${id}/answer`, { uci }),
+  woodpecker: () => call<WoodpeckerState>('GET', '/api/woodpecker'),
+  woodpeckerStart: (size: number) =>
+    call<WoodpeckerState>('POST', '/api/woodpecker/start', { size }),
+  woodpeckerReset: () => call<WoodpeckerState>('POST', '/api/woodpecker/reset'),
+  rushRecords: () => call<RushRecords>('GET', '/api/rush'),
+  rushResult: (run: RushResultRequest) => call<RushRecords>('POST', '/api/rush/result', run),
   calcNext: (depth: number) => request<CalcNextResponse>('GET', `/api/calc/next?depth=${depth}`),
   calcStep: (id: string, line: string[], uci: string) =>
     request<CalcStepResponse>('POST', `/api/calc/${id}/step`, { line, uci }),
@@ -252,8 +267,12 @@ export const api = {
     call<ExamResultResponse>('POST', `/api/exams/${stage}/result`, { kind, correct }),
   // Puzzles.
   puzzleStats: () => call<PuzzleStats>('GET', '/api/puzzles/stats'),
-  puzzleNext: (mode: PuzzleMode, theme: string | null) =>
-    request<PuzzleNextResponse>('POST', '/api/puzzles/next', { mode, theme }),
+  puzzleNext: (mode: PuzzleMode, theme: string | null, index?: number) =>
+    request<PuzzleNextResponse>('POST', '/api/puzzles/next', {
+      mode,
+      theme,
+      ...(index === undefined ? {} : { index }),
+    }),
   puzzleMove: (attemptId: string, uci: string) =>
     call<PuzzleMoveResponse>('POST', `/api/puzzles/${attemptId}/move`, { uci }),
   puzzleHint: (attemptId: string) =>

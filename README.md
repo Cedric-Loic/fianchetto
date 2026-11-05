@@ -56,7 +56,7 @@ L'application s'organise en six rubriques.
 | **Aujourd'hui** | La **séance du jour** (≈ 28 min) : révisions dues, étape du parcours, puzzles sur ta compétence la plus faible, bilan.                                                                                                                                      |
 | **Jouer**       | Classique ou Secret Queen, contre un **bot à 5 niveaux** (600 à 1800 Elo, partie classée) ou **à deux sur le même écran**. Cadences 1+0, 3+2, 5+0, 10+0 ou sans pendule. **Entraînement avec le coach** et **parties lentes** (15+10, 30 min) en classique. |
 | **Apprendre**   | Un **parcours en trois paliers** (1000-1200, 1200-1400, 1400-1600) : **30 leçons**, **20 chapitres de finales**, **10 parties classiques commentées**, un répertoire d'ouvertures et un **examen par palier**.                                              |
-| **S'entraîner** | **Puzzles** Lichess (au niveau, par thème, révisions, tirés de tes erreurs ; classement Glicko-2), **calcul**, **révisions espacées**, finales et ouvertures.                                                                                               |
+| **S'entraîner** | **Puzzles** Lichess (au niveau, par thème, révisions, tirés de tes erreurs ; classement Glicko-2), **trouve la menace**, **contre la montre**, **cycles Woodpecker**, **vision de l'échiquier**, **calcul**, **révisions espacées**, finales et ouvertures. |
 | **Mes parties** | **Revue Stockfish** de chaque coup (classe, explication, précision), revue guidée, « Apprends de tes erreurs », revue réflexive, import **PGN** ou **chess.com**, échiquier d'analyse.                                                                      |
 | **Progrès**     | **14 compétences** (niveau, tendance), profil de pensée, courbes (Elo chess.com, classement puzzle, précision), classement des joueurs.                                                                                                                     |
 
@@ -159,6 +159,18 @@ Premoves, coups possibles et garde-fou du coach se désactivent dans ⚙ Réglag
   conseillé mais jamais bloquant.
 - **Révisions** : exercices ratés, finales échouées et erreurs de tes parties reviennent à 1, 3,
   7, 21 puis 60 jours.
+
+### S'entraîner vite
+
+| Exercice                  | Principe                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Trouve la menace**      | tu viens de jouer : désigne le coup adverse qui te ferait mal (Heisman, _Looking for Trouble_)                  |
+| **Contre la montre**      | 3 ou 5 minutes, puzzles de plus en plus durs, 3 erreurs au plus ; records par durée                             |
+| **Woodpecker**            | un lot fixe de 25 à 200 puzzles refait en 7 cycles, objectif : moitié du temps à chaque cycle (Smith, Tikkanen) |
+| **Vision de l'échiquier** | coordonnées (repères masqués), couleur des cases sans échiquier, sauts du cavalier                              |
+
+Ces exercices ne comptent pas pour le classement puzzle ; « Trouve la menace » nourrit la compétence
+« menaces ».
 
 ### Puzzles
 

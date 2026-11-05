@@ -3,6 +3,10 @@ import { connect, disconnect } from './lib/net';
 import { useSession } from './lib/session';
 import { useGame } from './lib/store';
 import { Calc } from './screens/Calc';
+import { Rush } from './screens/Rush';
+import { Threats } from './screens/Threats';
+import { Vision } from './screens/Vision';
+import { Woodpecker } from './screens/Woodpecker';
 import { Exam } from './screens/Exam';
 import { Endgames } from './screens/Endgames';
 import { GameScreen } from './screens/GameScreen';
@@ -41,6 +45,10 @@ type Route =
   | { page: 'learn'; module: string | null }
   | { page: 'train' }
   | { page: 'calc' }
+  | { page: 'threats' }
+  | { page: 'woodpecker' }
+  | { page: 'rush' }
+  | { page: 'vision' }
   | { page: 'progress' }
   | { page: 'lessons' }
   | { page: 'endgames' }
@@ -78,6 +86,10 @@ function parseHash(h: string): Route {
   if (h === '#/today') return { page: 'today' };
   if (h === '#/train') return { page: 'train' };
   if (h === '#/calc') return { page: 'calc' };
+  if (h === '#/threats') return { page: 'threats' };
+  if (h === '#/woodpecker') return { page: 'woodpecker' };
+  if (h === '#/rush') return { page: 'rush' };
+  if (h === '#/vision') return { page: 'vision' };
   if (h === '#/progress') return { page: 'progress' };
   // Parcours, éventuellement sur un module : #/learn?module=<id>.
   m = /^#\/learn(?:\?module=([\w-]+))?$/.exec(h);
@@ -122,6 +134,10 @@ function sectionOf(route: Route): NavSection {
       return 'learn';
     case 'train':
     case 'calc':
+    case 'threats':
+    case 'woodpecker':
+    case 'rush':
+    case 'vision':
     case 'puzzles':
     case 'reviews':
       return 'train';
@@ -194,6 +210,14 @@ function titleOf(route: Route): string {
       return "S'entraîner";
     case 'calc':
       return 'Calcul';
+    case 'threats':
+      return 'Trouve la menace';
+    case 'woodpecker':
+      return 'Woodpecker';
+    case 'rush':
+      return 'Contre la montre';
+    case 'vision':
+      return 'Vision de l’échiquier';
     case 'progress':
       return 'Progrès';
     case 'lessons':
@@ -270,6 +294,10 @@ export function App() {
   else if (route.page === 'learn') content = <Learn module={route.module} />;
   else if (route.page === 'train') content = <Train />;
   else if (route.page === 'calc') content = <Calc />;
+  else if (route.page === 'threats') content = <Threats />;
+  else if (route.page === 'woodpecker') content = <Woodpecker />;
+  else if (route.page === 'rush') content = <Rush />;
+  else if (route.page === 'vision') content = <Vision />;
   else if (route.page === 'reviews') content = <Reviews />;
   else if (route.page === 'lessons') content = <Lessons />;
   else if (route.page === 'endgames') content = <Endgames />;

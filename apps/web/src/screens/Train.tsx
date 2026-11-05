@@ -1,6 +1,14 @@
 import type { ReactNode } from 'react';
 import { Button } from '../ui/Button';
-import { IconBook, IconFlag, IconPuzzle, IconRetry, IconTarget } from '../ui/icons';
+import {
+  IconBook,
+  IconFlag,
+  IconHourglass,
+  IconPuzzle,
+  IconRetry,
+  IconTarget,
+  IconWarning,
+} from '../ui/icons';
 
 const CARDS: {
   id: string;
@@ -17,6 +25,38 @@ const CARDS: {
     href: '#/puzzles',
     action: 'Résoudre',
     icon: <IconPuzzle />,
+  },
+  {
+    id: 'threats',
+    title: 'Trouve la menace',
+    text: 'Tu viens de jouer : quel coup adverse te ferait mal ? Le réflexe qui évite les gaffes.',
+    href: '#/threats',
+    action: 'Chercher la menace',
+    icon: <IconWarning />,
+  },
+  {
+    id: 'rush',
+    title: 'Contre la montre',
+    text: '3 ou 5 minutes, puzzles de plus en plus durs, 3 erreurs au plus : vois les motifs vite.',
+    href: '#/rush',
+    action: 'Lancer le chrono',
+    icon: <IconHourglass />,
+  },
+  {
+    id: 'woodpecker',
+    title: 'Woodpecker',
+    text: 'Le même lot de puzzles, refait en cycles de plus en plus rapides, jusqu’au réflexe.',
+    href: '#/woodpecker',
+    action: 'Mes cycles',
+    icon: <IconRetry />,
+  },
+  {
+    id: 'vision',
+    title: 'Vision de l’échiquier',
+    text: 'Coordonnées, couleur des cases, sauts du cavalier : lis l’échiquier sans effort.',
+    href: '#/vision',
+    action: 'S’exercer',
+    icon: <IconTarget />,
   },
   {
     id: 'calc',
