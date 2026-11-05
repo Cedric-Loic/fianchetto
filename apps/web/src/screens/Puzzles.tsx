@@ -26,6 +26,7 @@ import { LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
 import { BoardLayout } from '../ui/BoardLayout';
+import { useBoardHistory, useNavKeys } from '../lib/navKeys';
 import { SideBadge } from '../ui/SideBadge';
 import { IconBulb, IconNext } from '../ui/icons';
 import { RatingDelta, StreakBadge } from '../ui/StreakBadge';
@@ -196,6 +197,10 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
   // Quand la position redevient jouable, le premier premove part comme un coup normal (jugé par
   // le serveur : un mauvais coup fait rater le puzzle, un coup illégal vide la file).
   const playable = phase === 'playing' && !busy && attempt !== null;
+  // ← → ↑ ↓ : revoir les positions du puzzle (le plateau n'est jouable qu'au présent).
+  const history = useBoardHistory({ pieces, lastMove }, attempt?.attemptId ?? '');
+  useNavKeys(history.nav);
+  const live = history.isLive;
   const nextPremove = playable ? queue.next : undefined;
   const playPremove = useEffectEvent((move: LocalMove) => {
     queue.shift();
@@ -233,17 +238,21 @@ export function Puzzles(props: { initialMode?: PuzzleMode; initialTheme?: string
       toPlay={attempt && <SideBadge color={color} />}
       board={
         <Board
-          pieces={applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])}
+          pieces={
+            live
+              ? applyLocalMoves(pieces, [...(pending ? [pending] : []), ...queue.premoves])
+              : history.frame.pieces
+          }
           orientation={color}
-          movable={playable ? color : null}
-          premoveColor={premoveOn && phase === 'playing' && busy ? color : null}
-          premoves={queue.premoves}
+          movable={playable && live ? color : null}
+          premoveColor={premoveOn && phase === 'playing' && busy && live ? color : null}
+          premoves={live ? queue.premoves : []}
           onPremove={queue.add}
           onCancelPremove={queue.clear}
-          legalMoves={showLegalMoves && phase === 'playing' ? legal : null}
-          lastMove={lastMove}
-          highlighted={hint}
-          flash={flash}
+          legalMoves={showLegalMoves && phase === 'playing' && live ? legal : null}
+          lastMove={history.frame.lastMove}
+          highlighted={live ? hint : null}
+          flash={live ? flash : null}
           onMove={(from, to, promotion) =>
             void onMove(promotion ? { from, to, promotion } : { from, to })
           }

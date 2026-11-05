@@ -33,6 +33,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
 import { BoardLayout } from '../ui/BoardLayout';
+import { useNavKeys } from '../lib/navKeys';
 import { SideBadge } from '../ui/SideBadge';
 import {
   IconBulb,
@@ -142,6 +143,20 @@ export function GameScreen({ state, onLeave }: { state: ViewerGameState; onLeave
   const plyCount = board?.moves.length ?? 0;
   const cursor = nav !== null && nav.base === plyCount ? nav.ply : null;
   const setCursor = (ply: number | null) => setNav(ply === null ? null : { ply, base: plyCount });
+  // ← → coup précédent, suivant ; ↑ dernier coup (retour au direct) ; ↓ position de départ.
+  useNavKeys(
+    board
+      ? {
+          prev: () => setCursor(Math.max(0, (cursor ?? plyCount) - 1)),
+          next: () => {
+            const next = (cursor ?? plyCount) + 1;
+            setCursor(next >= plyCount ? null : next);
+          },
+          start: () => setCursor(0),
+          end: () => setCursor(null),
+        }
+      : null,
+  );
 
   const pending =
     pendingState && pendingState.base === plyCount && pendingState.rej === rejections

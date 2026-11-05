@@ -218,7 +218,7 @@ export class AnalysisTree {
   }
 
   /**
-   * Variante voisine (↑ / ↓) : frère précédent ou suivant du nœud ; à défaut, celui du premier
+   * Variante voisine : frère précédent ou suivant du nœud ; à défaut, celui du premier
    * ancêtre qui a des frères. `null` s'il n'y a aucune variante.
    */
   sibling(id: string, direction: 1 | -1): string | null {

@@ -122,7 +122,15 @@ test('revue : variante jouée sur l’échiquier, retour à la partie, moteur', 
   await expect(page.getByTestId('move-card')).not.toContainText('Variante');
   await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('move-card')).toContainText('Nxe5');
+  // ↓ début de partie, ↑ fin de partie.
   await page.keyboard.press('ArrowDown');
+  await expect(page.locator('img[data-square="e2"]')).toHaveAttribute('alt', 'wp');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('img[data-square="e2"]')).toHaveCount(0);
+  // Retour dans la variante 3. Bc4 (déjà créée : pas de doublon).
+  await moves.locator('button.move', { hasText: 'Nc6' }).first().click();
+  await clickSquare(page, 'f1');
+  await clickSquare(page, 'c4');
   await expect(page.getByTestId('move-card')).toContainText('Variante');
 
   // Moteur (flux simulé) : trois lignes, survol = flèche, clic = la ligne est jouée.

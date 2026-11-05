@@ -8,6 +8,7 @@ import { piecesFromFen } from '../lib/fen';
 import { MOBILE_QUERY, useMediaQuery } from '../lib/media';
 import { useSession } from '../lib/session';
 import { BoardLayout } from '../ui/BoardLayout';
+import { useNavKeys } from '../lib/navKeys';
 import { Button } from '../ui/Button';
 import { EmptyState, LoginRequired } from '../ui/EmptyState';
 import { Loading } from '../ui/Spinner';
@@ -301,19 +302,23 @@ function LessonReader({ lesson, children }: { lesson: LessonView; children: Reac
     return () => clearTimeout(t);
   }, [auto, walk, active, n, max]);
 
-  // Touches ←/→ sur toute la page (sauf quand le plateau a le focus : elles y déplacent le curseur).
-  useEffect(() => {
-    if (!walk || active === null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof Element && e.target.closest('[role="grid"], input, textarea')) return;
-      const at = (d: number) =>
-        setSteps((m) => ({ ...m, [active]: Math.max(0, Math.min(max, (m[active] ?? 0) + d)) }));
-      if (e.key === 'ArrowLeft') at(-1);
-      else if (e.key === 'ArrowRight') at(1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [walk, active, max]);
+  // ← → coup précédent, suivant ; ↑ fin, ↓ début (sauf quand le plateau a le focus clavier : les
+  // flèches y déplacent le curseur de case).
+  const at = (to: (n: number) => number) => {
+    if (active === null) return;
+    setAuto(false);
+    setSteps((m) => ({ ...m, [active]: Math.max(0, Math.min(max, to(m[active] ?? 0))) }));
+  };
+  useNavKeys(
+    walk && active !== null
+      ? {
+          prev: () => at((n) => n - 1),
+          next: () => at((n) => n + 1),
+          start: () => at(() => 0),
+          end: () => at(() => max),
+        }
+      : null,
+  );
 
   const show = (i: number) => {
     setActive(i);

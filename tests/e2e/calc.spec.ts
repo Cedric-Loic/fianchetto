@@ -144,9 +144,11 @@ test('calcul : mauvaise ligne et mauvaise réponse remettent la série à zéro'
   await mockCalc(page, [problem('c1')], () => true);
   await page.goto('/#/calc');
   await page.getByTestId('calc-depth-2').click();
-  for (const uci of ['h2h3', 'a7a6', 'h3h4']) {
+  for (const [i, uci] of ['h2h3', 'a7a6', 'h3h4'].entries()) {
     await page.getByTestId('calc-input').fill(uci);
     await page.getByTestId('calc-input').press('Enter');
+    // Coup inscrit (et champ vidé) avant de saisir le suivant.
+    await expect(page.getByTestId('calc-line-move')).toHaveCount(i + 1);
   }
   await page.getByTestId('calc-option-0').click();
   await page.getByTestId('calc-validate').click();

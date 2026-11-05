@@ -9,6 +9,7 @@ import { piecesFromFen } from '../lib/fen';
 import { playSound } from '../lib/sound';
 import { useSan } from '../lib/notation';
 import { BoardLayout } from '../ui/BoardLayout';
+import { useBoardHistory, useNavKeys } from '../lib/navKeys';
 import { SideBadge } from '../ui/SideBadge';
 import { Button } from '../ui/Button';
 import { IconBulb, IconNext, IconRetry } from '../ui/icons';
@@ -194,6 +195,11 @@ export function LearnMistakes(props: {
     });
   };
 
+  // ← → ↑ ↓ : revoir les positions de l'exercice (jouable seulement au présent).
+  const history = useBoardHistory({ pieces, lastMove }, String(index));
+  useNavKeys(history.nav);
+  const live = history.isLive;
+
   const total = moves.length;
   const finished = index >= total;
   const found = outcomes.filter((o) => o === 'first').length;
@@ -286,11 +292,11 @@ export function LearnMistakes(props: {
       toPlay={<SideBadge color={move.color} />}
       board={
         <Board
-          pieces={pieces}
+          pieces={history.frame.pieces}
           orientation={props.orientation}
-          movable={phase === 'play' ? move.color : null}
+          movable={live && phase === 'play' ? move.color : null}
           onMove={onMove}
-          lastMove={lastMove}
+          lastMove={history.frame.lastMove}
           checkSquare={checkSquare}
           arrows={arrows}
           squareMarks={marks}
