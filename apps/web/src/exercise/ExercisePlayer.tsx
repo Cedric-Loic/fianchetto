@@ -166,6 +166,7 @@ function SquaresExercise(props: ExercisePlayerProps) {
     <BoardLayout
       className="exercise"
       testId="exercises"
+      toPlay={<SideBadge color={spec.color} />}
       board={
         <Board
           pieces={piecesFromFen(spec.fen)}
@@ -245,6 +246,7 @@ function ChoiceExercise(props: ExercisePlayerProps) {
     <BoardLayout
       className="exercise"
       testId="exercises"
+      toPlay={<SideBadge color={spec.color} />}
       board={<Board pieces={piecesFromFen(spec.fen)} orientation={spec.color} movable={null} />}
       side={
         <>
